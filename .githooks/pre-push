@@ -2,5 +2,5 @@
 
 echo "Push diblokir: repo dashboard ini masih dalam mode containment."
 echo "Verifikasi dulu remote resmi dan boundary repo sebelum menghapus atau memperbarui guardrail ini."
-echo "Rujuk: D:/Devops/the-abyss-factory/RELOCATION-NOTES.md"
+echo "Rujuk: RELOCATION-NOTES.md pada root factory workspace aktif."
 exit 1
