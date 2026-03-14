@@ -56,35 +56,35 @@ The system is designed to reduce administrative overhead on clinicians, improve 
 
 ## Key Features
 
-### 👤 User Profile Dashboard
+### User Profile Dashboard
 
 Home view displaying logged-in crew member information, quick-links to government health portals (Satu Sehat, SIPARWA, ePuskesmas, P-Care BPJS), and a clinical patient data overview with vitals, ICD-X coding, and treatment history.
 
-### 🤖 EMR Auto-Fill Engine
+### EMR Auto-Fill Engine
 
 Playwright-driven RPA engine that transfers structured clinical data (anamnesis, diagnosis, prescriptions) into the ePuskesmas electronic medical record system. Communicates transfer progress to the frontend in real-time over Socket.IO, eliminating double-entry burden on clinical staff.
 
-### 🔍 ICD-X Finder
+### ICD-X Finder
 
 Multi-version ICD-10 lookup tool supporting the **2010**, **2016**, and **2019** catalogs with dynamic search, fuzzy matching, and legacy code translation. Enables fast and accurate diagnosis coding at the point of care.
 
-### 📊 LB1 Report Automation
+###LB1 Report Automation
 
 End-to-end pipeline that ingests exported visit data from ePuskesmas, normalizes and validates records, maps ICD-10 codes to the national LB1 template, and outputs the completed Excel report — along with a QC CSV of rejected records and a JSON summary file for audit trails.
 
-### 🎙️ Audrey — Clinical Consultation AI
+### Audrey — Clinical Consultation AI
 
 Voice-first clinical assistant powered by **Google Gemini Live** (native audio). Operates as a real-time conversational copilot for doctors during patient encounters, providing concise diagnostic insights calibrated for Puskesmas-level resources and constraints.
 
-### 💬 ACARS — Internal Chat
+### ACARS — Internal Chat
 
 Socket.IO-backed team messaging system with room-based conversations, typing indicators, and online presence tracking. Enables seamless communication between clinical and administrative staff within the facility.
 
-### 🧠 CDSS — Clinical Decision Support
+### CDSS — Clinical Decision Support
 
 API-driven diagnostic suggestion engine combining a local disease knowledge base (**159 diseases**, **45,030 real encounter records**) with Gemini-powered reasoning to provide ranked differential diagnoses, treatment plans, and referral criteria.
 
-### 🔐 Crew Access Portal
+### Crew Access Portal
 
 Authentication gate requiring crew credentials before any dashboard access. Session management uses **HMAC-signed cookies** with a 12-hour TTL. Credentials are sourced from environment variables, a runtime JSON file, or compiled defaults — in that priority order.
 
