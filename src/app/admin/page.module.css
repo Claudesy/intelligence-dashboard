@@ -1,0 +1,397 @@
+.page {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+}
+
+.pageState {
+  padding: 80px 48px;
+  color: var(--text-muted);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+}
+
+.errorState {
+  color: var(--c-critical);
+  font-size: 14px;
+  letter-spacing: normal;
+}
+
+.tabLoader {
+  padding: 40px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  padding: 10px 0 8px;
+  align-items: start;
+}
+
+.hero {
+  display: grid;
+  gap: 10px;
+}
+
+.heroEyebrow {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--c-asesmen);
+  text-transform: uppercase;
+}
+
+.heroCopy {
+  display: grid;
+  gap: 8px;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.04;
+}
+
+.heroDescription {
+  margin: 0;
+  max-width: 720px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #c8bdaf;
+}
+
+.sessionCard,
+.downloadCard,
+.quickPublishCard {
+  border-radius: 6px;
+  border: 1px solid var(--line-base);
+  background: rgba(255, 255, 255, 0.008);
+}
+
+.sessionCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.sessionHeader,
+.quickPublishHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sessionLabel {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.secureBadge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 126, 34, 0.22);
+  background: rgba(230, 126, 34, 0.05);
+  color: var(--c-asesmen);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sessionIdentity {
+  display: grid;
+  gap: 6px;
+}
+
+.sessionName {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.sessionRoleText {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.sessionPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessionPill {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-base);
+  color: var(--text-main);
+  font-size: 11px;
+}
+
+.sessionPillMuted {
+  color: var(--text-muted);
+}
+
+.messageBanner {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.messageBannerSuccess {
+  border: 1px solid rgba(230, 126, 34, 0.22);
+  background: rgba(230, 126, 34, 0.07);
+  color: var(--c-asesmen);
+}
+
+.messageBannerError {
+  border: 1px solid rgba(220, 53, 69, 0.24);
+  background: rgba(220, 53, 69, 0.08);
+  color: #dc3545;
+}
+
+.downloadCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.downloadEyebrow,
+.quickPublishEyebrow {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--c-asesmen);
+  text-transform: uppercase;
+}
+
+.downloadTitle {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.downloadDescription {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.downloadLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border: 1px solid var(--c-asesmen);
+  border-radius: 6px;
+  background: rgba(230, 126, 34, 0.06);
+  color: var(--c-asesmen);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.downloadLink:hover {
+  background: rgba(230, 126, 34, 0.12);
+}
+
+.quickPublishGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 4px 0 2px;
+}
+
+.quickPublishCard {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.quickPublishTitle {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.quickGhostButton,
+.quickPublishToggleButton {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-base);
+  background: rgba(255, 255, 255, 0.01);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.quickPublishToggleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quickChevron {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.quickChevronOpen {
+  transform: rotate(180deg);
+}
+
+.quickPublishForm {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-base);
+}
+
+.quickField {
+  display: grid;
+  gap: 6px;
+}
+
+.quickLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.quickInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid var(--line-base);
+  border-radius: 6px;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.quickTextarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.quickActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.quickSelectField {
+  min-width: 150px;
+}
+
+.quickSelect {
+  width: auto;
+  min-width: 150px;
+}
+
+.quickSubmitButton {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 999px;
+  background: #e67e22;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quickSubmitButtonDisabled {
+  background: rgba(230, 126, 34, 0.3);
+  cursor: not-allowed;
+}
+
+.groupTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--line-base);
+}
+
+.groupTab {
+  padding: 11px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: all 0.15s ease;
+}
+
+.groupTabActive {
+  border-bottom-color: rgba(230, 126, 34, 0.85);
+  color: var(--text-main);
+  opacity: 1;
+}
+
+.sectionTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.sectionTab {
+  padding: 8px 14px;
+  border: 1px solid var(--line-base);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.012);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sectionTabActive {
+  border-color: rgba(230, 126, 34, 0.24);
+  background: rgba(230, 126, 34, 0.06);
+  color: #f0e8dc;
+}
+
+.sectionContent {
+  padding-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .downloadCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

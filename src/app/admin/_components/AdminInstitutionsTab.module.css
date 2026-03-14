@@ -1,0 +1,201 @@
+.statusMessage {
+  padding: 40px 0;
+}
+
+.loadingMessage {
+  color: var(--text-muted);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+}
+
+.errorMessage {
+  color: var(--c-critical);
+  font-size: 14px;
+}
+
+.summaryRow {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.summaryCard {
+  border: 1px solid var(--line-base);
+  border-radius: 10px;
+  padding: 14px 20px;
+  background: var(--bg-nav);
+}
+
+.summaryLabel {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+}
+
+.summaryValue {
+  margin: 4px 0 0;
+  color: var(--text-main);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.summaryValueAccent {
+  color: var(--c-asesmen);
+}
+
+.formPanel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line-base);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--bg-nav);
+}
+
+.input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--line-base);
+  border-radius: 6px;
+  outline: none;
+  background: var(--bg-canvas);
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.editInput {
+  width: 100%;
+  flex: none;
+  padding: 6px 10px;
+  border-color: rgba(230, 126, 34, 0.3);
+  border-radius: 5px;
+}
+
+.primaryButton {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  background: var(--c-asesmen);
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  background: rgba(230, 126, 34, 0.3);
+}
+
+.formMessage {
+  font-size: 11px;
+}
+
+.formMessageSuccess {
+  color: #4caf50;
+}
+
+.formMessageError {
+  color: var(--c-critical);
+}
+
+.tablePanel {
+  overflow: hidden;
+  border: 1px solid var(--line-base);
+  border-radius: 10px;
+  background: var(--bg-nav);
+}
+
+.emptyState {
+  padding: 32px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  text-align: center;
+  font-size: 12px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableHeaderRow {
+  border-bottom: 1px solid var(--line-base);
+}
+
+.tableHeaderCell {
+  padding: 10px 14px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-align: left;
+}
+
+.tableRow {
+  border-bottom: 1px solid var(--line-base);
+}
+
+.tableCell {
+  padding: 10px 14px;
+}
+
+.institutionName {
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.crewCount {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crewCountActive {
+  color: var(--text-main);
+}
+
+.crewCountMuted {
+  color: var(--text-muted);
+}
+
+.crewSuffix {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 6px;
+}
+
+.tableButton {
+  padding: 4px 10px;
+  border: 1px solid var(--line-base);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.tableButtonMuted {
+  color: var(--text-muted);
+}
+
+.tableButtonDanger {
+  color: var(--c-critical);
+}
+
+.tableButtonDisabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  color: var(--text-muted);
+}

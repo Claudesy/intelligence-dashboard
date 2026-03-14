@@ -1,0 +1,94 @@
+.statusMessage {
+  padding: 40px;
+}
+
+.loadingMessage {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.errorMessage {
+  color: var(--c-critical);
+  font-size: 13px;
+}
+
+.analyticsRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.card {
+  border: 1px solid var(--line-base);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--bg-nav);
+}
+
+.sectionTitle {
+  margin-bottom: 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lineChartPanel {
+  height: 280px;
+}
+
+.sectionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.emrCard {
+  flex: 1;
+  min-width: 260px;
+}
+
+.doughnutPanel {
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+.peakHoursCard {
+  flex: 2;
+  min-width: 320px;
+}
+
+.barChartPanel {
+  height: 480px;
+}
+
+.kpiRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.kpiCard {
+  flex: 1;
+  min-width: 140px;
+  text-align: center;
+}
+
+.kpiValue {
+  margin-bottom: 4px;
+  color: var(--nav-accent);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.kpiValueHealthy {
+  color: var(--text-main);
+}
+
+.kpiLabel {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}

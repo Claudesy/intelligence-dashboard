@@ -1,0 +1,15 @@
+# Architected and built by Claudesy.
+[build]
+builder = "nixpacks"
+buildCommand = "npm run build"
+
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[environments.production]
+NODE_ENV = "production"

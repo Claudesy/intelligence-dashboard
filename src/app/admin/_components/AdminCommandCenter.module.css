@@ -1,0 +1,472 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.statusMessage {
+  padding: 40px 0;
+}
+
+.loadingMessage {
+  color: var(--text-muted);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+}
+
+.errorMessage {
+  color: var(--c-critical);
+  font-size: 14px;
+}
+
+.surfaceCard,
+.chartCard,
+.kpiCard {
+  border: 1px solid var(--line-base);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.014);
+}
+
+.surfaceCard {
+  padding: 16px 18px;
+}
+
+.topGrid,
+.chartGrid,
+.usersAlertsGrid,
+.kpiGrid,
+.moduleGrid {
+  display: grid;
+}
+
+.topGrid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.timeCard,
+.moduleColumn,
+.queueCard {
+  display: grid;
+  gap: 8px;
+}
+
+.timeCard {
+  padding-right: 12px;
+}
+
+.sectionEyebrow {
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sectionEyebrowAccent {
+  color: var(--c-asesmen);
+}
+
+.timeValue {
+  color: var(--text-main);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.timeSubValue {
+  color: #c8bdaf;
+  font-size: 13px;
+}
+
+.uptimeWrap {
+  padding-top: 2px;
+}
+
+.uptimeCard {
+  display: grid;
+  gap: 3px;
+  max-width: 180px;
+  padding: 10px 12px;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  background: rgba(76, 175, 80, 0.05);
+}
+
+.uptimeLabel {
+  color: #7ee2a2;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.uptimeValue {
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.moduleColumn,
+.queueCard {
+  gap: 10px;
+}
+
+.moduleGrid {
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 8px;
+}
+
+.moduleItem {
+  display: grid;
+  gap: 6px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.moduleDot,
+.userDot {
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.moduleDot {
+  width: 9px;
+  height: 9px;
+}
+
+.userDot {
+  width: 8px;
+  height: 8px;
+}
+
+.statusOk {
+  background: #4caf50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.33);
+}
+
+.statusWarning {
+  background: #f1c40f;
+  box-shadow: 0 0 10px rgba(241, 196, 15, 0.33);
+}
+
+.statusError {
+  background: #e74c3c;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.33);
+}
+
+.statusUnknown {
+  background: #666;
+  box-shadow: 0 0 10px rgba(102, 102, 102, 0.33);
+}
+
+.moduleLabel {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.moduleStatus {
+  color: var(--text-main);
+  font-size: 12px;
+}
+
+.queueStats {
+  display: grid;
+  gap: 8px;
+}
+
+.queueValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.queueNumber,
+.queueNumberSmall {
+  line-height: 1;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.queueNumber {
+  font-size: 24px;
+}
+
+.queueNumberSmall {
+  font-size: 20px;
+}
+
+.queueNumberOnline {
+  color: #7ee2a2;
+}
+
+.queueCaption {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.kpiGrid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.kpiCard {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 16px 14px;
+}
+
+.kpiCardAccent {
+  border-color: rgba(230, 126, 34, 0.24);
+  background: rgba(230, 126, 34, 0.05);
+}
+
+.kpiTopLine {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.kpiTopLineAccent {
+  background: rgba(255, 212, 168, 0.22);
+}
+
+.kpiBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid rgba(230, 126, 34, 0.3);
+  border-radius: 999px;
+  background: rgba(230, 126, 34, 0.08);
+  color: #ffd29c;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.kpiLabel {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+}
+
+.kpiValue {
+  margin: 8px 0 6px;
+  color: var(--text-main);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.kpiValueAccent {
+  color: var(--c-asesmen);
+}
+
+.kpiSub {
+  margin: 0;
+  color: #b7aa9c;
+  opacity: 0.9;
+  font-size: 13px;
+}
+
+.chartGrid,
+.usersAlertsGrid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.chartGrid {
+  gap: 14px;
+}
+
+.usersAlertsGrid {
+  gap: 20px;
+}
+
+.chartCard {
+  padding: 18px 20px;
+}
+
+.chartTitle,
+.chartTitleCompact {
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+}
+
+.chartTitle {
+  margin: 0 0 14px;
+}
+
+.chartTitleCompact {
+  margin: 0;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.chartMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.railwayBadge {
+  border: 1px solid rgba(230, 126, 34, 0.2);
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: rgba(230, 126, 34, 0.1);
+  color: var(--c-asesmen);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.chartMetaText {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.chartCanvas {
+  height: 220px;
+}
+
+.onlineCountBadge,
+.liveBadge {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.onlineCountBadge {
+  font-size: 10px;
+}
+
+.userList {
+  display: grid;
+  gap: 6px;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.userInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.userName {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.userMeta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.liveBadge {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.alertCountBadge {
+  color: #e74c3c;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.alertList {
+  display: grid;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.alertRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  border-left: 3px solid rgba(231, 76, 60, 0.4);
+  border-radius: 6px;
+  background: rgba(231, 76, 60, 0.04);
+}
+
+.alertSource {
+  margin-top: 1px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.alertSourceLb1 {
+  background: rgba(230, 126, 34, 0.12);
+  color: var(--c-asesmen);
+}
+
+.alertSourceEmr {
+  background: rgba(160, 160, 160, 0.12);
+  color: var(--text-muted);
+}
+
+.alertBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.alertMessage {
+  color: var(--text-main);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.alertTime {
+  margin-top: 1px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.6;
+  font-size: 10px;
+}
+
+.emptyState {
+  display: grid;
+  place-items: center;
+  min-height: 60px;
+  height: 100%;
+  border: 1px dashed rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.012);
+  color: var(--text-muted);
+  opacity: 0.72;
+  font-size: 14px;
+}

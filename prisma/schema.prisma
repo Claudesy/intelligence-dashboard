@@ -1,0 +1,348 @@
+// ============================================================
+// PKM Dashboard — Prisma Schema
+// Telemedicine Module — Sentra Healthcare Solutions © 2025
+// ============================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ConsultationType {
+  VIDEO
+  AUDIO
+  CHAT
+}
+
+enum SessionParticipantRole {
+  DOCTOR
+  NURSE
+  PATIENT
+  OBSERVER
+}
+
+// ─── MODELS ──────────────────────────────────────────────────
+
+model TelemedicineAppointment {
+  id                String            @id @default(cuid())
+
+  // Identitas peserta (menggunakan username dari CrewAccessSession)
+  patientId         String
+  patientPhone      String?           // No HP pasien untuk WhatsApp notifikasi
+  patientJoinToken  String?           @unique // Token sekali pakai untuk pasien join tanpa login
+  doctorId          String
+  createdByStaffId  String
+
+  // Detail jadwal
+  scheduledAt       DateTime
+  durationMinutes   Int               @default(15)
+  consultationType  ConsultationType  @default(VIDEO)
+  status            AppointmentStatus @default(PENDING)
+
+  // BPJS / P-Care Integration
+  bpjsNomorSEP      String?
+  pCareNoKunjungan  String?
+  diagnosaICD10     String?
+  diagnosaInaCBGs   String?
+
+  // Keluhan pasien sebelum konsultasi
+  keluhanUtama      String?
+  riwayatPenyakit   String?
+
+  // Hasil konsultasi (diisi dokter)
+  anamnesis         String?
+  pemeriksaan       String?
+  diagnosis         String?
+  tatalaksana       String?
+  resepDigital      Json?
+  rujukan           Boolean           @default(false)
+  rujukanTujuan     String?
+
+  // LiveKit Room
+  livekitRoomName   String?           @unique
+  livekitRoomId     String?
+
+  // SATUSEHAT
+  satusehatEncounterId String?
+
+  // Timestamps
+  startedAt         DateTime?
+  endedAt           DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  session           TelemedicineSession?
+  attachments       TelemedicineAttachment[]
+  auditLogs         TelemedicineAuditLog[]
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("telemedicine_appointments")
+}
+
+model TelemedicineSession {
+  id                    String    @id @default(cuid())
+  appointmentId         String    @unique
+
+  roomName              String    @unique
+  roomSid               String?
+
+  recordingEnabled      Boolean   @default(false)
+  recordingUrl          String?
+  recordingConsent      Boolean   @default(false)
+
+  actualStartAt         DateTime?
+  actualEndAt           DateTime?
+  actualDurationSeconds Int?
+
+  avgNetworkQuality     Json?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  appointment           TelemedicineAppointment @relation(fields: [appointmentId], references: [id])
+  participants          TelemedicineParticipant[]
+
+  @@map("telemedicine_sessions")
+}
+
+model TelemedicineParticipant {
+  id              String                 @id @default(cuid())
+  sessionId       String
+  userId          String
+  role            SessionParticipantRole
+  livekitIdentity String
+  joinedAt        DateTime?
+  leftAt          DateTime?
+
+  session         TelemedicineSession @relation(fields: [sessionId], references: [id])
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@map("telemedicine_participants")
+}
+
+model TelemedicineAttachment {
+  id               String    @id @default(cuid())
+  appointmentId    String
+  uploadedByUserId String
+
+  fileName         String
+  fileType         String
+  fileSizeBytes    Int
+
+  storagePath      String
+  encryptionKeyId  String
+
+  category         String
+
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+
+  appointment      TelemedicineAppointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@map("telemedicine_attachments")
+}
+
+model TelemedicineAuditLog {
+  id            String    @id @default(cuid())
+  appointmentId String
+  userId        String
+  action        String
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+
+  appointment   TelemedicineAppointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@index([userId])
+  @@map("telemedicine_audit_logs")
+}
+
+// ─── STAFF / USER SCARS ──────────────────────────────────────
+
+model Staff {
+  id          String   @id @default(cuid())
+  staffId     String   @unique  // ferdi, josep, cahyo, dll
+  name        String
+  role        String
+  color       String   @default("#E67E22")
+  gender      String   @default("male") // male | female
+  
+  // Location untuk map tracking
+  locationLat Float    @default(-7.8166)
+  locationLng Float    @default(112.0116)
+  locationLabel String @default("Puskesmas")
+  
+  // Permissions
+  canChat     Boolean  @default(true)
+  canVideo    Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("staff")
+}
+
+// ─── DOCTOR STATUS ────────────────────────────────────────────
+
+model DoctorStatus {
+  id          String   @id @default(cuid())
+  doctorName  String   @unique
+  isOnline    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@map("doctor_status")
+}
+
+// ─── TELEMEDICINE REQUEST (dari website pasien) ───────────────
+
+enum TeleRequestStatus {
+  PENDING
+  SEEN
+  HANDLED
+}
+
+model TelemedicineRequest {
+  id        String             @id @default(cuid())
+  nama      String
+  usia      String
+  hp        String
+  poli      String
+  bpjs      String?
+  keluhan   String
+  status    TeleRequestStatus  @default(PENDING)
+  createdAt DateTime           @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("telemedicine_requests")
+}
+
+model CDSSAuditLog {
+  id               String   @id
+  timestamp        DateTime @default(now())
+  sessionHash      String   @map("session_hash")
+  action           String
+  inputHash        String   @default("") @map("input_hash")
+  outputSummary    Json     @map("output_summary")
+  modelVersion     String   @map("model_version")
+  latencyMs        Int      @default(0) @map("latency_ms")
+  validationStatus String   @map("validation_status")
+  metadata         Json?
+
+  @@index([sessionHash], map: "cdss_audit_logs_session_hash_idx")
+  @@index([action], map: "cdss_audit_logs_action_idx")
+  @@index([validationStatus], map: "cdss_audit_logs_validation_status_idx")
+  @@index([timestamp], map: "cdss_audit_logs_timestamp_idx")
+  @@map("cdss_audit_logs")
+}
+
+model CDSSOutcomeFeedback {
+  id                 String    @id @default(cuid())
+  timestamp          DateTime  @default(now())
+  sessionHash        String    @map("session_hash")
+  selectedIcd        String    @map("selected_icd")
+  selectedConfidence Float     @map("selected_confidence")
+  finalIcd           String    @map("final_icd")
+  outcomeConfirmed   Boolean?  @map("outcome_confirmed")
+  followUpNote       String?   @map("follow_up_note")
+  doctorUserId       String?   @map("doctor_user_id")
+  overrideReason     String?   @map("override_reason")
+  daysToFollowUp     Int?      @map("days_to_follow_up")
+  metadata           Json?
+
+  @@index([sessionHash], map: "cdss_outcome_feedback_session_hash_idx")
+  @@index([timestamp], map: "cdss_outcome_feedback_timestamp_idx")
+  @@index([finalIcd], map: "cdss_outcome_feedback_final_icd_idx")
+  @@index([outcomeConfirmed], map: "cdss_outcome_feedback_outcome_confirmed_idx")
+  @@map("cdss_outcome_feedback")
+}
+
+model AssistantKnowledgeEntry {
+  id            String   @id @default(cuid())
+  assistantName String   @map("assistant_name")
+  scope         String   @default("GLOBAL")
+  title         String
+  content       String
+  priority      Int      @default(100)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([assistantName, scope, isActive], map: "assistant_knowledge_entries_lookup_idx")
+  @@index([priority], map: "assistant_knowledge_entries_priority_idx")
+  @@map("assistant_knowledge_entries")
+}
+
+model ClinicalReport {
+  id               String   @id
+  nomor            Int      @unique
+  doctorName       String?  @map("doctor_name")
+  patientMrn       String?  @map("patient_mrn")
+  patientName      String?  @map("patient_name")
+  diagnosisKerja   String?  @map("diagnosis_kerja")
+  sourceAppointmentId String? @map("source_appointment_id")
+  sourceConsultId  String?  @map("source_consult_id")
+  sourceOrigin     String?  @map("source_origin")
+  auditTrail       Json     @map("audit_trail")
+  pasien           Json
+  anamnesa         Json
+  pemeriksaanFisik Json     @map("pemeriksaan_fisik")
+  asesmen          Json
+  tataLaksana      Json     @map("tata_laksana")
+  penutup          Json
+  pdfStoragePath   String?  @map("pdf_storage_path")
+  pdfGeneratedAt   DateTime? @map("pdf_generated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt], map: "clinical_reports_created_at_idx")
+  @@index([doctorName], map: "clinical_reports_doctor_name_idx")
+  @@index([patientMrn], map: "clinical_reports_patient_mrn_idx")
+  @@index([sourceAppointmentId], map: "clinical_reports_source_appointment_id_idx")
+  @@index([sourceConsultId], map: "clinical_reports_source_consult_id_idx")
+  @@map("clinical_reports")
+}
+
+model ClinicalCaseAuditEvent {
+  id            String   @id @default(cuid())
+  eventType     String   @map("event_type")
+  actorUserId   String?  @map("actor_user_id")
+  actorName     String?  @map("actor_name")
+  appointmentId String?  @map("appointment_id")
+  consultId     String?  @map("consult_id")
+  reportId      String?  @map("report_id")
+  sourceOrigin  String?  @map("source_origin")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([eventType], map: "clinical_case_audit_events_event_type_idx")
+  @@index([appointmentId], map: "clinical_case_audit_events_appointment_id_idx")
+  @@index([consultId], map: "clinical_case_audit_events_consult_id_idx")
+  @@index([reportId], map: "clinical_case_audit_events_report_id_idx")
+  @@index([createdAt], map: "clinical_case_audit_events_created_at_idx")
+  @@map("clinical_case_audit_events")
+}
