@@ -8,5 +8,5 @@ fi
 echo "Push diblokir: repo dashboard ini masih dalam mode containment."
 echo "Verifikasi dulu remote resmi dan boundary repo sebelum menghapus atau memperbarui guardrail ini."
 echo "Untuk publish sadar, gunakan override ALLOW_DASHBOARD_PUSH=1."
-echo "Rujuk: RELOCATION-NOTES.md pada root factory workspace aktif."
+echo "Jika ini clone baru, jalankan npm run setup:git-guardrails setelah install dependencies."
 exit 1

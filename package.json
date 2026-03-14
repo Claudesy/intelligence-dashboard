@@ -9,6 +9,7 @@
     "dev": "tsx --conditions react-server server.ts",
     "dev:clean": "node -e \"try{require('fs').rmSync('.next/dev/lock')}catch(e){}\" && tsx --conditions react-server server.ts",
     "dev:next": "next dev",
+    "postinstall": "node scripts/install-git-guardrails.mjs",
     "setup:git-guardrails": "node scripts/install-git-guardrails.mjs",
     "lint": "tsc --noEmit --incremental false",
     "check": "npm test && npm run lint && npm run build",

@@ -7,8 +7,8 @@ const gitDir = join(repoRoot, ".git");
 const hookPath = join(repoRoot, ".githooks", "pre-push");
 
 if (!existsSync(gitDir)) {
-  console.error("Repo git tidak ditemukan. Jalankan script ini dari root repo dashboard.");
-  process.exit(1);
+  console.log("Lewati setup git guardrails: folder .git tidak ditemukan.");
+  process.exit(0);
 }
 
 if (!existsSync(hookPath)) {
