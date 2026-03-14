@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 export const EMR_SOURCE_ORIGINS = {
   telemedicineAppointment: "telemedicine-appointment",
   assistConsult: "assist-consult",

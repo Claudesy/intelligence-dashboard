@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { headers } from "next/headers";
 
 import { resolveIntelligenceDashboardAccess } from "@/lib/intelligence/server";

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * enrich-penyakit-clinical.mjs
  * Generates missing pemeriksaan_fisik and red_flags for penyakit.json

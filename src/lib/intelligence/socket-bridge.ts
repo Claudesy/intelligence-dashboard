@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import "server-only";
 /**
  * Intelligence Dashboard — Socket.IO Server Bridge

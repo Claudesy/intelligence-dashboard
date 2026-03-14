@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import type { AIInsightsSnapshot } from "./ai-insights";
 
 export type IntelligenceInteraction =

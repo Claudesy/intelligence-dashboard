@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * normalize-icd-codes.mjs
  * Normalizes composite ICD-10 codes in 144_penyakit_puskesmas.json

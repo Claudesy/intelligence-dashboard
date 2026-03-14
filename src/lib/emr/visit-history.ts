@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 export interface ScrapedVisitDiagnosis {
   icd_x: string;
   nama: string;

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { validateCDSSOutput, type ValidationResult } from "@abyss/guardrails";
 import type {
   CDSSResponse,

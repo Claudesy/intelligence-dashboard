@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Sentra Assist — Ghost Protocols Bridge
 // GET /api/doctors/online — returns list of doctors currently online
 // Called by Assist (Chrome Extension) to populate "Send to Doctor" selector

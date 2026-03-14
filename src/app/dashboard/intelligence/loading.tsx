@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 function LoadingBlock({ className }: { className: string }): React.JSX.Element {
   return (
     <div

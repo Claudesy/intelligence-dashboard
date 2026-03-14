@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { chmodSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { spawn } from "node:child_process";
 
 const child = spawn(process.execPath, ["./node_modules/tsx/dist/cli.mjs", "scripts/test-cdss.ts"], {

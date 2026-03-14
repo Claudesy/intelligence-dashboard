@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import * as Sentry from "@sentry/nextjs";
 
 import { initializeAbysLangfuseTracing } from "./langfuse.config";

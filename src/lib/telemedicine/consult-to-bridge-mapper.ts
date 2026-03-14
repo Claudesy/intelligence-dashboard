@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Pure mapping Assist consult → RMETransferPayload (no server-only; testable).
 import type { AnamnesaFillPayload, RMETransferPayload } from "@/lib/emr/types";
 import type { AssistConsultPayload } from "./socket-bridge";

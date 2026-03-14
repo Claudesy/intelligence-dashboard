@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { recordIntelligenceInteractionAudit } from "@/lib/intelligence/server";
 import { getCrewSessionFromRequest } from "@/lib/server/crew-access-auth";
 import {

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Ambient fallback declarations for optional observability packages that are
 // loaded from shared root helpers. Keep these signatures minimal and aligned
 // with the small API surface consumed by this workspace.

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Map Assist consult payload → RMETransferPayload untuk create bridge entry (Transfer ke EMR).
 import "server-only";
 

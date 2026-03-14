@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * clean-penyakit-fields.mjs
  * Removes duplicate fields (gejala, terpi) from penyakit.json

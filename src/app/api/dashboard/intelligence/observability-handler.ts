@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

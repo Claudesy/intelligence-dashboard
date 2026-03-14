@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // POST /api/consult/accept — dokter "Ambil kasus", persist untuk audit / bridge EMR nanti.
 import { NextRequest, NextResponse } from "next/server";
 

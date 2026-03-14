@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import "server-only";
 
 import { Prisma } from "@prisma/client";

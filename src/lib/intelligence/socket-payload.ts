@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import type { IntelligenceEventPayload } from "./types";
 
 export const INTELLIGENCE_EVENT_STATUSES = [

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * update-penyakit-ppk2022.mjs
  * Updates public/data/penyakit.json to align with PPK 2022:

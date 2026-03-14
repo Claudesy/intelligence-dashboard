@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * update-144-ppk2022.mjs
  * Sync PPK 2022 (KMK HK.01.07/MENKES/1186/2022 + amendment 1936/2022)

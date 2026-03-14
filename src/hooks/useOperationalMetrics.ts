@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 "use client";
 
 import type { DashboardOperationalMetrics } from "@abyss/types";

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Persistensi "Ambil kasus" — simpan consult yang sudah di-accept dokter untuk audit / alur EMR nanti.
 import "server-only";
 

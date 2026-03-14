@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Persistensi "Ambil kasus" — implementasi (no server-only; testable).
 import fs from "node:fs";
 import path from "node:path";

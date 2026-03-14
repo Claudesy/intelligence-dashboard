@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * update-obat-fornas-2023.mjs
  * Updates public/data/obat_data.json to align with Fornas KMK 2197/2023

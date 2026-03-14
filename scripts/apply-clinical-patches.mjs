@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * apply-clinical-patches.mjs
  * Applies clinical-patches.json to penyakit.json.

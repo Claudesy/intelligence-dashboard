@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import dynamic from "next/dynamic";
 
 import type { IntelligenceDashboardAccess } from "@/lib/intelligence/server";

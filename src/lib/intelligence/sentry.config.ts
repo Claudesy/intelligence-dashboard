@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * sentry/sentry.config.ts
  * ─────────────────────────────────────────────────────────────────────────────

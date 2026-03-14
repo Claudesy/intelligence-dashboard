@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Sentra Assist — Ghost Protocols Bridge
 // POST /api/consult — receive clinical consult from Assist, route to target doctor
 // Called by Assist (Chrome Extension) after perawat selects a doctor

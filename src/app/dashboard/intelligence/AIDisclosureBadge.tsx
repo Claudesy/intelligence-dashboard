@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import { AI_DISCLOSURE_LABEL } from "@/lib/intelligence/disclosure";
 
 export function AIDisclosureBadge(): React.JSX.Element {

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * apply-enrichment.mjs
  * Applies reviewed enrichment data from database/enrichment-output.json

@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 import assert from "node:assert/strict";
 import test from "node:test";
 

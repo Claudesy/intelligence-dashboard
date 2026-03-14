@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // POST /api/consult/transfer-to-emr — buat bridge entry dari accepted consult (Assist bisa claim & isi ePuskesmas).
 import { NextRequest, NextResponse } from "next/server";
 

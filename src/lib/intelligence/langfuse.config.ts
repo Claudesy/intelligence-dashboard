@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * Langfuse tracing stub for standalone dashboard deployment.
  * Full implementation lives in the Abyss monorepo langfuse package.

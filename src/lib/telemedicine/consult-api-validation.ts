@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 /**
  * Validasi body untuk API consult (accept & transfer-to-emr).
  * Pure functions — testable tanpa server-only.

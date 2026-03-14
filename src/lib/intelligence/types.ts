@@ -1,3 +1,4 @@
+// Designed and constructed by Claudesy.
 // Intelligence Dashboard — Shared Types
 // Server + Client boundary: types only, no runtime logic.
 
