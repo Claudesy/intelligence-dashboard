@@ -12,13 +12,14 @@
  * 6. Tulis hasil ke history
  */
 
-"server only";
+import "server-only";
 
 import path from "node:path";
 import fs from "node:fs";
 import { RMETransferOrchestrator } from "./transfer-orchestrator";
 import { emitEMRProgress } from "./socket-bridge";
 import { appendEMRHistory } from "./history";
+import { getEMRCredentials } from "./config";
 import type {
   EMRTransferConfig,
   RMETransferPayload,
@@ -76,6 +77,7 @@ function saveSessionMeta(storagePath: string, username: string): void {
 async function loginToEPuskesmas(
   page: import("playwright").Page,
   config: EMRTransferConfig,
+  credentials: { username: string; password: string },
 ): Promise<void> {
   await page.goto(config.loginUrl, {
     waitUntil: "domcontentloaded",
@@ -87,13 +89,13 @@ async function loginToEPuskesmas(
     timeout: 10000,
   });
 
-  // Fill credentials
+  // Fill credentials — read directly from env, never from config object
   const usernameSel = "input[name='email'], input[name='username']";
   const passwordSel = "input[name='password']";
   const submitSel = "button[type='submit'], input[type='submit']";
 
-  await page.locator(usernameSel).first().fill(config.username);
-  await page.locator(passwordSel).first().fill(config.password);
+  await page.locator(usernameSel).first().fill(credentials.username);
+  await page.locator(passwordSel).first().fill(credentials.password);
   await page.locator(submitSel).first().click();
 
   // Wait for redirect after login
@@ -184,9 +186,10 @@ export async function runEMRTransfer(
   const sessionStoragePath = path.resolve(
     config.sessionStoragePath || "runtime/emr-session.json",
   );
+  const credentials = getEMRCredentials();
   const hasValidSession = isSessionValid(
     sessionStoragePath,
-    config.username,
+    credentials.username,
     ttlMs,
   );
 
@@ -206,11 +209,11 @@ export async function runEMRTransfer(
     // Login if needed
     if (!hasValidSession) {
       emit("login", "running", "Login ke ePuskesmas...");
-      await loginToEPuskesmas(page, config);
+      await loginToEPuskesmas(page, config, credentials);
 
       // Save session state
       await context.storageState({ path: sessionStoragePath });
-      saveSessionMeta(sessionStoragePath, config.username);
+      saveSessionMeta(sessionStoragePath, credentials.username);
       emit("login", "success", "Login berhasil");
     } else {
       emit("login", "success", "Session valid, skip login");

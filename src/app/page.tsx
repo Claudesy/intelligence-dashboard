@@ -2,18 +2,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { io, type Socket } from "socket.io-client";
 import { useTheme } from "@/components/ThemeProvider";
 import {
   CREW_ACCESS_GENDERS,
-  CREW_ACCESS_SERVICE_AREAS,
   type CrewAccessGender,
-  type CrewAccessServiceArea,
 } from "@/lib/crew-access";
 import {
   CREW_PROFILE_BLOOD_TYPES,
   CREW_PROFILE_DEGREES,
+  CREW_PROFILE_MAX_DEGREES,
   CREW_PROFILE_MAX_POSITIONS,
-  CREW_PROFILE_POSITIONS,
+  CREW_PROFILE_SENTRA_ROLES,
+  CREW_PROFILE_STRUCTURAL_POSITIONS,
   createEmptyCrewProfile,
   resolveCrewRankBadgeSrc,
   resolveCrewSentraTitle,
@@ -36,37 +37,19 @@ function calcAge(birthDate: string): number {
 const QUICK_LINKS = [
   {
     label: "Satu Sehat",
-    desc: "Portal Kemenkes RI",
+    desc: "Kemenkes",
     href: "https://satusehat.kemkes.go.id/sdmk/dashboard",
     badge: "KEMENKES",
   },
   {
-    label: "Absen Apel Pagi",
-    desc: "Presensi Harian",
-    href: "#absen-apel",
-    badge: "PRESENSI",
-  },
-  {
-    label: "SIPARWA",
-    desc: "E-Presensi Kota Kediri",
-    href: "https://epresensi.kedirikota.go.id/",
-    badge: "ABSEN",
-  },
-  {
-    label: "SIM PKM",
-    desc: "Sistem Informasi Manajemen",
-    href: "#simpkm",
-    badge: "MANAJEMEN",
-  },
-  {
     label: "E-Rekam Medis",
-    desc: "ePuskesmas Kota Kediri",
+    desc: "EMR",
     href: "https://kotakediri.epuskesmas.id/pelayanan?broadcastNotif=1",
     badge: "EMR",
   },
   {
     label: "P-Care BPJS",
-    desc: "Primary Care BPJS Kesehatan",
+    desc: "BPJS",
     href: "https://pcarejkn.bpjs-kesehatan.go.id/eclaim",
     badge: "BPJS",
   },
@@ -77,16 +60,16 @@ function useL() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   return {
-    bg: isDark ? "var(--bg-canvas)" : "var(--bg-canvas)",
+    bg: "var(--bg-canvas)",
     bgPanel: isDark ? "var(--bg-card)" : "var(--bg-card, #EDE4D9)",
     bgHero: isDark
       ? "linear-gradient(135deg, var(--bg-card) 0%, rgba(15,16,18,0.96) 100%)"
       : "linear-gradient(135deg, var(--bg-card, #EDE4D9) 0%, rgba(250,243,235,0.96) 100%)",
     bgHover: isDark ? "rgba(255,255,255,0.035)" : "rgba(201,168,124,0.06)",
-    border: isDark ? "var(--line-base)" : "var(--line-base)",
+    border: "var(--line-base)",
     borderAcc: isDark ? "rgba(230,126,34,0.4)" : "rgba(201,168,124,0.5)",
-    text: isDark ? "var(--text-main)" : "var(--text-main)",
-    muted: isDark ? "var(--text-muted)" : "var(--text-muted)",
+    text: "var(--text-main)",
+    muted: "var(--text-muted)",
     accent: isDark ? "#E67E22" : "var(--c-asesmen)",
     statusTone: "#101012",
     statusToneSoft: "rgba(16,16,18,0.18)",
@@ -122,12 +105,12 @@ const Row = ({
       alignItems: "baseline",
     }}
   >
-    <span style={{ fontSize: 15, color: L.muted, letterSpacing: "0.02em" }}>
+    <span style={{ fontSize: 14, color: L.muted, letterSpacing: "0.02em" }}>
       {label}
     </span>
     <span
       style={{
-        fontSize: 15,
+        fontSize: 14,
         color: accent ? L.accent : L.text,
         letterSpacing: mono ? "0.02em" : 0,
       }}
@@ -231,7 +214,13 @@ function useTypingEffect(text: string, speed = 40) {
   return displayed;
 }
 
-const HERO_TABS = ["Ringkasan Hari Ini", "Agent Sentra", "Berita Kesehatan"];
+const HERO_TABS = [
+  "Ringkasan Hari Ini",
+  "Agent Sentra",
+  "Berita Kesehatan",
+  "Ghost Protocol",
+  "Critical Mind",
+];
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10); // "2026-03-02"
@@ -243,14 +232,6 @@ function loadAbsen(key: string): boolean {
     return localStorage.getItem(`absen_${key}_${todayKey()}`) === "1";
   } catch {
     return false;
-  }
-}
-
-function saveAbsen(key: string, val: boolean) {
-  try {
-    localStorage.setItem(`absen_${key}_${todayKey()}`, val ? "1" : "0");
-  } catch {
-    /* noop */
   }
 }
 
@@ -285,6 +266,13 @@ type NotamBoardRecord = {
 };
 
 const PROFILE_LOAD_ERROR = "Profil user belum dapat dimuat.";
+type OnlineUser = {
+  userId: string;
+  name: string;
+  role: string;
+  profession: string;
+  institution: string;
+};
 
 function formatBirthDate(value: string): string {
   if (!value) return "Belum diisi";
@@ -312,17 +300,16 @@ function formatRoleLabel(value: string | undefined): string {
 }
 
 function formatBoardDateTime(value: string): string {
-  try {
-    const parsed = new Date(value);
-    return parsed.toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
     return value;
   }
+  return parsed.toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function sortBoardByLatest<T extends { createdAt: string }>(items: T[]): T[] {
@@ -359,13 +346,16 @@ function shouldShowBoardExpand(text: string): boolean {
   return text.trim().length > 120;
 }
 
-type ProfileLinkItem = {
-  key: "githubUrl" | "linkedinUrl" | "gravatarUrl" | "blogUrl";
+type OfficialLinkLogo = {
   label: string;
-  href: string;
-  color: string;
   iconSrc: string;
+  href: string;
 };
+
+function normalizeWhatsappHref(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
+}
 
 export default function ProfilUserPage() {
   const L = useL();
@@ -389,18 +379,6 @@ export default function ProfilUserPage() {
     setAbsenSiparwa(loadAbsen("siparwa"));
   }, []);
 
-  function toggleApel() {
-    const next = !absenApel;
-    setAbsenApel(next);
-    saveAbsen("apel", next);
-  }
-
-  function toggleSiparwa() {
-    const next = !absenSiparwa;
-    setAbsenSiparwa(next);
-    saveAbsen("siparwa", next);
-  }
-
   const [crewName, setCrewName] = useState("");
   const [sessionUser, setSessionUser] = useState<ProfileUser | null>(null);
   const [profile, setProfile] = useState<CrewProfileData>(
@@ -414,9 +392,13 @@ export default function ProfilUserPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
   const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [selectedDegreeOption, setSelectedDegreeOption] = useState("");
+  const [selectedSentraRoleOption, setSelectedSentraRoleOption] = useState("");
+  const [selectedStructuralPositionOption, setSelectedStructuralPositionOption] =
+    useState("");
   const [activeTab, setActiveTab] = useState(0);
-  const [heroExpanded, setHeroExpanded] = useState(true);
-  const [chatHeight, setChatHeight] = useState(340);
+  const [heroExpanded, setHeroExpanded] = useState(false);
+  const [chatHeight, setChatHeight] = useState(260);
   const dragRef = useRef<{ startY: number; startH: number } | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const [news, setNews] = useState<
@@ -431,11 +413,13 @@ export default function ProfilUserPage() {
   const [newsLoading, setNewsLoading] = useState(false);
   const [devUpdates, setDevUpdates] = useState<DevUpdateBoardRecord[]>([]);
   const [notams, setNotams] = useState<NotamBoardRecord[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [boardLoading, setBoardLoading] = useState(true);
   const [boardError, setBoardError] = useState("");
   const [expandedBoardItems, setExpandedBoardItems] = useState<Set<string>>(
     () => new Set(),
   );
+  const onlineSocketRef = useRef<Socket | null>(null);
 
   // Logbook klinis state
   type LogbookRow = {
@@ -452,7 +436,6 @@ export default function ProfilUserPage() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
-  const chatBottomRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const chatIdCounter = useRef(0);
 
@@ -523,6 +506,7 @@ export default function ProfilUserPage() {
 
   useEffect(() => {
     if (activeTab !== 2) return;
+    let alive = true;
     setNewsLoading(true);
     fetch("/api/news")
       .then((r) => r.json())
@@ -536,11 +520,18 @@ export default function ProfilUserPage() {
             description?: string;
           }[];
         }) => {
+          if (!alive) return;
           setNews(d.items ?? []);
           setNewsLoading(false);
         },
       )
-      .catch(() => setNewsLoading(false));
+      .catch(() => {
+        if (!alive) return;
+        setNewsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [activeTab]);
 
   useEffect(() => {
@@ -600,6 +591,46 @@ export default function ProfilUserPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [chatMessages, chatLoading]);
 
+  useEffect(() => {
+    if (!sessionUser) return;
+
+    // Track dashboard usage
+    void fetch("/api/track-usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "dashboard" }),
+    }).catch(() => {
+      // Silent fail
+    });
+
+    const socket = io({
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+    });
+    onlineSocketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("user:join", {
+        userId: sessionUser.username,
+        name: profile.fullName || sessionUser.displayName,
+        role: sessionUser.role,
+        profession: sessionUser.profession,
+        institution: sessionUser.institution,
+      });
+    });
+
+    socket.on("users:online", (users: OnlineUser[]) => {
+      setOnlineUsers(users);
+    });
+
+    return () => {
+      socket.disconnect();
+      if (onlineSocketRef.current === socket) {
+        onlineSocketRef.current = null;
+      }
+    };
+  }, [profile.fullName, sessionUser]);
+
   async function sendChat() {
     const text = chatInput.trim();
     if (!text || chatLoading) return;
@@ -651,35 +682,32 @@ export default function ProfilUserPage() {
     });
   }
 
-  function toggleServiceArea(area: CrewAccessServiceArea) {
-    setProfileDraft((current) => ({
-      ...current,
-      serviceAreas: current.serviceAreas.includes(area)
-        ? current.serviceAreas.filter((item) => item !== area)
-        : [...current.serviceAreas, area],
-      serviceAreaOther:
-        area === "Lainnya" && current.serviceAreas.includes(area)
-          ? ""
-          : current.serviceAreaOther,
-    }));
+  function resetProfileSelectionInputs() {
+    setSelectedDegreeOption("");
+    setSelectedSentraRoleOption("");
+    setSelectedStructuralPositionOption("");
   }
 
-  function toggleProfileDegree(degree: CrewProfileDegree) {
+  function addProfileDegree(degree: CrewProfileDegree) {
     setProfileDraft((current) => ({
       ...current,
       degrees: current.degrees.includes(degree)
-        ? current.degrees.filter((item) => item !== degree)
-        : [...current.degrees, degree],
+        ? current.degrees
+        : [...current.degrees, degree].slice(0, CREW_PROFILE_MAX_DEGREES),
     }));
   }
 
-  function toggleProfileJobTitle(jobTitle: CrewProfilePosition) {
+  function removeProfileDegree(degree: CrewProfileDegree) {
+    setProfileDraft((current) => ({
+      ...current,
+      degrees: current.degrees.filter((item) => item !== degree),
+    }));
+  }
+
+  function addProfileJobTitle(jobTitle: CrewProfilePosition) {
     setProfileDraft((current) => {
       if (current.jobTitles.includes(jobTitle)) {
-        return {
-          ...current,
-          jobTitles: current.jobTitles.filter((item) => item !== jobTitle),
-        };
+        return current;
       }
 
       if (current.jobTitles.length >= CREW_PROFILE_MAX_POSITIONS) {
@@ -691,6 +719,13 @@ export default function ProfilUserPage() {
         jobTitles: [...current.jobTitles, jobTitle],
       };
     });
+  }
+
+  function removeProfileJobTitle(jobTitle: CrewProfilePosition) {
+    setProfileDraft((current) => ({
+      ...current,
+      jobTitles: current.jobTitles.filter((item) => item !== jobTitle),
+    }));
   }
 
   async function saveProfile() {
@@ -719,6 +754,7 @@ export default function ProfilUserPage() {
       setProfileDraft(payload.profile);
       setCrewName(payload.profile.fullName || sessionUser?.displayName || "");
       setProfileSaveMessage("Profil berhasil diperbarui.");
+      resetProfileSelectionInputs();
       setIsProfileEditorOpen(false);
     } catch {
       setProfileError("Tidak dapat terhubung ke server profil.");
@@ -797,11 +833,15 @@ export default function ProfilUserPage() {
     profile.jobTitles,
     sessionUser?.role,
   );
-  const profileBadgeValue = profile.employeeId
-    ? `NIP: ${profile.employeeId}`
-    : "NIP: BELUM DIISI";
+  const positionSectionBadges = positionBadges.filter(
+    (title) => title !== "Chief Executive Officer",
+  );
   const roleLabel = formatRoleLabel(sessionUser?.role);
   const professionLabel = sessionUser?.profession || "Belum diatur";
+  const isAdminDashboardUser =
+    sessionUser?.role === "CEO" ||
+    sessionUser?.role === "CHIEF_EXECUTIVE_OFFICER" ||
+    sessionUser?.role === "ADMINISTRATOR";
   const rankBadgeSrc = resolveCrewRankBadgeSrc(
     sessionUser?.role,
     profile.jobTitles,
@@ -812,91 +852,114 @@ export default function ProfilUserPage() {
   );
   const chatUserAvatarSrc = profile.avatarUrl || "/avatar.png";
   const chatAssistantAvatarSrc = "/audrey.png";
-  const serviceAreaBadges =
-    profile.serviceAreas.includes("Lainnya") && profile.serviceAreaOther
-      ? [
-          ...profile.serviceAreas.filter((area) => area !== "Lainnya"),
-          profile.serviceAreaOther,
-        ]
-      : profile.serviceAreas;
-  const shiftLabel =
-    professionLabel === "Dokter Gigi" || professionLabel === "Dokter"
-      ? "07:00 - 14:00 WIB"
-      : "08:00 - 15:00 WIB";
-  const hubPresenceLabel =
-    absenApel && absenSiparwa
-      ? "Connected penuh"
-      : absenApel || absenSiparwa
-        ? "Connected parsial"
-        : "Belum connect";
-  const statusBadges = Array.from(
-    new Set(
-      [
-        "AKTIF",
-        sessionUser?.profession?.toUpperCase(),
-        sessionUser?.role?.replace(/_/g, " "),
-      ].filter(Boolean) as string[],
-    ),
-  );
-  const profileHeroStats = [
-    { label: "Jabatan Sentra", value: sentraTitle },
-    { label: "Profesi", value: professionLabel },
-    { label: "Status HUB", value: hubPresenceLabel },
-  ];
-  const profileLinks = [
+  const statusOperasionalActive = absenApel || absenSiparwa;
+  const visiblePositionBadges = isAdminDashboardUser
+    ? positionSectionBadges
+    : [];
+  const profileHeroStats = isAdminDashboardUser
+    ? [
+        { label: "Role Sentra", value: sentraTitle },
+        { label: "Profesi", value: professionLabel },
+      ]
+    : [{ label: "Profesi", value: professionLabel }];
+  const officialWhatsappHref = normalizeWhatsappHref(profile.whatsappNumber);
+  const officialEmailHref = sessionUser?.email
+    ? `mailto:${sessionUser.email}`
+    : "";
+  const officialLinkLogos = [
     {
-      key: "githubUrl",
       label: "GitHub",
-      href: profile.githubUrl,
-      color: "#d6dbe1",
       iconSrc: "/social/github.svg",
+      href: profile.githubUrl,
     },
     {
-      key: "linkedinUrl",
       label: "LinkedIn",
-      href: profile.linkedinUrl,
-      color: "#6fb6ff",
       iconSrc: "/social/linkedin.svg",
+      href: profile.linkedinUrl,
     },
     {
-      key: "gravatarUrl",
       label: "Gravatar",
-      href: profile.gravatarUrl,
-      color: "#ffae57",
       iconSrc: "/social/gravatar.svg",
+      href: profile.gravatarUrl,
     },
     {
-      key: "blogUrl",
       label: "Blog",
-      href: profile.blogUrl,
-      color: "#8fdb9b",
       iconSrc: "/social/blog.svg",
+      href: profile.blogUrl,
     },
-  ] satisfies ProfileLinkItem[];
-  const visibleProfileLinks = profileLinks.filter((item) => Boolean(item.href));
-  const visibleDevUpdates = sortBoardByLatest(devUpdates).slice(0, 5);
-  const visibleNotams = sortBoardByLatest(notams).slice(0, 5);
+    {
+      label: "Instagram",
+      iconSrc: "/social/instagram.svg",
+      href: profile.instagramUrl,
+    },
+    {
+      label: "TikTok",
+      iconSrc: "/social/tiktok.svg",
+      href: profile.tiktokUrl,
+    },
+    {
+      label: "YouTube",
+      iconSrc: "/social/youtube.svg",
+      href: profile.youtubeUrl,
+    },
+    {
+      label: "WhatsApp",
+      iconSrc: "/social/whatsapp.svg",
+      href: officialWhatsappHref,
+    },
+    {
+      label: "Email",
+      iconSrc: "/social/email.svg",
+      href: officialEmailHref,
+    },
+  ] satisfies OfficialLinkLogo[];
+  const visibleDevUpdates = sortBoardByLatest(devUpdates).slice(0, 1);
+  const visibleNotams = sortBoardByLatest(notams).slice(0, 1);
+  const visibleNews = news.slice(0, 1);
+  const uniqueOnlineUsers = onlineUsers.filter(
+    (user, index, array) =>
+      array.findIndex((item) => item.userId === user.userId) === index,
+  );
+  const onlineRoster = [...uniqueOnlineUsers].sort((left, right) => {
+    if (left.userId === sessionUser?.username) return -1;
+    if (right.userId === sessionUser?.username) return 1;
+    return left.name.localeCompare(right.name, "id-ID");
+  });
+  const selectedSentraRoles = profileDraft.jobTitles.filter(
+    (
+      jobTitle,
+    ): jobTitle is (typeof CREW_PROFILE_SENTRA_ROLES)[number] =>
+      CREW_PROFILE_SENTRA_ROLES.includes(
+        jobTitle as (typeof CREW_PROFILE_SENTRA_ROLES)[number],
+      ),
+  );
+  const selectedStructuralPositions = profileDraft.jobTitles.filter(
+    (
+      jobTitle,
+    ): jobTitle is (typeof CREW_PROFILE_STRUCTURAL_POSITIONS)[number] =>
+      CREW_PROFILE_STRUCTURAL_POSITIONS.includes(
+        jobTitle as (typeof CREW_PROFILE_STRUCTURAL_POSITIONS)[number],
+      ),
+  );
+  const hasScrollableOnlineRoster = onlineRoster.length > 5;
+  const hasScrollableLogbook = logbookRows.length > 5;
   const statusSnapshot = [
-    { label: "Shift", value: shiftLabel, isActive: true },
     {
-      label: "Apel Pagi",
-      value: absenApel ? "Sudah Absen" : "Belum Absen",
-      isActive: absenApel,
-    },
-    {
-      label: "SIPARWA",
-      value: absenSiparwa ? "Sudah Check-in" : "Belum Check-in",
-      isActive: absenSiparwa,
-    },
-    {
-      label: "Status Operasional",
-      value: absenSiparwa ? "Sedang aktif" : "Siap bertugas",
-      isActive: absenSiparwa,
+      label: "Status Operasional Sentra",
+      value: statusOperasionalActive
+        ? "Siap operasional"
+        : "Menunggu aktivasi operasional",
+      isActive: statusOperasionalActive,
     },
     {
       label: "SenAuto Session",
-      value: absenSiparwa ? "Connected" : "Standby",
-      isActive: absenSiparwa,
+      value: heroExpanded ? "Aktif di dashboard" : "Standby",
+      isActive: heroExpanded,
+    },
+    {
+      label: "Akses EMR",
+      value: sessionUser?.institution ? "Siap dibuka" : "Perlu verifikasi akun",
+      isActive: Boolean(sessionUser?.institution),
     },
   ];
   const statusHariIniSection = (
@@ -938,7 +1001,7 @@ export default function ProfilUserPage() {
             </span>
             <span
               style={{
-                fontSize: 15,
+                fontSize: 14,
                 color: L.text,
                 lineHeight: 1.35,
                 textAlign: "right",
@@ -981,7 +1044,7 @@ export default function ProfilUserPage() {
           <div
             style={{
               padding: "18px 16px",
-              fontSize: 13,
+              fontSize: 14,
               color: L.muted,
               letterSpacing: "0.04em",
               textAlign: "center",
@@ -1014,64 +1077,75 @@ export default function ProfilUserPage() {
                 </span>
               ))}
             </div>
-            {logbookRows.map((row, idx) => (
-              <a
-                key={row.id}
-                href={`/report/clinical?id=${row.id}`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "36px minmax(0,1fr) minmax(0,1.2fr) 90px",
-                  gap: 8,
-                  padding: "10px 16px",
-                  borderBottom:
-                    idx === logbookRows.length - 1
-                      ? "none"
-                      : `1px solid ${L.border}`,
-                  textDecoration: "none",
-                  color: L.text,
-                  cursor: "pointer",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = L.bgHover)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                <span style={{ fontSize: 13, color: L.muted }}>{idx + 1}</span>
-                <span
+            <div
+              className={hasScrollableLogbook ? "who-online-scroll" : undefined}
+              style={{
+                maxHeight: hasScrollableLogbook ? 230 : undefined,
+                overflowY: hasScrollableLogbook ? "auto" : "visible",
+                paddingRight: hasScrollableLogbook ? 4 : 0,
+              }}
+            >
+              {logbookRows.map((row, idx) => (
+                <a
+                  key={row.id}
+                  href={`/report/clinical?id=${row.id}`}
                   style={{
-                    fontSize: 13,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "grid",
+                    gridTemplateColumns:
+                      "36px minmax(0,1fr) minmax(0,1.2fr) 90px",
+                    gap: 8,
+                    padding: "10px 16px",
+                    borderBottom:
+                      idx === logbookRows.length - 1
+                        ? "none"
+                        : `1px solid ${L.border}`,
+                    textDecoration: "none",
+                    color: L.text,
+                    cursor: "pointer",
+                    transition: "background 0.15s",
                   }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = L.bgHover)
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "transparent")
+                  }
                 >
-                  {row.pasien}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {row.diagnosis}
-                </span>
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: L.muted,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {row.tanggal}
-                </span>
-              </a>
-            ))}
+                  <span style={{ fontSize: 14, color: L.muted }}>
+                    {idx + 1}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 14,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.pasien}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 14,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.diagnosis}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 14,
+                      color: L.muted,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {row.tanggal}
+                  </span>
+                </a>
+              ))}
+            </div>
           </>
         )}
       </div>
@@ -1092,7 +1166,7 @@ export default function ProfilUserPage() {
         <div
           style={{
             marginBottom: 16,
-            fontSize: 15,
+                          fontSize: 14,
             color: L.muted,
             letterSpacing: "0.04em",
           }}
@@ -1110,7 +1184,7 @@ export default function ProfilUserPage() {
       ) : null}
 
       {profileSaveMessage && !isProfileEditorOpen ? (
-        <div style={{ marginBottom: 16, fontSize: 13, color: L.accent }}>
+        <div style={{ marginBottom: 16, fontSize: 14, color: L.accent }}>
           {profileSaveMessage}
         </div>
       ) : null}
@@ -1282,6 +1356,20 @@ export default function ProfilUserPage() {
               padding-top: 12px !important;
             }
           }
+          .who-online-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: ${L.borderAcc} transparent;
+          }
+          .who-online-scroll::-webkit-scrollbar {
+            width: 4px;
+          }
+          .who-online-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .who-online-scroll::-webkit-scrollbar-thumb {
+            background: ${L.borderAcc};
+            border-radius: 999px;
+          }
         `}</style>
 
         {/* Tabs + controls */}
@@ -1295,7 +1383,15 @@ export default function ProfilUserPage() {
             marginTop: 8,
           }}
         >
-          <div style={{ display: "flex", gap: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              flexWrap: "wrap",
+              rowGap: 8,
+            }}
+          >
             {HERO_TABS.map((t, i) => {
               const isActive = i === activeTab && heroExpanded;
               return (
@@ -1323,6 +1419,30 @@ export default function ProfilUserPage() {
                 </div>
               );
             })}
+            <button
+              type="button"
+              onClick={() => {
+                setProfileDraft(profile);
+                setProfileSaveMessage("");
+                setProfileError("");
+                resetProfileSelectionInputs();
+                setIsProfileEditorOpen(true);
+              }}
+              style={{
+                height: 30,
+                padding: "0 12px",
+                borderRadius: 999,
+                border: `1px solid ${L.border}`,
+                background: "transparent",
+                color: L.text,
+                fontSize: 13,
+                letterSpacing: "0.04em",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              Edit Profil
+            </button>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
@@ -1351,18 +1471,18 @@ export default function ProfilUserPage() {
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                color: L.muted,
+                color: "#E67E22",
                 fontSize: 14,
                 transition: "border-color 0.15s, color 0.15s",
                 flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = L.accent;
-                e.currentTarget.style.color = L.accent;
+                e.currentTarget.style.color = "#F28B54";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = L.border;
-                e.currentTarget.style.color = L.muted;
+                e.currentTarget.style.color = "#E67E22";
               }}
             >
               <span
@@ -1382,7 +1502,7 @@ export default function ProfilUserPage() {
         <div
           style={{
             overflow: "hidden",
-            maxHeight: heroExpanded ? chatHeight + 200 : 0,
+            maxHeight: heroExpanded ? chatHeight + 120 : 0,
             transition: "max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
@@ -1409,7 +1529,7 @@ export default function ProfilUserPage() {
                 <div>
                   <div
                     style={{
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: 500,
                       color: L.text,
                       marginBottom: 6,
@@ -1417,18 +1537,18 @@ export default function ProfilUserPage() {
                   >
                     SenAuto — Clinical AI
                   </div>
-                  <div style={{ fontSize: 14, color: L.muted }}>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.5 }}>
                     Ringkasan operasional pagi ini, update deployment terbaru,
                     dan NOTAM aktif untuk crew.
                   </div>
                 </div>
                 <a
                   href="/emr"
+                  className="summary-sidebar-cta"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
-                    fontSize: 13,
                     color: "#ffffff",
                     background: L.statusTone,
                     border: `1px solid ${L.statusTone}`,
@@ -1437,6 +1557,7 @@ export default function ProfilUserPage() {
                     textDecoration: "none",
                     marginTop: 16,
                     transition: "opacity 0.15s",
+                    fontSize: 13,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.opacity = "0.8";
@@ -1480,9 +1601,10 @@ export default function ProfilUserPage() {
                         </div>
                         <div
                           style={{
-                            fontSize: 12,
+                            fontSize: 13,
                             color: L.signal,
                             marginTop: 4,
+                            lineHeight: 1.5,
                           }}
                         >
                           Deployment, patch, dan perubahan terkini.
@@ -1586,7 +1708,7 @@ export default function ProfilUserPage() {
                                 </div>
                                 <div
                                   style={{
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     lineHeight: 1.55,
                                     color: "#C8BDAF",
                                     display: isExpanded
@@ -1608,7 +1730,7 @@ export default function ProfilUserPage() {
                                       border: "none",
                                       background: "transparent",
                                       color: L.signal,
-                                      fontSize: 11,
+                                      fontSize: 13,
                                       letterSpacing: "0.04em",
                                       textAlign: "left",
                                       cursor: "pointer",
@@ -1668,9 +1790,10 @@ export default function ProfilUserPage() {
                         </div>
                         <div
                           style={{
-                            fontSize: 12,
+                            fontSize: 13,
                             color: L.signal,
                             marginTop: 4,
+                            lineHeight: 1.5,
                           }}
                         >
                           Pengumuman operasional penting untuk seluruh crew.
@@ -1691,7 +1814,7 @@ export default function ProfilUserPage() {
                         <div
                           style={{
                             padding: "10px 0",
-                            fontSize: 13,
+                            fontSize: 14,
                             color: L.muted,
                           }}
                         >
@@ -1774,7 +1897,7 @@ export default function ProfilUserPage() {
                                 </div>
                                 <div
                                   style={{
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     lineHeight: 1.55,
                                     color: "#C8BDAF",
                                     display: isExpanded
@@ -1796,7 +1919,7 @@ export default function ProfilUserPage() {
                                       border: "none",
                                       background: "transparent",
                                       color: L.signal,
-                                      fontSize: 11,
+                                      fontSize: 13,
                                       letterSpacing: "0.04em",
                                       textAlign: "left",
                                       cursor: "pointer",
@@ -1832,7 +1955,7 @@ export default function ProfilUserPage() {
                     style={{
                       marginTop: 10,
                       paddingLeft: 16,
-                      fontSize: 12,
+                      fontSize: 13,
                       color: "#C8BDAF",
                     }}
                   >
@@ -2018,7 +2141,7 @@ export default function ProfilUserPage() {
                           border: "1px solid rgba(255,255,255,0.92)",
                           borderRadius: 4,
                           padding: "8px 12px",
-                          fontSize: 14,
+                          fontSize: 13,
                           color: "#101012",
                           whiteSpace: "pre-wrap",
                           boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
@@ -2034,7 +2157,7 @@ export default function ProfilUserPage() {
                           border: `1px solid ${L.border}`,
                           borderRadius: 4,
                           padding: "8px 12px",
-                          fontSize: 14,
+                          fontSize: 13,
                           color: L.text,
                         }}
                         dangerouslySetInnerHTML={{
@@ -2113,8 +2236,6 @@ export default function ProfilUserPage() {
                     ⚠ {chatError}
                   </div>
                 )}
-
-                <div ref={chatBottomRef} />
               </div>
 
               {/* Input */}
@@ -2146,7 +2267,7 @@ export default function ProfilUserPage() {
                     border: `1px solid ${L.border}`,
                     background: L.bgPanel,
                     color: L.text,
-                    fontSize: 14,
+                    fontSize: 13,
                     padding: "0 12px",
                     outline: "none",
                   }}
@@ -2223,7 +2344,7 @@ export default function ProfilUserPage() {
           )}
           {/* TAB 2 — Berita Kesehatan */}
           {activeTab === 2 && (
-            <div style={{ padding: "16px 24px", minHeight: 160 }}>
+            <div style={{ padding: "16px 24px", minHeight: 132 }}>
               {newsLoading ? (
                 <div
                   style={{ fontSize: 13, color: L.muted, padding: "20px 0" }}
@@ -2238,7 +2359,7 @@ export default function ProfilUserPage() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {news.map((item, i) => (
+                  {visibleNews.map((item, i) => (
                     <a
                       key={i}
                       href={item.link}
@@ -2273,7 +2394,7 @@ export default function ProfilUserPage() {
                           gap: 16,
                         }}
                       >
-                        <div style={{ fontSize: 14, color: L.text }}>
+                        <div style={{ fontSize: 13, color: L.text }}>
                           {item.title}
                         </div>
                         <span
@@ -2310,7 +2431,7 @@ export default function ProfilUserPage() {
                       >
                         {item.description && (
                           <div
-                            style={{ fontSize: 14, color: L.muted, flex: 1 }}
+                            style={{ fontSize: 13, color: L.muted, flex: 1 }}
                           >
                             {item.description}
                           </div>
@@ -2336,98 +2457,252 @@ export default function ProfilUserPage() {
               )}
             </div>
           )}
+          {/* TAB 3 — Ghost Protocol */}
+          {activeTab === 3 && (
+            <div
+              className="summary-tab-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "232px minmax(0, 1fr)",
+                minHeight: 144,
+              }}
+            >
+              <div
+                className="summary-tab-sidebar"
+                style={{
+                  padding: "16px 18px",
+                  borderRight: `1px solid ${L.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: L.text,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Ghost Protocol
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.5 }}>
+                    Konektor antara sistem Rekam Medis Elektronik (RME) dengan
+                    Sentra Intelligence Dashboard — bridge otomatis yang
+                    menghubungkan data klinis ke engine AI.
+                  </div>
+                </div>
+                <a
+                  href="/docs/ghost-protocol"
+                  download
+                  className="summary-sidebar-cta"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    color: "#ffffff",
+                    background: L.statusTone,
+                    border: `1px solid ${L.statusTone}`,
+                    borderRadius: 3,
+                    padding: "6px 12px",
+                    textDecoration: "none",
+                    marginTop: 16,
+                    transition: "opacity 0.15s",
+                    fontSize: 13,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.8";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                  }}
+                >
+                  Download File
+                </a>
+              </div>
+              <div>
+                <PanelSection L={L}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    Apa itu Ghost Protocol?
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.6 }}>
+                    Ghost Protocol adalah bridge otomatis antara sistem RME
+                    (ePuskesmas) dengan Sentra Intelligence Dashboard. Protokol ini
+                    memungkinkan transfer data anamnesis, diagnosis, dan resep dari
+                    dashboard langsung ke formulir RME — tanpa input ulang manual.
+                  </div>
+                </PanelSection>
+                <PanelSection L={L}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    Cara Kerja
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.6 }}>
+                    Sentra Bridge Engine menghubungkan sesi RME aktif.
+                    Data CDSS (keluhan, diagnosis ICD-10, terapi) di-transfer
+                    otomatis ke form ePuskesmas melalui socket bridge dengan
+                    progress real-time. Session reuse 30 menit untuk efisiensi.
+                  </div>
+                </PanelSection>
+                <PanelSection L={L} last>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    Status Koneksi
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 12,
+                      color: L.muted,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 99,
+                        background: "#27ae60",
+                        flexShrink: 0,
+                      }}
+                    />
+                    RME Bridge tersedia — siap digunakan dari halaman EMR
+                  </div>
+                </PanelSection>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4 — Critical Mind Algorithm */}
+          {activeTab === 4 && (
+            <div
+              className="summary-tab-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "232px minmax(0, 1fr)",
+                minHeight: 144,
+              }}
+            >
+              <div
+                className="summary-tab-sidebar"
+                style={{
+                  padding: "16px 18px",
+                  borderRight: `1px solid ${L.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: L.text,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Critical Mind Algorithm
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.5 }}>
+                    Iskandar Engine — kerangka reasoning klinis yang mendasari
+                    seluruh proses diagnosis AI di Sentra.
+                  </div>
+                </div>
+                <a
+                  href="/critical-mind"
+                  className="summary-sidebar-cta"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    color: "#ffffff",
+                    background: L.statusTone,
+                    border: `1px solid ${L.statusTone}`,
+                    borderRadius: 3,
+                    padding: "6px 12px",
+                    textDecoration: "none",
+                    marginTop: 16,
+                    transition: "opacity 0.15s",
+                    fontSize: 13,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.8";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                  }}
+                >
+                  Lihat Detail →
+                </a>
+              </div>
+              <div>
+                <PanelSection L={L}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    Iskandar Diagnosis Engine V2
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.6 }}>
+                    LLM-first architecture dengan knowledge base grounding — 172
+                    penyakit KKI, hybrid retrieval (BM25 + semantic embedding), dan
+                    multi-layer validation.
+                  </div>
+                </PanelSection>
+                <PanelSection L={L}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    NEWS2 Early Warning System
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.6 }}>
+                    Graduated vital signs scoring (5 parameter, skor 0-3) untuk
+                    deteksi dini deteriorasi fisiologis. Terintegrasi dengan 7 pola
+                    penyakit spesifik: DHF, sepsis (SIRS/qSOFA), gagal napas, ACS,
+                    syok hemoragik, preeklampsia, dan malaria berat.
+                  </div>
+                </PanelSection>
+                <PanelSection L={L}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    Safety Layers
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.6 }}>
+                    5 lapis keamanan klinis: vital signs red flags (hardcoded),
+                    NEWS2 composite scoring, disease-specific early warning,
+                    KB grounding validation (ICD-10 + sex/age/pregnancy plausibility
+                    + drug-allergy cross-reference), dan hybrid decisioning
+                    deterministik.
+                  </div>
+                </PanelSection>
+                <PanelSection L={L} last>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 500, color: L.text, marginBottom: 4 }}
+                  >
+                    Retrieval Pipeline
+                  </div>
+                  <div style={{ fontSize: 13, color: L.muted, lineHeight: 1.6 }}>
+                    BM25 keyword scoring → Gemini semantic embedding (768-dim) →
+                    Reciprocal Rank Fusion merge → DeepSeek Reasoner (primary) /
+                    Gemini Flash-Lite (fallback) dengan circuit breaker. Alias
+                    expansion 350+ sinonim bahasa Indonesia awam → klinis.
+                  </div>
+                </PanelSection>
+              </div>
+            </div>
+          )}
         </div>
         {/* end collapse wrapper */}
       </div>
       <style>{`@keyframes dotPulse { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }`}</style>
-
-      {/* ── Sentra HUB header ── */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 1200,
-          border: `1px solid ${L.border}`,
-          borderRadius: 8,
-          background: L.bgHero,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 20,
-          marginBottom: 32,
-          padding: "18px 20px",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "grid", gap: 6 }}>
-          <div
-            style={{
-              fontSize: 12,
-              color: L.muted,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-            }}
-          >
-            Sentra HUB
-          </div>
-          <div
-            style={{ fontSize: 26, color: L.text, letterSpacing: "-0.03em" }}
-          >
-            Identitas Crew & Koneksi Operasional
-          </div>
-          <div
-            style={{
-              fontSize: 14,
-              color: L.muted,
-              maxWidth: 720,
-              lineHeight: 1.6,
-            }}
-          >
-            Halaman ini merangkum identitas user, jabatan Sentra, koneksi
-            layanan, dan status aktif harian dalam satu workspace yang lebih
-            ringkas.
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            style={{
-              ...solidStatusBadgeStyle,
-              padding: "5px 10px",
-              fontSize: 12,
-            }}
-          >
-            {profileBadgeValue}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setProfileDraft(profile);
-              setProfileSaveMessage("");
-              setProfileError("");
-              setIsProfileEditorOpen(true);
-            }}
-            style={{
-              height: 36,
-              padding: "0 14px",
-              borderRadius: 3,
-              border: `1px solid ${L.border}`,
-              background: "transparent",
-              color: L.text,
-              fontSize: 15,
-              letterSpacing: "0.06em",
-              cursor: "pointer",
-            }}
-          >
-            Edit Profil
-          </button>
-        </div>
-      </div>
 
       {/* ── 2-col grid ── */}
       <div
@@ -2493,7 +2768,7 @@ export default function ProfilUserPage() {
                     <div style={{ minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: 12,
+                        fontSize: 14,
                           color: L.muted,
                           letterSpacing: "0.16em",
                           textTransform: "uppercase",
@@ -2515,7 +2790,7 @@ export default function ProfilUserPage() {
                       </div>
                       <div
                         style={{
-                          fontSize: 15,
+                          fontSize: 14,
                           color: L.muted,
                           marginBottom: 10,
                         }}
@@ -2534,19 +2809,6 @@ export default function ProfilUserPage() {
                         >
                           {roleLabel}
                         </span>
-                        <span
-                          style={{
-                            fontSize: 12,
-                            color: absenSiparwa ? "#f0b264" : L.muted,
-                            letterSpacing: "0.08em",
-                            padding: "5px 10px",
-                            borderRadius: 999,
-                            border: `1px solid ${L.border}`,
-                            background: L.bg,
-                          }}
-                        >
-                          {hubPresenceLabel}
-                        </span>
                         {(degreeBadges.length > 0
                           ? degreeBadges
                           : ["Belum diisi"]
@@ -2554,12 +2816,9 @@ export default function ProfilUserPage() {
                           <span
                             key={g}
                             style={{
-                              fontSize: 12,
-                              color: L.muted,
-                              letterSpacing: "0.1em",
-                              padding: "5px 8px",
-                              borderRadius: 999,
-                              border: `1px solid ${L.border}`,
+                              ...solidStatusBadgeStyle,
+                              padding: "4px 10px",
+                              fontSize: 11,
                             }}
                           >
                             {g}
@@ -2571,8 +2830,8 @@ export default function ProfilUserPage() {
                   {rankBadgeSrc ? (
                     <div
                       style={{
-                        width: "clamp(82px, 22vw, 132px)",
-                        minWidth: 82,
+                        width: "clamp(74px, 18vw, 116px)",
+                        minWidth: 74,
                         display: "flex",
                         justifyContent: "flex-end",
                         alignItems: "center",
@@ -2587,7 +2846,7 @@ export default function ProfilUserPage() {
                         style={{
                           display: "block",
                           maxWidth: "100%",
-                          maxHeight: 72,
+                          maxHeight: 62,
                           width: "auto",
                           height: "auto",
                           objectFit: "contain",
@@ -2627,7 +2886,7 @@ export default function ProfilUserPage() {
                       </div>
                       <div
                         style={{
-                          fontSize: 15,
+                          fontSize: 14,
                           color: L.text,
                           lineHeight: 1.45,
                         }}
@@ -2664,52 +2923,66 @@ export default function ProfilUserPage() {
                     >
                       Link Resmi
                     </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {visibleProfileLinks.length > 0 ? (
-                        visibleProfileLinks.map((item) => (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                      {officialLinkLogos.map((item) => {
+                        const content = (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              display: "inline-block",
+                              width: 26,
+                              height: 26,
+                              flexShrink: 0,
+                              background: item.href ? L.signal : L.muted,
+                              opacity: item.href ? 1 : 0.55,
+                              WebkitMaskImage: `url(${item.iconSrc})`,
+                              maskImage: `url(${item.iconSrc})`,
+                              WebkitMaskRepeat: "no-repeat",
+                              maskRepeat: "no-repeat",
+                              WebkitMaskPosition: "center",
+                              maskPosition: "center",
+                              WebkitMaskSize: "contain",
+                              maskSize: "contain",
+                            }}
+                          />
+                        );
+
+                        const sharedStyle: React.CSSProperties = {
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 28,
+                          height: 28,
+                          textDecoration: "none",
+                        };
+
+                        if (!item.href) {
+                          return (
+                            <div
+                              key={item.label}
+                              title={item.label}
+                              aria-label={item.label}
+                              style={sharedStyle}
+                            >
+                              {content}
+                            </div>
+                          );
+                        }
+
+                        return (
                           <a
-                            key={item.key}
+                            key={item.label}
                             href={item.href}
                             target="_blank"
                             rel="noreferrer"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "7px 11px",
-                              borderRadius: 999,
-                              border: `1px solid ${L.border}`,
-                              background: "rgba(255,255,255,0.02)",
-                              color: item.color,
-                              textDecoration: "none",
-                              fontSize: 12,
-                              letterSpacing: "0.04em",
-                            }}
+                            title={item.label}
+                            aria-label={item.label}
+                            style={sharedStyle}
                           >
-                            <img
-                              src={item.iconSrc}
-                              alt={`${item.label} logo`}
-                              style={{
-                                width: 15,
-                                height: 15,
-                                objectFit: "contain",
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span>{item.label}</span>
+                            {content}
                           </a>
-                        ))
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: 14,
-                            color: L.muted,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          Link resmi belum ditambahkan.
-                        </span>
-                      )}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2717,7 +2990,7 @@ export default function ProfilUserPage() {
             </PanelSection>
 
             {/* Data Pribadi */}
-            <PanelSection L={L}>
+            <PanelSection L={L} last>
               <SectionLabel L={L}>Data Pribadi</SectionLabel>
               <Row
                 L={L}
@@ -2750,33 +3023,9 @@ export default function ProfilUserPage() {
               />
               <Row
                 L={L}
-                label="Gol. Darah"
-                val={profile.bloodType || "Belum diisi"}
-              />
-              <Row
-                L={L}
                 label="Email"
                 val={sessionUser?.email || "Belum diisi"}
               />
-            </PanelSection>
-
-            {/* Status */}
-            <PanelSection L={L} last>
-              <SectionLabel L={L}>Status</SectionLabel>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {statusBadges.map((label) => (
-                  <span
-                    key={label}
-                    style={{
-                      ...solidStatusBadgeStyle,
-                      letterSpacing: "0.08em",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
             </PanelSection>
           </Panel>
 
@@ -2801,20 +3050,10 @@ export default function ProfilUserPage() {
               }}
             >
               {QUICK_LINKS.map((link, i) => {
-                const isApel = link.label === "Absen Apel Pagi";
-                const isSiparwa = link.label === "SIPARWA";
-                const checked = isApel
-                  ? absenApel
-                  : isSiparwa
-                    ? absenSiparwa
-                    : false;
-                const isAbsen = isApel || isSiparwa;
-
                 const wrapStyle: React.CSSProperties = {
                   border: `1px solid ${L.border}`,
                   borderRadius: 8,
-                  background:
-                    isAbsen && checked ? L.statusToneSoft : "transparent",
+                  background: "transparent",
                   transition: "background 0.15s",
                   overflow: "hidden",
                 };
@@ -2830,47 +3069,15 @@ export default function ProfilUserPage() {
                   cursor: "pointer",
                 };
 
-                const labelColor = isAbsen && checked ? L.statusTone : L.text;
-                const badgeColor = isAbsen && checked ? L.statusTone : L.muted;
-                const badgeBorder =
-                  isAbsen && checked
-                    ? `1px solid ${L.statusTone}`
-                    : `1px solid ${L.border}`;
-                const badgeText = isAbsen
-                  ? checked
-                    ? "SUDAH"
-                    : link.badge
-                  : link.badge;
-
                 const content = (
                   <>
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 6 }}
                     >
-                      {isAbsen && (
-                        <span
-                          style={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: 2,
-                            flexShrink: 0,
-                            border: `1px solid ${checked ? L.statusTone : L.muted}`,
-                            background: checked ? L.statusTone : "transparent",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 13,
-                            color: L.bg,
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          {checked ? "✓" : ""}
-                        </span>
-                      )}
                       <span
                         style={{
-                          fontSize: 15,
-                          color: labelColor,
+                          fontSize: 13,
+                          color: L.text,
                           transition: "color 0.2s",
                         }}
                       >
@@ -2887,26 +3094,26 @@ export default function ProfilUserPage() {
                     >
                       <div
                         style={{
-                          fontSize: 15,
+                          fontSize: 14,
                           color: L.muted,
                           letterSpacing: "0.02em",
                         }}
                       >
-                        {isAbsen && checked ? "Sudah diabsen" : link.desc}
+                        {link.desc}
                       </div>
                       <span
                         style={{
                           fontSize: 13,
-                          color: badgeColor,
+                          color: L.muted,
                           letterSpacing: "0.08em",
                           padding: "1px 5px",
                           borderRadius: 2,
-                          border: badgeBorder,
+                          border: `1px solid ${L.border}`,
                           flexShrink: 0,
                           transition: "all 0.2s",
                         }}
                       >
-                        {badgeText}
+                        {link.badge}
                       </span>
                     </div>
                   </>
@@ -2914,56 +3121,157 @@ export default function ProfilUserPage() {
 
                 return (
                   <div key={i} style={wrapStyle}>
-                    {isAbsen ? (
-                      <button
-                        type="button"
-                        onClick={isApel ? toggleApel : toggleSiparwa}
-                        style={{
-                          ...innerStyle,
-                          background: "transparent",
-                          border: "none",
-                          textAlign: "left",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!checked)
-                            e.currentTarget.parentElement!.style.background =
-                              L.bgHover;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.parentElement!.style.background =
-                            checked ? L.statusToneSoft : "transparent";
-                        }}
-                      >
-                        {content}
-                      </button>
-                    ) : (
-                      <a
-                        href={link.href}
-                        target={
-                          link.href.startsWith("http") ? "_blank" : undefined
-                        }
-                        rel={
-                          link.href.startsWith("http")
-                            ? "noopener noreferrer"
-                            : undefined
-                        }
-                        style={innerStyle}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.parentElement!.style.background =
-                            L.bgHover;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.parentElement!.style.background =
-                            "transparent";
-                        }}
-                      >
-                        {content}
-                      </a>
-                    )}
+                    <a
+                      href={link.href}
+                      target={link.href.startsWith("http") ? "_blank" : undefined}
+                      rel={
+                        link.href.startsWith("http")
+                          ? "noopener noreferrer"
+                          : undefined
+                      }
+                      style={innerStyle}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.parentElement!.style.background =
+                          L.bgHover;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.parentElement!.style.background =
+                          "transparent";
+                      }}
+                    >
+                      {content}
+                    </a>
                   </div>
                 );
               })}
             </div>
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <SectionLabel L={L}>WHOS ONLINE</SectionLabel>
+            <Panel L={L}>
+              <PanelSection L={L} last>
+                {onlineRoster.length > 0 ? (
+                  <div
+                    className={hasScrollableOnlineRoster ? "who-online-scroll" : undefined}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                      maxHeight: hasScrollableOnlineRoster ? 286 : undefined,
+                      overflowY: hasScrollableOnlineRoster ? "auto" : "visible",
+                      paddingRight: hasScrollableOnlineRoster ? 4 : 0,
+                    }}
+                  >
+                    {onlineRoster.map((user, index) => {
+                      const subtitle =
+                        user.profession || formatRoleLabel(user.role);
+                      const isCurrentUser = user.userId === sessionUser?.username;
+
+                      return (
+                        <div
+                          key={user.userId}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "minmax(0, 1fr) auto",
+                            alignItems: "center",
+                            gap: 10,
+                            paddingBottom: 10,
+                            borderBottom:
+                              index === onlineRoster.length - 1
+                                ? "none"
+                                : `1px solid ${L.border}`,
+                          }}
+                        >
+                          <div
+                            style={{
+                              minWidth: 0,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 14,
+                                  color: L.text,
+                                  lineHeight: 1.35,
+                                }}
+                              >
+                                {user.name}
+                              </span>
+                              {isCurrentUser ? (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: L.accent,
+                                    letterSpacing: "0.12em",
+                                  }}
+                                >
+                                  ANDA
+                                </span>
+                              ) : null}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                color: L.muted,
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {subtitle}
+                              {user.institution ? ` • ${user.institution}` : ""}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "#4CAF50",
+                              letterSpacing: "0.14em",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <span
+                              aria-hidden
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: "#4CAF50",
+                                boxShadow: "0 0 8px rgba(76,175,80,0.45)",
+                                display: "inline-block",
+                              }}
+                            />
+                            ONLINE
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: L.muted,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Belum ada crew yang sedang online.
+                  </div>
+                )}
+              </PanelSection>
+            </Panel>
           </div>
         </div>
         {/* ── end kolom kiri ── */}
@@ -2982,8 +3290,8 @@ export default function ProfilUserPage() {
                   marginBottom: 6,
                 }}
               >
-                {(positionBadges.length > 0
-                  ? positionBadges
+                {(visiblePositionBadges.length > 0
+                  ? visiblePositionBadges
                   : [sessionUser?.profession || "Belum diisi"]
                 ).map((jobTitle) => (
                   <span
@@ -2996,34 +3304,12 @@ export default function ProfilUserPage() {
               </div>
               <div
                 style={{
-                  fontSize: 15,
+                          fontSize: 14,
                   color: L.muted,
                   letterSpacing: "0.02em",
                 }}
               >
                 {sessionUser?.institution || "Institusi belum diatur"}
-              </div>
-            </PanelSection>
-
-            {/* Konsultan */}
-            <PanelSection L={L}>
-              <SectionLabel L={L}>Konsultan</SectionLabel>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {(serviceAreaBadges.length > 0
-                  ? serviceAreaBadges
-                  : ["Belum diisi"]
-                ).map((k) => (
-                  <span
-                    key={k}
-                    style={{
-                      ...solidStatusBadgeStyle,
-                      letterSpacing: "0.08em",
-                      padding: "4px 10px",
-                    }}
-                  >
-                    {k}
-                  </span>
-                ))}
               </div>
             </PanelSection>
 
@@ -3040,26 +3326,25 @@ export default function ProfilUserPage() {
                 label="Profesi"
                 val={sessionUser?.profession || "Belum diisi"}
               />
-              <Row
-                L={L}
-                label="Role"
-                val={sessionUser?.role || "Belum diisi"}
-                accent
-              />
-              <Row
-                L={L}
-                label="Tambahan"
-                val={profile.institutionAdditional || "Belum diisi"}
-              />
-              <Row
-                L={L}
-                label="Jabatan"
-                val={
-                  positionBadges.length > 0
-                    ? positionBadges.join(", ")
-                    : "Belum diisi"
-                }
-              />
+              {isAdminDashboardUser ? (
+                <>
+                  <Row
+                    L={L}
+                    label="Role"
+                    val={sessionUser?.role || "Belum diisi"}
+                    accent
+                  />
+                  <Row
+                    L={L}
+                    label="Role Sentra"
+                    val={
+                      visiblePositionBadges.length > 0
+                        ? visiblePositionBadges.join(", ")
+                        : "Belum diisi"
+                    }
+                  />
+                </>
+              ) : null}
             </PanelSection>
 
             {/* Kredensial */}
@@ -3104,7 +3389,7 @@ export default function ProfilUserPage() {
                 />
                 <span
                   style={{
-                    fontSize: 15,
+                    fontSize: 14,
                     color: L.muted,
                     letterSpacing: "0.04em",
                   }}
@@ -3188,6 +3473,7 @@ export default function ProfilUserPage() {
                   setProfileDraft(profile);
                   setProfileError("");
                   setProfileSaveMessage("");
+                  resetProfileSelectionInputs();
                   setIsProfileEditorOpen(false);
                 }}
                 style={{
@@ -3237,38 +3523,77 @@ export default function ProfilUserPage() {
                 />
               </label>
 
-              <div style={{ display: "grid", gap: 6, gridColumn: "1 / -1" }}>
+              <div className="gelar-section" style={{ display: "grid", gap: 6, gridColumn: "1 / -1" }}>
                 <span style={{ fontSize: 15, color: L.muted }}>Gelar</span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {CREW_PROFILE_DEGREES.map((degree) => {
-                    const isSelected = profileDraft.degrees.includes(degree);
-                    return (
-                      <button
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 10,
+                    gridTemplateColumns: "minmax(0, 1fr)",
+                  }}
+                >
+                  <select
+                    value={selectedDegreeOption}
+                    onChange={(event) => {
+                      const nextDegree = event.target.value as CrewProfileDegree;
+                      if (!nextDegree) return;
+                      addProfileDegree(nextDegree);
+                      setSelectedDegreeOption("");
+                    }}
+                    style={{
+                      height: 42,
+                      borderRadius: 6,
+                      border: `1px solid ${L.border}`,
+                      background: L.bg,
+                      color: L.text,
+                      fontSize: 15,
+                      padding: "0 12px",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="">Pilih gelar</option>
+                    {CREW_PROFILE_DEGREES.map((degree) => (
+                      <option
                         key={degree}
-                        type="button"
-                        onClick={() => toggleProfileDegree(degree)}
-                        style={{
-                          minHeight: 34,
-                          padding: "0 12px",
-                          borderRadius: 999,
-                          border: isSelected
-                            ? `1px solid ${L.statusTone}`
-                            : `1px solid ${L.border}`,
-                          background: isSelected
-                            ? L.statusToneSoft
-                            : "transparent",
-                          color: isSelected ? L.text : L.muted,
-                          fontSize: 15,
-                          boxShadow: isSelected
-                            ? "3px 3px 10px rgba(0,0,0,0.12), inset 1px 1px 0 rgba(255,255,255,0.03)"
-                            : "none",
-                          cursor: "pointer",
-                        }}
+                        value={degree}
+                        disabled={profileDraft.degrees.includes(degree)}
                       >
                         {degree}
-                      </button>
-                    );
-                  })}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {profileDraft.degrees.length > 0 ? (
+                      profileDraft.degrees.map((degree) => (
+                        <button
+                          key={degree}
+                          type="button"
+                          onClick={() => removeProfileDegree(degree)}
+                          style={{
+                            minHeight: 34,
+                            padding: "0 12px",
+                            borderRadius: 999,
+                            border: `1px solid ${L.statusTone}`,
+                            background: L.statusToneSoft,
+                            color: L.text,
+                            fontSize: 14,
+                            boxShadow:
+                              "3px 3px 10px rgba(0,0,0,0.12), inset 1px 1px 0 rgba(255,255,255,0.03)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {degree} ×
+                        </button>
+                      ))
+                    ) : (
+                      <span style={{ fontSize: 14, color: L.muted }}>
+                        Belum ada gelar dipilih.
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 14, color: L.muted }}>
+                    Pilih sampai {CREW_PROFILE_MAX_DEGREES} gelar.
+                  </div>
                 </div>
               </div>
 
@@ -3432,78 +3757,172 @@ export default function ProfilUserPage() {
                 />
               </label>
 
-              <div style={{ display: "grid", gap: 6, gridColumn: "1 / -1" }}>
+              <div style={{ display: "grid", gap: 14, gridColumn: "1 / -1" }}>
                 <span style={{ fontSize: 15, color: L.muted }}>
-                  Jabatan / posisi
+                  Role Sentra dan posisi
                 </span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {CREW_PROFILE_POSITIONS.map((jobTitle) => {
-                    const isSelected =
-                      profileDraft.jobTitles.includes(jobTitle);
-                    const isDisabled =
-                      !isSelected &&
-                      profileDraft.jobTitles.length >=
-                        CREW_PROFILE_MAX_POSITIONS;
-                    return (
-                      <button
-                        key={jobTitle}
-                        type="button"
-                        onClick={() => toggleProfileJobTitle(jobTitle)}
-                        disabled={isDisabled}
-                        style={{
-                          minHeight: 34,
-                          padding: "0 12px",
-                          borderRadius: 999,
-                          border: isSelected
-                            ? `1px solid ${L.statusTone}`
-                            : `1px solid ${L.border}`,
-                          background: isSelected
-                            ? L.statusToneSoft
-                            : "transparent",
-                          color: isSelected ? L.text : L.muted,
-                          fontSize: 15,
-                          boxShadow: isSelected
-                            ? "3px 3px 10px rgba(0,0,0,0.12), inset 1px 1px 0 rgba(255,255,255,0.03)"
-                            : "none",
-                          cursor: isDisabled ? "not-allowed" : "pointer",
-                          opacity: isDisabled ? 0.45 : 1,
-                          textAlign: "left",
-                        }}
-                      >
-                        {jobTitle}
-                      </button>
-                    );
-                  })}
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: L.muted,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Role Sentra
+                    </span>
+                    <select
+                      value={selectedSentraRoleOption}
+                      onChange={(event) => {
+                        const nextRole = event.target
+                          .value as CrewProfilePosition;
+                        if (!nextRole) return;
+                        addProfileJobTitle(nextRole);
+                        setSelectedSentraRoleOption("");
+                      }}
+                      style={{
+                        height: 42,
+                        borderRadius: 6,
+                        border: `1px solid ${L.border}`,
+                        background: L.bg,
+                        color: L.text,
+                        fontSize: 15,
+                        padding: "0 12px",
+                        outline: "none",
+                      }}
+                    >
+                      <option value="">Pilih role sentra</option>
+                      {CREW_PROFILE_SENTRA_ROLES.map((jobTitle) => (
+                        <option
+                          key={jobTitle}
+                          value={jobTitle}
+                          disabled={
+                            profileDraft.jobTitles.includes(jobTitle) ||
+                            profileDraft.jobTitles.length >=
+                              CREW_PROFILE_MAX_POSITIONS
+                          }
+                        >
+                          {jobTitle}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {selectedSentraRoles.length > 0 ? (
+                        selectedSentraRoles.map((jobTitle) => (
+                            <button
+                              key={jobTitle}
+                              type="button"
+                              onClick={() => removeProfileJobTitle(jobTitle)}
+                              style={{
+                                minHeight: 34,
+                                padding: "0 12px",
+                                borderRadius: 999,
+                                border: `1px solid ${L.statusTone}`,
+                                background: L.statusToneSoft,
+                                color: L.text,
+                                fontSize: 14,
+                                boxShadow:
+                                  "3px 3px 10px rgba(0,0,0,0.12), inset 1px 1px 0 rgba(255,255,255,0.03)",
+                                cursor: "pointer",
+                                textAlign: "left",
+                              }}
+                            >
+                              {jobTitle} ×
+                            </button>
+                          ))
+                      ) : (
+                        <span style={{ fontSize: 14, color: L.muted }}>
+                          Belum ada role sentra dipilih.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: L.muted,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Posisi
+                    </span>
+                    <select
+                      value={selectedStructuralPositionOption}
+                      onChange={(event) => {
+                        const nextPosition = event.target
+                          .value as CrewProfilePosition;
+                        if (!nextPosition) return;
+                        addProfileJobTitle(nextPosition);
+                        setSelectedStructuralPositionOption("");
+                      }}
+                      style={{
+                        height: 42,
+                        borderRadius: 6,
+                        border: `1px solid ${L.border}`,
+                        background: L.bg,
+                        color: L.text,
+                        fontSize: 15,
+                        padding: "0 12px",
+                        outline: "none",
+                      }}
+                    >
+                      <option value="">Pilih posisi</option>
+                      {CREW_PROFILE_STRUCTURAL_POSITIONS.map((jobTitle) => (
+                        <option
+                          key={jobTitle}
+                          value={jobTitle}
+                          disabled={
+                            profileDraft.jobTitles.includes(jobTitle) ||
+                            profileDraft.jobTitles.length >=
+                              CREW_PROFILE_MAX_POSITIONS
+                          }
+                        >
+                          {jobTitle}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {selectedStructuralPositions.length > 0 ? (
+                        selectedStructuralPositions.map((jobTitle) => (
+                            <button
+                              key={jobTitle}
+                              type="button"
+                              onClick={() => removeProfileJobTitle(jobTitle)}
+                              style={{
+                                minHeight: 34,
+                                padding: "0 12px",
+                                borderRadius: 999,
+                                border: `1px solid ${L.statusTone}`,
+                                background: L.statusToneSoft,
+                                color: L.text,
+                                fontSize: 14,
+                                boxShadow:
+                                  "3px 3px 10px rgba(0,0,0,0.12), inset 1px 1px 0 rgba(255,255,255,0.03)",
+                                cursor: "pointer",
+                                textAlign: "left",
+                              }}
+                            >
+                              {jobTitle} ×
+                            </button>
+                          ))
+                      ) : (
+                        <span style={{ fontSize: 14, color: L.muted }}>
+                          Belum ada posisi dipilih.
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div style={{ fontSize: 15, color: L.muted }}>
-                  Pilih sampai {CREW_PROFILE_MAX_POSITIONS} jabatan/posisi.
+                  Pilih sampai {CREW_PROFILE_MAX_POSITIONS} item gabungan untuk
+                  role sentra dan posisi.
                 </div>
               </div>
-
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 15, color: L.muted }}>
-                  Institusi tambahan
-                </span>
-                <input
-                  value={profileDraft.institutionAdditional}
-                  onChange={(event) =>
-                    setProfileDraft((current) => ({
-                      ...current,
-                      institutionAdditional: event.target.value,
-                    }))
-                  }
-                  style={{
-                    height: 42,
-                    borderRadius: 6,
-                    border: `1px solid ${L.border}`,
-                    background: L.bg,
-                    color: L.text,
-                    fontSize: 15,
-                    padding: "0 12px",
-                    outline: "none",
-                  }}
-                />
-              </label>
 
               <label style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 15, color: L.muted }}>
@@ -3628,6 +4047,78 @@ export default function ProfilUserPage() {
               </label>
 
               <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 15, color: L.muted }}>Instagram</span>
+                <input
+                  value={profileDraft.instagramUrl}
+                  onChange={(event) =>
+                    setProfileDraft((current) => ({
+                      ...current,
+                      instagramUrl: event.target.value,
+                    }))
+                  }
+                  placeholder="instagram.com/username"
+                  style={{
+                    height: 42,
+                    borderRadius: 6,
+                    border: `1px solid ${L.border}`,
+                    background: L.bg,
+                    color: L.text,
+                    fontSize: 15,
+                    padding: "0 12px",
+                    outline: "none",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 15, color: L.muted }}>TikTok</span>
+                <input
+                  value={profileDraft.tiktokUrl}
+                  onChange={(event) =>
+                    setProfileDraft((current) => ({
+                      ...current,
+                      tiktokUrl: event.target.value,
+                    }))
+                  }
+                  placeholder="tiktok.com/@username"
+                  style={{
+                    height: 42,
+                    borderRadius: 6,
+                    border: `1px solid ${L.border}`,
+                    background: L.bg,
+                    color: L.text,
+                    fontSize: 15,
+                    padding: "0 12px",
+                    outline: "none",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 15, color: L.muted }}>YouTube</span>
+                <input
+                  value={profileDraft.youtubeUrl}
+                  onChange={(event) =>
+                    setProfileDraft((current) => ({
+                      ...current,
+                      youtubeUrl: event.target.value,
+                    }))
+                  }
+                  placeholder="youtube.com/@channel"
+                  style={{
+                    height: 42,
+                    borderRadius: 6,
+                    border: `1px solid ${L.border}`,
+                    background: L.bg,
+                    color: L.text,
+                    fontSize: 15,
+                    padding: "0 12px",
+                    outline: "none",
+                  }}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 15, color: L.muted }}>NIP</span>
                 <input
                   value={profileDraft.employeeId}
@@ -3714,63 +4205,6 @@ export default function ProfilUserPage() {
                   dan konteks layanan.
                 </div>
               </div>
-            </div>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ fontSize: 15, color: L.muted }}>Bidang layanan</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {CREW_ACCESS_SERVICE_AREAS.map((area) => {
-                  const isSelected = profileDraft.serviceAreas.includes(area);
-                  return (
-                    <button
-                      key={area}
-                      type="button"
-                      onClick={() => toggleServiceArea(area)}
-                      style={{
-                        minHeight: 34,
-                        padding: "0 12px",
-                        borderRadius: 999,
-                        border: isSelected
-                          ? `1px solid ${L.statusTone}`
-                          : `1px solid ${L.border}`,
-                        background: isSelected
-                          ? L.statusToneSoft
-                          : "transparent",
-                        color: isSelected ? L.text : L.muted,
-                        fontSize: 15,
-                        boxShadow: isSelected
-                          ? "3px 3px 10px rgba(0,0,0,0.12), inset 1px 1px 0 rgba(255,255,255,0.03)"
-                          : "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {area}
-                    </button>
-                  );
-                })}
-              </div>
-              {profileDraft.serviceAreas.includes("Lainnya") ? (
-                <input
-                  value={profileDraft.serviceAreaOther}
-                  onChange={(event) =>
-                    setProfileDraft((current) => ({
-                      ...current,
-                      serviceAreaOther: event.target.value,
-                    }))
-                  }
-                  placeholder="Isi bidang layanan lain"
-                  style={{
-                    height: 42,
-                    borderRadius: 6,
-                    border: `1px solid ${L.border}`,
-                    background: L.bg,
-                    color: L.text,
-                    fontSize: 15,
-                    padding: "0 12px",
-                    outline: "none",
-                  }}
-                />
-              ) : null}
             </div>
 
             {profileError ? (

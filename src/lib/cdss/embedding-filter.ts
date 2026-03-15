@@ -94,9 +94,10 @@ interface PenyakitEntry {
   nama: string;
   definisi?: string;
   gejala?: string[];
+  gejala_klinis?: string[];
   pemeriksaan_fisik?: string[];
   red_flags?: string[];
-  terpi?: Array<{ obat: string; dosis: string; frek: string }>;
+  terapi?: Array<{ obat: string; dosis: string; frek: string }>;
   kriteria_rujukan?: string;
   diagnosis_banding?: string[];
 }
@@ -133,10 +134,10 @@ function toFilteredDisease(
     icd10: entry.icd10,
     nama: entry.nama,
     definisi: entry.definisi ?? "",
-    gejala: entry.gejala ?? [],
+    gejala: [...(entry.gejala ?? []), ...(entry.gejala_klinis ?? [])],
     pemeriksaan_fisik: entry.pemeriksaan_fisik ?? [],
     red_flags: entry.red_flags ?? [],
-    terpi: entry.terpi ?? [],
+    terapi: entry.terapi ?? [],
     kriteria_rujukan: entry.kriteria_rujukan ?? "",
     diagnosis_banding: entry.diagnosis_banding ?? [],
     score,

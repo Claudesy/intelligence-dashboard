@@ -563,7 +563,6 @@ export default function HubPage() {
                 {roster.map((member, idx) => {
                   const isOnline = onlineUserIds.has(member.username);
                   const professionMark = getProfessionMark(member.profession);
-                  const shiftLabel = getShiftLabel(member.profession);
                   const avatarUrl = member.profile?.avatarUrl || "/avatar.png";
                   const fullName =
                     member.profile?.fullName || member.displayName;
@@ -577,10 +576,8 @@ export default function HubPage() {
                     member.role,
                     jobTitles,
                   );
-                  const displayTitle =
-                    degrees.length > 0
-                      ? `${degrees.join(" ")} ${fullName}`
-                      : fullName;
+                  const degreesLabel =
+                    degrees.length > 0 ? degrees.join(", ") : "";
                   const accessRoleLabel = formatRole(member.role);
                   const professionLabel = formatProfessionLabel(
                     member.profession,
@@ -591,7 +588,6 @@ export default function HubPage() {
                   );
                   const rosterMeta = [
                     { label: "Role Akses", value: accessRoleLabel },
-                    { label: "Jam Aktif", value: shiftLabel },
                   ];
                   const profileLinks = [
                     {
@@ -697,8 +693,20 @@ export default function HubPage() {
                               overflow: "hidden",
                             }}
                           >
-                            {displayTitle}
+                            {fullName}
                           </div>
+                          {degreesLabel && (
+                            <div
+                              style={{
+                                fontSize: 10.5,
+                                color: "var(--text-muted)",
+                                lineHeight: 1.3,
+                                marginTop: 2,
+                              }}
+                            >
+                              {degreesLabel}
+                            </div>
+                          )}
                           <div
                             style={{
                               display: "grid",
@@ -926,7 +934,7 @@ export default function HubPage() {
                         <div
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                            gridTemplateColumns: "minmax(0, 1fr)",
                             gap: 6,
                           }}
                         >

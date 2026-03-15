@@ -39,9 +39,9 @@ Proses adaptasi model dari pengetahuan medis global ke dalam kebiasaan dan alur 
 - **Google Vertex AI Pipelines:** Orkestrasi pelatihan menggunakan infrastruktur kelas _enterprise_ yang aman dan terisolasi.
 - **Supervised Fine-Tuning (SFT) via PEFT/LoRA:** Pembaruan bobot model secara efisien untuk menguasai linguistik medis Indonesia (termasuk singkatan klinis lokal dan bahasa anamnesis pasien).
 - **RLHF (Reinforcement Learning from Human Feedback):** dr. Ferdi bertindak sebagai _Clinical Steward_. Model dilatih berdasarkan _reward system_ yang memprioritaskan:
-  1.  Akurasi diagnosis banding.
-  2.  Keamanan rekomendasi tata laksana.
-  3.  Empati dan etika komunikasi klinis.
+  1. Akurasi diagnosis banding.
+  2. Keamanan rekomendasi tata laksana.
+  3. Empati dan etika komunikasi klinis.
 
 ## 5. EVALUATION, SAFETY & ZERO-TOLERANCE DEPLOYMENT
 

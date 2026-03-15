@@ -114,11 +114,8 @@ export async function writeCDSSAuditEntry({
         metadata,
       },
     });
-  } catch (error) {
-    console.error("[cdss-workflow] Gagal menulis audit entry:", {
-      action,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
+    // Audit write failure — silent to avoid leaking info
   }
 }
 
@@ -157,10 +154,8 @@ export async function writeCDSSOutcomeFeedbackEntry({
         metadata,
       },
     });
-  } catch (error) {
-    console.error("[cdss-workflow] Gagal menulis outcome feedback:", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
+    // Outcome feedback write failure — silent
   }
 }
 
@@ -280,10 +275,74 @@ export async function getCDSSQualityMetrics(
         0,
       ),
     };
-  } catch (error) {
-    console.error("[cdss-workflow] Gagal membaca quality metrics:", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
     return empty;
   }
+}
+
+// ─── Per-Encounter CDSS Summary (for Intelligence Dashboard) ─────────────────
+
+export interface CDSSEncounterSummary {
+  sessionHash: string;
+  hasDiagnoseResult: boolean;
+  redFlagCount: number;
+  totalDisplayed: number;
+  modelVersion: string;
+  latestAt: Date;
+}
+
+/**
+ * Fetch CDSS audit summaries for a set of encounter IDs.
+ * Returns a Map<encounterId, CDSSEncounterSummary>.
+ */
+export async function getCDSSEncounterSummaries(
+  encounterIds: string[],
+): Promise<Map<string, CDSSEncounterSummary>> {
+  const result = new Map<string, CDSSEncounterSummary>();
+  if (encounterIds.length === 0 || !shouldUseDatabase()) return result;
+
+  const hashToId = new Map<string, string>();
+  for (const id of encounterIds) {
+    hashToId.set(hashSessionId(id), id);
+  }
+
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    const prismaLike = prisma as unknown as {
+      cDSSAuditLog?: { findMany: (args: unknown) => Promise<CDSSAuditRow[]> };
+    };
+
+    const rows =
+      (await prismaLike.cDSSAuditLog?.findMany({
+        where: {
+          sessionHash: { in: Array.from(hashToId.keys()) },
+          action: "DIAGNOSE_RESULT",
+        },
+        select: {
+          sessionHash: true,
+          timestamp: true,
+          outputSummary: true,
+          modelVersion: true,
+        },
+        orderBy: { timestamp: "desc" },
+      })) ?? [];
+
+    for (const row of rows) {
+      const encounterId = hashToId.get(row.sessionHash);
+      if (!encounterId || result.has(encounterId)) continue;
+
+      result.set(encounterId, {
+        sessionHash: row.sessionHash,
+        hasDiagnoseResult: true,
+        redFlagCount: toNumber(row.outputSummary?.redFlagCount),
+        totalDisplayed: toNumber(row.outputSummary?.totalDisplayed),
+        modelVersion: String(row.metadata?.modelVersion ?? row.outputSummary?.modelVersion ?? "unknown"),
+        latestAt: row.timestamp,
+      });
+    }
+  } catch {
+    // Silent — intelligence dashboard degrades gracefully
+  }
+
+  return result;
 }

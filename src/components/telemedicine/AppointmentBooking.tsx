@@ -278,6 +278,7 @@ export function AppointmentBooking({
 
             <div>
               <FieldLabel>Nama / No. RM Pasien *</FieldLabel>
+              {/* patientId bisa berisi nama lengkap atau nomor RM — dipakai untuk DB dan display */}
               <input
                 placeholder="nama lengkap atau nomor rekam medis..."
                 value={form.patientId ?? ""}

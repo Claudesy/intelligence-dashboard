@@ -193,6 +193,17 @@ export function buildProblemRepresentation(input: CDSSEngineInput): string {
   return snippets.join("; ");
 }
 
+/**
+ * Reciprocal Rank Fusion (RRF) merge strategy.
+ *
+ * RRF score = sum(1 / (k + rank_i)) across all lists.
+ * More robust than raw score addition because it normalizes
+ * different score distributions between keyword and semantic retrieval.
+ *
+ * k=60 is the standard constant (Cormack et al. 2009).
+ */
+const RRF_K = 60;
+
 export function mergeDiseaseCandidates(
   keywordCandidates: FilteredDisease[],
   semanticCandidates: FilteredDisease[],
@@ -206,42 +217,65 @@ export function mergeDiseaseCandidates(
     0,
     ...semanticCandidates.map((candidate) => candidate.score),
   );
-  const merged = new Map<string, CandidateScore>();
 
+  // Build RRF scores from rank positions
+  const rrfScores = new Map<string, number>();
+  const diseaseByKey = new Map<string, FilteredDisease>();
+
+  for (let i = 0; i < keywordCandidates.length; i++) {
+    const candidate = keywordCandidates[i];
+    const key = buildCandidateKey(candidate.icd10, candidate.nama);
+    const rrfContribution = 1 / (RRF_K + i + 1);
+    rrfScores.set(key, (rrfScores.get(key) ?? 0) + rrfContribution);
+    if (!diseaseByKey.has(key)) diseaseByKey.set(key, candidate);
+  }
+
+  for (let i = 0; i < semanticCandidates.length; i++) {
+    const candidate = semanticCandidates[i];
+    const key = buildCandidateKey(candidate.icd10, candidate.nama);
+    const rrfContribution = 1 / (RRF_K + i + 1);
+    rrfScores.set(key, (rrfScores.get(key) ?? 0) + rrfContribution);
+    if (!diseaseByKey.has(key)) diseaseByKey.set(key, candidate);
+  }
+
+  // Build keyword/semantic normalized scores for hybrid decisioning downstream
+  const keywordScoreMap = new Map<string, number>();
   for (const candidate of keywordCandidates) {
     const key = buildCandidateKey(candidate.icd10, candidate.nama);
-    merged.set(key, {
-      disease: candidate,
-      keywordScore: scaleByMax(candidate.score, keywordMax),
-      semanticScore: 0,
-    });
+    keywordScoreMap.set(
+      key,
+      Math.max(
+        keywordScoreMap.get(key) ?? 0,
+        scaleByMax(candidate.score, keywordMax),
+      ),
+    );
   }
 
+  const semanticScoreMap = new Map<string, number>();
   for (const candidate of semanticCandidates) {
     const key = buildCandidateKey(candidate.icd10, candidate.nama);
-    const existing = merged.get(key);
-    if (existing) {
-      existing.semanticScore = Math.max(
-        existing.semanticScore,
+    semanticScoreMap.set(
+      key,
+      Math.max(
+        semanticScoreMap.get(key) ?? 0,
         scaleByMax(candidate.score, semanticMax),
-      );
-      continue;
-    }
-    merged.set(key, {
-      disease: candidate,
-      keywordScore: 0,
-      semanticScore: scaleByMax(candidate.score, semanticMax),
-    });
+      ),
+    );
   }
 
-  return [...merged.values()]
-    .sort(
-      (left, right) =>
-        right.keywordScore +
-        right.semanticScore -
-        (left.keywordScore + left.semanticScore),
-    )
-    .slice(0, topN);
+  // Sort by RRF score, build CandidateScore with normalized keyword/semantic scores
+  return [...rrfScores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .flatMap(([key]) => {
+      const disease = diseaseByKey.get(key);
+      if (!disease) return [];
+      return [{
+        disease,
+        keywordScore: keywordScoreMap.get(key) ?? 0,
+        semanticScore: semanticScoreMap.get(key) ?? 0,
+      }];
+    });
 }
 
 function buildQuestionsFromMissingInformation(
@@ -339,8 +373,10 @@ export function applyHybridDecisioning(
     const keywordScore = candidate?.keywordScore ?? 0;
     const semanticScore = candidate?.semanticScore ?? 0;
 
+    // Weights: keyword boosted post-BM25 upgrade (was 0.34, now 0.36)
+    // LLM slightly reduced (was 0.38, now 0.36) — more balanced with improved retrieval
     let score =
-      suggestion.confidence * 0.38 + keywordScore * 0.34 + semanticScore * 0.22;
+      suggestion.confidence * 0.36 + keywordScore * 0.36 + semanticScore * 0.22;
 
     if (suggestion.rag_verified) score += 0.12;
     if (explainsChiefComplaint(input, candidate)) score += 0.08;
@@ -350,6 +386,7 @@ export function applyHybridDecisioning(
     if (hasValidationFlag(suggestion, "age_implausible")) score -= 0.2;
     if (hasValidationFlag(suggestion, "sex_implausible")) score -= 0.25;
     if (hasValidationFlag(suggestion, "pregnancy_implausible")) score -= 0.3;
+    if (hasValidationFlag(suggestion, "allergy_conflict")) score -= 0.15;
     if (
       hasValidationFlag(suggestion, "icd_not_found") ||
       hasValidationFlag(suggestion, "missing_icd")

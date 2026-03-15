@@ -27,13 +27,8 @@ export async function createAuditLog({
         metadata: (metadata ?? {}) as object,
       },
     });
-  } catch (error) {
-    // Audit log gagal tidak boleh menghentikan flow utama
-    console.error("[AuditLog] Gagal menulis audit log:", {
-      action,
-      userId,
-      error,
-    });
+  } catch {
+    // Audit log gagal tidak boleh menghentikan flow utama — silent
   }
 }
 

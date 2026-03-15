@@ -16,6 +16,8 @@
     "test": "tsx scripts/test-suite.ts",
     "test:auth-hardening": "tsx scripts/test-auth-hardening.ts",
     "test:cdss": "tsx scripts/test-cdss.ts",
+    "test:cdss:engine": "tsx scripts/test-cdss-engine.ts",
+    "test:news2": "tsx scripts/test-news2-early-warning.ts",
     "test:cdss:protected": "node scripts/test-cdss-protected-route.mjs",
     "build": "next build",
     "start": "NODE_ENV=production tsx --conditions react-server server.ts",

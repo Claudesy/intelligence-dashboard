@@ -1,6 +1,6 @@
 <div align="center">
   
-  # Healthcare Intelligence Dashboard
+# Healthcare Intelligence Dashboard
 
 **Clinical Information System for Primary Healthcare Facilities**
 
@@ -68,7 +68,7 @@ Playwright-driven RPA engine that transfers structured clinical data (anamnesis,
 
 Multi-version ICD-10 lookup tool supporting the **2010**, **2016**, and **2019** catalogs with dynamic search, fuzzy matching, and legacy code translation. Enables fast and accurate diagnosis coding at the point of care.
 
-###LB1 Report Automation
+### LB1 Report Automation
 
 End-to-end pipeline that ingests exported visit data from ePuskesmas, normalizes and validates records, maps ICD-10 codes to the national LB1 template, and outputs the completed Excel report — along with a QC CSV of rejected records and a JSON summary file for audit trails.
 

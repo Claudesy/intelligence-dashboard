@@ -2161,6 +2161,15 @@ export default function EMRPage() {
         };
         setCurrentUser(u);
 
+        // Track EMR Clinical usage
+        void fetch("/api/track-usage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "emr-clinical" }),
+        }).catch(() => {
+          // Silent fail
+        });
+
         const socket = socketIO({ transports: ["websocket"] });
         socketRef.current = socket;
 
@@ -2630,7 +2639,7 @@ export default function EMRPage() {
 
     const retrievalTimer = setTimeout(() => {
       if (synthRunIdRef.current !== runId) return;
-      setHeaderText("SENTRA // RM-BARU // EMR RETRIEVAL ACTIVE");
+      setHeaderText("SENTRA // RM-BARU // CLINICAL MIND ALGORITHM RETRIEVAL ACTIVE");
       setShowEmrLoader(true);
 
       [0, 1, 2].forEach((i) => {
@@ -4235,7 +4244,7 @@ export default function EMRPage() {
     setTimeout(
       () => {
         setHeaderText(
-          "EMR Klinis dalam masa pengembangan intensif — khusus penggunaan Poli Umum Dewasa Puskesmas Balowerti",
+          "Clinical Mind Algorithm dalam masa pengembangan intensif — khusus penggunaan Poli Umum Dewasa Puskesmas Balowerti",
         );
         setHeaderColor("var(--c-asesmen)");
       },
@@ -4599,7 +4608,11 @@ export default function EMRPage() {
           className="page-header"
           style={{ maxWidth: "100%", width: "100%", marginBottom: 24 }}
         >
-          <div className="page-title">EMR Klinis</div>
+          <div className="page-title">
+            Clinical Mind
+            <br />
+            Algorithm
+          </div>
           <div className="page-subtitle">
             Workflow klinis terintegrasi untuk Poli Umum Dewasa Puskesmas
             Balowerti
@@ -4706,7 +4719,7 @@ export default function EMRPage() {
         <div
           className="emr-workflow-tabs"
           role="tablist"
-          aria-label="Workflow EMR Klinis"
+          aria-label="Workflow Clinical Mind Algorithm"
         >
           {workflowTabs.map((tab) => {
             const isActive = workflowTab === tab.id;

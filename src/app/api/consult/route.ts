@@ -54,10 +54,6 @@ export async function POST(req: NextRequest) {
       penyakit_kronis: Array.isArray(penyakit_kronis) ? penyakit_kronis : [],
     });
 
-    console.log(
-      `[Consult] Routed to ${target_doctor_id}, consultId: ${consultId}`,
-    );
-
     return NextResponse.json({ ok: true, consultId });
   } catch (err) {
     console.error("[Consult] POST error:", err);

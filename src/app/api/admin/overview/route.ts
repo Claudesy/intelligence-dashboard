@@ -8,6 +8,12 @@ import { listAllCrewProfiles } from "@/lib/server/crew-access-profile";
 import { listPendingRegistrations } from "@/lib/server/crew-access-registration";
 import { readRunHistory } from "@/lib/lb1/history";
 import { readEMRHistory } from "@/lib/emr/history";
+import { getOnlineTodayCount } from "@/lib/server/online-today-tracker";
+import {
+  getTodayUsageData,
+  getRecentLogins,
+  getTopUsers,
+} from "@/lib/server/usage-tracker";
 
 export const runtime = "nodejs";
 
@@ -94,6 +100,7 @@ export async function GET(request: Request) {
       kpi: {
         totalCrew: users.length,
         pendingRegistrations: pendingRegistrations.length,
+        onlineToday: getOnlineTodayCount(),
         lb1Runs: lb1History.length,
         lb1SuccessRuns: lb1Success.length,
         lb1FailedRuns: lb1Failed.length,
@@ -156,6 +163,27 @@ export async function GET(request: Request) {
         createdAt: r.createdAt,
         status: r.status,
       })),
+      usageToday: (() => {
+        try {
+          return getTodayUsageData();
+        } catch {
+          return { hours: [], dashboardCounts: [], emrClinicalCounts: [] };
+        }
+      })(),
+      recentLogins: (() => {
+        try {
+          return getRecentLogins();
+        } catch {
+          return [];
+        }
+      })(),
+      topUsers: (() => {
+        try {
+          return getTopUsers(10);
+        } catch {
+          return [];
+        }
+      })(),
     });
   } catch (error) {
     console.error("[Admin] Overview error:", error);

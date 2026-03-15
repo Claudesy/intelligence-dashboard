@@ -31,10 +31,7 @@ function buildMetricCards(
       value: formatPercent(metrics.eklaimReadinessRate),
       helper: `Updated ${new Date(metrics.generatedAt).toLocaleTimeString(
         "id-ID",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        },
+        { hour: "2-digit", minute: "2-digit" },
       )}`,
     },
     {
@@ -53,21 +50,54 @@ export function OperationalSummaryPanelContent({
   const cards = buildMetricCards(metrics);
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12,
+      }}
+    >
       {cards.map((metric) => (
         <article
           key={metric.label}
-          className="rounded-md border border-[var(--line-base)] px-4 py-4"
+          style={{
+            borderRadius: 4,
+            border: "1px solid var(--line-base)",
+            padding: "16px 20px",
+          }}
         >
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              marginBottom: 10,
+            }}
+          >
             {metric.label}
-          </p>
-          <p className="mt-2 text-2xl font-medium text-[var(--text-main)]">
+          </div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 500,
+              color: "var(--text-main)",
+              marginBottom: 6,
+              fontFamily: "var(--font-mono)",
+            }}
+          >
             {metric.value}
-          </p>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--text-muted)",
+              opacity: 0.7,
+            }}
+          >
             {metric.helper}
-          </p>
+          </div>
         </article>
       ))}
     </div>
@@ -79,11 +109,23 @@ export default function OperationalSummaryPanel(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+        }}
+      >
         {[1, 2, 3, 4].map((item) => (
           <div
             key={item}
-            className="h-[96px] animate-pulse rounded-md border border-[var(--line-base)] bg-[var(--bg-card)]"
+            style={{
+              height: 96,
+              borderRadius: 4,
+              border: "1px solid var(--line-base)",
+              background: "var(--bg-card)",
+              animation: "pulse 2s ease-in-out infinite",
+            }}
           />
         ))}
       </div>
@@ -92,9 +134,37 @@ export default function OperationalSummaryPanel(): React.JSX.Element {
 
   if (error || !metrics) {
     return (
-      <p className="rounded-md border border-dashed border-[var(--c-critical)] px-4 py-3 text-sm text-[var(--c-critical)]">
-        {error ?? "Ringkasan operasional belum tersedia."}
-      </p>
+      <div
+        style={{
+          padding: "40px 24px",
+          textAlign: "center",
+          color: "var(--text-muted)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 28,
+            fontFamily: "var(--font-mono)",
+            opacity: 0.2,
+            marginBottom: 12,
+          }}
+        >
+          ≡
+        </div>
+        <div style={{ fontSize: 14, marginBottom: 4 }}>
+          {error ?? "Ringkasan operasional belum tersedia"}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.05em",
+            opacity: 0.5,
+          }}
+        >
+          To be filled — metrik akan terisi saat shift berjalan
+        </div>
+      </div>
     );
   }
 

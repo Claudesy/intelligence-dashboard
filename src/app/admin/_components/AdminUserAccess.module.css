@@ -25,7 +25,7 @@
 .tablePanel,
 .editPanel {
   border: 1px solid var(--line-base);
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
   background: var(--bg-nav);
 }
 
@@ -82,7 +82,7 @@
 }
 
 .kpiCardPending {
-  border-color: rgba(230, 126, 34, 0.3);
+  border-color: var(--c-asesmen-border);
   border-left: 3px solid var(--c-asesmen);
 }
 
@@ -102,9 +102,9 @@
 }
 
 .kpiBadge {
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   padding: 1px 6px;
-  background: rgba(230, 126, 34, 0.15);
+  background: var(--c-asesmen-soft);
   color: var(--c-asesmen);
   font-size: 10px;
   font-weight: 700;
@@ -118,9 +118,9 @@
 
 .pendingPanel {
   margin-bottom: 28px;
-  border: 1px solid rgba(230, 126, 34, 0.25);
+  border: 1px solid var(--c-asesmen-border);
   border-left: 4px solid var(--c-asesmen);
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
   padding: 20px 24px;
   background: var(--bg-nav);
 }
@@ -169,7 +169,7 @@
 .searchInput {
   flex: 1;
   min-width: 200px;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 8px 12px;
   background: var(--bg-nav);
   font-size: 12px;
@@ -177,7 +177,7 @@
 
 .filterSelect {
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 8px 10px;
   background: var(--bg-nav);
   font-size: 11px;
@@ -234,7 +234,7 @@
 }
 
 .tableRowSelected {
-  background: rgba(230, 126, 34, 0.06);
+  background: var(--c-asesmen-soft);
 }
 
 .tableRowInactive {
@@ -261,7 +261,7 @@
 .userAvatar {
   width: 30px;
   height: 30px;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
 }
 
 .userFullName {
@@ -287,7 +287,7 @@
 
 .statusBadge {
   display: inline-block;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   padding: 2px 8px;
   font-size: 10px;
   font-weight: 600;
@@ -295,12 +295,12 @@
 }
 
 .statusBadgeActive {
-  background: rgba(76, 175, 80, 0.12);
-  color: #4caf50;
+  background: var(--c-ok-soft);
+  color: var(--c-status-ok);
 }
 
 .statusBadgeInactive {
-  background: rgba(231, 76, 60, 0.12);
+  background: var(--c-critical-soft);
   color: var(--c-critical);
 }
 
@@ -309,9 +309,9 @@
   flex-direction: column;
   gap: 10px;
   border: 1px solid var(--line-base);
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-surface-soft);
 }
 
 .pendingCardHeader {
@@ -323,7 +323,7 @@
 .pendingAvatar {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
 }
 
 .pendingCardBody {
@@ -361,9 +361,9 @@
 .primaryButtonBlock,
 .primaryButtonWide {
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   background: var(--c-asesmen);
-  color: #fff;
+  color: var(--text-on-accent);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
@@ -383,7 +383,7 @@
 .primaryButtonBlock:disabled,
 .primaryButtonWide:disabled {
   cursor: not-allowed;
-  background: rgba(230, 126, 34, 0.3);
+  background: var(--c-asesmen-border);
 }
 
 .secondaryButton,
@@ -396,7 +396,7 @@
 }
 
 .secondaryButton {
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 7px 14px;
   color: var(--text-muted);
   cursor: pointer;
@@ -411,7 +411,7 @@
 
 .editPanel {
   overflow: hidden;
-  border-color: rgba(230, 126, 34, 0.2);
+  border-color: var(--c-asesmen-border);
 }
 
 .toastBanner {
@@ -422,13 +422,13 @@
 }
 
 .toastBannerSuccess {
-  border-bottom: 1px solid rgba(76, 175, 80, 0.3);
-  background: rgba(76, 175, 80, 0.12);
+  border-bottom: 1px solid var(--c-ok-border);
+  background: var(--c-ok-soft);
 }
 
 .toastBannerError {
-  border-bottom: 1px solid rgba(231, 76, 60, 0.3);
-  background: rgba(231, 76, 60, 0.12);
+  border-bottom: 1px solid var(--c-critical-border-strong);
+  background: var(--c-critical-soft);
 }
 
 .toastMessage {
@@ -437,7 +437,7 @@
 }
 
 .toastMessageSuccess {
-  color: #4caf50;
+  color: var(--c-status-ok);
 }
 
 .toastMessageError {
@@ -548,12 +548,12 @@
 }
 
 .outlineButton {
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 7px 0;
 }
 
 .outlineButtonCompact {
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 7px 14px;
   font-size: 10px;
 }
@@ -563,12 +563,12 @@
 }
 
 .outlineButtonSuccess {
-  border-color: rgba(76, 175, 80, 0.3);
-  color: #4caf50;
+  border-color: var(--c-ok-border);
+  color: var(--c-status-ok);
 }
 
 .outlineButtonDanger {
-  border-color: rgba(231, 76, 60, 0.3);
+  border-color: var(--c-critical-border-strong);
   color: var(--c-critical);
 }
 
@@ -584,7 +584,7 @@
 }
 
 .inlineMessageSuccess {
-  color: #4caf50;
+  color: var(--c-status-ok);
 }
 
 .inlineMessageError {
@@ -620,8 +620,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid rgba(230, 126, 34, 0.3);
-  border-radius: 4px;
+  border: 1px solid var(--c-asesmen-border);
+  border-radius: var(--radius-md);
   padding: 3px 8px;
   background: rgba(230, 126, 34, 0.12);
   color: var(--c-asesmen);
@@ -641,7 +641,7 @@
   max-height: 180px;
   overflow-y: auto;
   border: 1px solid var(--line-base);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 10px;
   background: var(--bg-canvas);
 }
@@ -679,13 +679,13 @@
 
 .logbookEmpty {
   border: 1px solid var(--line-base);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   padding: 20px 16px;
 }
 
 .logbookTable {
   border: 1px solid var(--line-base);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
   font-size: 11px;
 }
 
@@ -748,8 +748,8 @@
 }
 
 .resultBadgeSuccess {
-  background: rgba(76, 175, 80, 0.12);
-  color: #4caf50;
+  background: var(--c-ok-soft);
+  color: var(--c-status-ok);
 }
 
 .resultBadgeError {
@@ -780,7 +780,7 @@
 }
 
 .paginationButton {
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   padding: 4px 10px;
   background: rgba(230, 126, 34, 0.08);
   color: var(--c-asesmen);
@@ -797,7 +797,7 @@
 }
 
 .chipToggle {
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   padding: 3px 8px;
   color: var(--text-muted);
   cursor: pointer;

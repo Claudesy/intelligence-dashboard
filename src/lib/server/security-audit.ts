@@ -86,12 +86,7 @@ export async function writeSecurityAuditLog({
         },
       },
     });
-  } catch (error) {
-    console.error("[security-audit] Failed to write audit log:", {
-      endpoint,
-      action,
-      result,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
+    // Audit write failure — silent to avoid leaking info to stdout
   }
 }

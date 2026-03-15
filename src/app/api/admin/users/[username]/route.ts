@@ -42,8 +42,7 @@ export async function GET(
     const profile = profiles.get(username) ?? null;
 
     return NextResponse.json({ ok: true, user: { ...user, profile } });
-  } catch (error) {
-    console.error("[Admin] Failed to get user:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Gagal memuat data user." },
       { status: 500 },
@@ -108,7 +107,16 @@ export async function PUT(
     await updateCrewAccessUser(username, body);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Gagal mengubah user.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+    const isKnownError =
+      error instanceof Error && error.message.includes("tidak ditemukan");
+    return NextResponse.json(
+      {
+        ok: false,
+        error: isKnownError
+          ? (error as Error).message
+          : "Gagal mengubah user.",
+      },
+      { status: 400 },
+    );
   }
 }

@@ -21,22 +21,17 @@ export async function sendApprovalEmail(
   username: string,
 ): Promise<void> {
   const resend = getResend();
-  if (!resend) {
-    console.log(
-      "[Email] RESEND_API_KEY tidak dikonfigurasi — skip email approval.",
-    );
-    return;
-  }
+  if (!resend) return;
 
   try {
     await resend.emails.send({
       from: FROM,
       to,
-      subject: "Akun Anda Telah Disetujui — Puskesmas Intelligence Dashboard",
+      subject: "Akun Anda Telah Disetujui — Sentra Intelligence Dashboard",
       html: `
         <div style="font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 520px; margin: 0 auto; color: #333;">
           <div style="padding: 24px 0; border-bottom: 2px solid #E67E22;">
-            <h2 style="margin: 0; color: #E67E22; font-size: 18px;">Puskesmas Intelligence Dashboard</h2>
+            <h2 style="margin: 0; color: #E67E22; font-size: 18px;">Sentra Intelligence Dashboard</h2>
           </div>
           <div style="padding: 24px 0;">
             <p style="margin: 0 0 16px;">Halo <strong>${escapeHtml(fullName)}</strong>,</p>
@@ -51,12 +46,8 @@ export async function sendApprovalEmail(
         </div>
       `,
     });
-    console.log(`[Email] Approval email sent to ${to}`);
-  } catch (error) {
-    console.error(
-      "[Email] Failed to send approval email:",
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    // Email send failure — silent, non-blocking
   }
 }
 
@@ -69,12 +60,7 @@ export async function sendNotamEmail(
   priority: string,
 ): Promise<void> {
   const resend = getResend();
-  if (!resend) {
-    console.log(
-      "[Email] RESEND_API_KEY tidak dikonfigurasi — skip email NOTAM.",
-    );
-    return;
-  }
+  if (!resend) return;
 
   const validRecipients = recipients.filter((e) => e.includes("@"));
   if (validRecipients.length === 0) return;
@@ -107,7 +93,7 @@ export async function sendNotamEmail(
         html: `
           <div style="font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 520px; margin: 0 auto; color: #333;">
             <div style="padding: 24px 0; border-bottom: 2px solid #E67E22;">
-              <h2 style="margin: 0; color: #E67E22; font-size: 18px;">Puskesmas Intelligence Dashboard</h2>
+              <h2 style="margin: 0; color: #E67E22; font-size: 18px;">Sentra Intelligence Dashboard</h2>
             </div>
             <div style="padding: 24px 0;">
               <div style="display: inline-block; padding: 2px 10px; border-radius: 4px; background: ${priorityColor}15; color: ${priorityColor}; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin-bottom: 12px;">
@@ -123,14 +109,8 @@ export async function sendNotamEmail(
         `,
       });
     }
-    console.log(
-      `[Email] NOTAM email sent to ${validRecipients.length} recipients`,
-    );
-  } catch (error) {
-    console.error(
-      "[Email] Failed to send NOTAM email:",
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    // NOTAM email send failure — silent, non-blocking
   }
 }
 

@@ -8,39 +8,39 @@ import {
 
 import { useSharedIntelligenceSocket } from "./IntelligenceSocketProvider";
 
-// ── Status config: icon + warna via CSS vars ────────────────────────────────
+// ── Status config ────────────────────────────────────────────────────────────
 
 interface StatusConfig {
-  indicator: string; // unicode indicator
-  badgeClass: string; // tailwind classes untuk badge
-  rowClass: string; // tailwind classes untuk border kiri card
+  indicator: string;
+  color: string;
+  borderColor: string;
 }
 
 const STATUS_CONFIG: Record<IntelligenceEventStatus, StatusConfig> = {
   in_consultation: {
     indicator: "●",
-    badgeClass: "border-[var(--c-asesmen)] text-[var(--c-asesmen)]",
-    rowClass: "border-l-2 border-l-[var(--c-asesmen)]",
+    color: "var(--c-asesmen)",
+    borderColor: "var(--c-asesmen)",
   },
   cdss_pending: {
     indicator: "◐",
-    badgeClass: "border-[var(--c-cdss,#E67E22)] text-[var(--c-cdss,#E67E22)]",
-    rowClass: "border-l-2 border-l-[var(--c-cdss,#E67E22)]",
+    color: "#E67E22",
+    borderColor: "#E67E22",
   },
   documentation_incomplete: {
     indicator: "⚠",
-    badgeClass: "border-[var(--c-critical)] text-[var(--c-critical)]",
-    rowClass: "border-l-2 border-l-[var(--c-critical)]",
+    color: "var(--c-critical)",
+    borderColor: "var(--c-critical)",
   },
   waiting: {
     indicator: "○",
-    badgeClass: "border-[var(--line-base)] text-[var(--text-muted)]",
-    rowClass: "border-l-2 border-l-[var(--line-base)]",
+    color: "var(--text-muted)",
+    borderColor: "var(--line-base)",
   },
   completed: {
     indicator: "✓",
-    badgeClass: "border-[var(--line-base)] text-[var(--text-muted)]",
-    rowClass: "border-l-2 border-l-transparent opacity-60",
+    color: "var(--text-muted)",
+    borderColor: "transparent",
   },
 };
 
@@ -53,11 +53,17 @@ export default function PatientQueuePanel(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-[88px] animate-pulse rounded-md border border-[var(--line-base)] bg-[var(--bg-card)]"
+            style={{
+              height: 80,
+              borderRadius: 4,
+              border: "1px solid var(--line-base)",
+              background: "var(--bg-card)",
+              animation: "pulse 2s ease-in-out infinite",
+            }}
           />
         ))}
       </div>
@@ -66,14 +72,31 @@ export default function PatientQueuePanel(): React.JSX.Element {
 
   if (error) {
     return (
-      <div className="flex flex-col gap-3">
-        <p className="rounded-md border border-dashed border-[var(--c-critical)] px-4 py-3 text-sm text-[var(--c-critical)]">
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div
+          style={{
+            borderRadius: 4,
+            border: "1px dashed var(--c-critical)",
+            padding: "12px 16px",
+            fontSize: 13,
+            color: "var(--c-critical)",
+          }}
+        >
           {error}
-        </p>
+        </div>
         <button
           type="button"
           onClick={retry}
-          className="self-start rounded-md border border-[var(--line-base)] px-3 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:border-[var(--c-asesmen)] hover:text-[var(--c-asesmen)] focus:outline-none focus:ring-2 focus:ring-[var(--c-asesmen)] focus:ring-offset-2"
+          style={{
+            alignSelf: "flex-start",
+            borderRadius: 4,
+            border: "1px solid var(--line-base)",
+            padding: "6px 12px",
+            fontSize: 13,
+            color: "var(--text-muted)",
+            background: "transparent",
+            cursor: "pointer",
+          }}
         >
           Coba lagi
         </button>
@@ -83,22 +106,58 @@ export default function PatientQueuePanel(): React.JSX.Element {
 
   if (encounters.length === 0) {
     return (
-      <p className="py-4 text-center text-sm text-[var(--text-muted)]">
-        Tidak ada encounter aktif saat ini.
-      </p>
+      <div
+        style={{
+          padding: "40px 24px",
+          textAlign: "center",
+          color: "var(--text-muted)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 28,
+            fontFamily: "var(--font-mono)",
+            opacity: 0.2,
+            marginBottom: 12,
+          }}
+        >
+          ○
+        </div>
+        <div style={{ fontSize: 14, marginBottom: 4 }}>
+          Tidak ada encounter aktif saat ini
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.05em",
+            opacity: 0.5,
+          }}
+        >
+          To be filled — encounter akan muncul saat shift aktif
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Stale data warning — shown when socket is disconnected */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* Stale data warning */}
       {isStale && (
-        <p
+        <div
           role="status"
-          className="rounded-md border border-dashed border-[var(--line-base)] px-3 py-2 text-[11px] text-[var(--text-muted)]"
+          style={{
+            borderRadius: 4,
+            border: "1px dashed var(--line-base)",
+            padding: "8px 12px",
+            fontSize: 11,
+            fontFamily: "var(--font-mono)",
+            color: "var(--text-muted)",
+            letterSpacing: "0.05em",
+          }}
         >
           ⚠ Koneksi terputus — data mungkin tidak terbaru.
-        </p>
+        </div>
       )}
 
       {encounters.map((item) => {
@@ -106,22 +165,71 @@ export default function PatientQueuePanel(): React.JSX.Element {
         return (
           <article
             key={item.encounterId}
-            className={`rounded-md border border-[var(--line-base)] bg-[var(--bg-card)] px-4 py-3 ${cfg.rowClass}`}
+            style={{
+              borderRadius: 4,
+              border: "1px solid var(--line-base)",
+              borderLeft: `3px solid ${cfg.borderColor}`,
+              background: "var(--bg-card)",
+              padding: "14px 16px",
+            }}
           >
             {/* Header row */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.18em",
+                    textTransform: "uppercase",
+                    color: "var(--text-muted)",
+                    opacity: 0.6,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {item.encounterId}
-                </p>
-                <h3 className="mt-1 truncate text-sm font-medium text-[var(--text-main)]">
+                </div>
+                <h3
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--text-main)",
+                    marginTop: 4,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {item.patientLabel}
                 </h3>
               </div>
 
               {/* Status badge */}
               <span
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] ${cfg.badgeClass}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  flexShrink: 0,
+                  borderRadius: 20,
+                  border: `1px solid ${cfg.color}`,
+                  padding: "4px 10px",
+                  fontSize: 10,
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: 500,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: cfg.color,
+                }}
               >
                 <span aria-hidden="true">{cfg.indicator}</span>
                 {getIntelligenceEventStatusLabel(item.status)}
@@ -130,18 +238,33 @@ export default function PatientQueuePanel(): React.JSX.Element {
 
             {/* Note */}
             {item.note && (
-              <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
+              <p
+                style={{
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  color: "var(--text-muted)",
+                  marginTop: 8,
+                }}
+              >
                 {item.note}
               </p>
             )}
 
             {/* Timestamp */}
-            <p className="mt-2 text-[10px] text-[var(--text-muted)]">
+            <div
+              style={{
+                fontSize: 10,
+                fontFamily: "var(--font-mono)",
+                color: "var(--text-muted)",
+                opacity: 0.5,
+                marginTop: 8,
+              }}
+            >
               {new Date(item.timestamp).toLocaleTimeString("id-ID", {
                 hour: "2-digit",
                 minute: "2-digit",
               })}
-            </p>
+            </div>
           </article>
         );
       })}

@@ -3,105 +3,182 @@
 /* Masterplan and masterpiece by Claudesy. */
 /* IBM Plex Sans + IBM Plex Mono — loaded via next/font/google in layout.tsx */
 
-/* ─── Dark Theme (User Request) ─── */
+/* ─── Dark Theme (Linear-authentic) ─── */
 :root,
 [data-theme="dark"] {
-  --bg-canvas: #08090a; /* Main dark — Linear-inspired */
-  --bg-nav: #0f1012; /* Navigation shell */
-  --bg-card: #111214; /* Card/content surface */
+  --bg-canvas: #121214; /* Linear signature dark — not pure black */
+  --bg-canvas-v1: #0e0f11;
+  --bg-canvas-v2: #161719;
+  --bg-canvas-v3: #131416;
+  --bg-nav: #17181b; /* Navigation shell — darker, aligned with palette */
+  --bg-card: #161719; /* Card/content surface — darker, from bg-canvas-v2 */
   --text-main: #f0e8dc; /* Cream warm text */
   --text-muted: #8a8278; /* Muted warm neutral */
-  --line-base: #1d2022; /* Border */
+  --line-base: #252629; /* Border — more visible like Linear */
   --grid-faint: rgba(255, 255, 255, 0.03);
   --c-anamnesa: #a0a0a0;
   --c-asesmen: #e67e22; /* Gold accent */
   --c-critical: #e74c3c;
   --c-warning: #f39c12;
   --c-ok: #27ae60; /* Success / ready indicator */
+  --c-ok-soft: rgba(39, 174, 96, 0.08);
+  --c-ok-border: rgba(39, 174, 96, 0.25);
   --c-cdss: #e67e22; /* CDSS pending / amber */
-  --theme-toggle-bg: #111214;
-  --theme-toggle-border: #1d2022;
+  --theme-toggle-bg: #161719;
+  --theme-toggle-border: #252629;
+  --bg-surface-soft: #131416; /* Card surface soft — darker, from bg-canvas-v3 */
 }
 
-/* ─── Light Theme (Cream — matches puskesmasbalowerti.com) ─── */
+/* ─── Light Theme (White + #002147 palette) ─── */
 [data-theme="light"] {
-  --bg-canvas: #ede4d9; /* Canvas: shade 200 — warm tan, kontras vs card */
-  --bg-nav: #faf3eb; /* Nav sidebar: shade 100 — cream */
-  --bg-card: #ede4d9; /* Card/content surface disamakan dengan canvas */
-  --text-main: #2d2420; /* shade 950 — dark brown */
-  --text-muted: #8b7d6f; /* shade 700 — muted warm */
-  --line-base: #dec9a8; /* shade 300 — border visible */
-  --grid-faint: rgba(45, 36, 32, 0.05);
-  --c-anamnesa: #8b7d6f;
-  --c-asesmen: #c9a87c; /* brand accent exact */
-  --c-critical: #c0392b;
-  --c-warning: #b8956a; /* shade 600 */
-  --c-ok: #1e8449; /* Success / ready indicator — darker for light bg */
-  --c-cdss: #c9a87c; /* CDSS pending — warm amber for light theme */
-  --theme-toggle-bg: rgba(201, 168, 124, 0.15);
-  --theme-toggle-border: #dec9a8;
+  --bg-canvas: #e5e5e5; /* Background — lebih gelap */
+  --bg-canvas-v1: #dcdcdc;
+  --bg-canvas-v2: #ebebeb;
+  --bg-canvas-v3: #e0e0e0;
+  --bg-nav: #dcdcdc;
+  --bg-card: #e5e5e5;
+  --text-main: #000d1a; /* Darker — near black blue */
+  --text-muted: #2d3d4d;
+  --line-base: #002147; /* Oxford blue border */
+  --grid-faint: rgba(0, 0, 0, 0.06);
+  --c-anamnesa: #2d3d4d;
+  --c-asesmen: #e63946; /* Red-orange — tombol primary */
+  --c-accent-red-orange: #e63946;
+  --c-critical: #e63946; /* Secondary accent */
+  --c-warning: #e63946;
+  --c-ok: #1e8449;
+  --c-cdss: #e63946;
+  --theme-toggle-bg: rgba(230, 57, 70, 0.1);
+  --theme-toggle-border: #e63946;
+  --bg-surface-soft: #dcdcdc; /* Lebih gelap */
+  --c-asesmen-soft: rgba(230, 57, 70, 0.12);
+  --c-asesmen-border: rgba(230, 57, 70, 0.35);
+  --c-asesmen-hover: rgba(230, 57, 70, 0.15);
+  --c-asesmen-muted: rgba(230, 57, 70, 0.5);
+  --c-asesmen-strong: #e63946;
+  --c-asesmen-accent: rgba(230, 57, 70, 0.2);
+  --c-accent-red-orange-soft: rgba(230, 57, 70, 0.12);
+  --c-accent-red-orange-border: rgba(230, 57, 70, 0.35);
+  --c-critical-soft: rgba(230, 57, 70, 0.08);
+  --c-critical-border: rgba(230, 57, 70, 0.25);
+  --c-critical-border-strong: rgba(230, 57, 70, 0.35);
+  --c-ok-soft: rgba(30, 132, 73, 0.08);
+  --c-ok-border: rgba(30, 132, 73, 0.2);
+  --text-on-accent: #ffffff; /* White on Oxford blue buttons */
 }
 
-/* Light Theme Overrides (Cream — matches puskesmasbalowerti.com) */
+/* Light Theme Overrides — text: hitam/Oxford blue, accent: red-orange */
 [data-theme="light"] .nav-item.active {
-  color: #2d2420;
-  border-color: #c9a87c;
-  background: rgba(201, 168, 124, 0.1);
+  color: #002147;
+  border-color: #e63946;
+  background: rgba(230, 57, 70, 0.08);
 }
 [data-theme="light"] .nav-item.active .nav-item-dot {
-  box-shadow: 0 0 8px rgba(201, 168, 124, 0.5);
+  box-shadow: 0 0 8px rgba(230, 57, 70, 0.4);
 }
 [data-theme="light"] .nav-logo {
-  color: #c9a87c;
+  color: #002147;
 }
 [data-theme="light"] .chronic-tag {
-  color: #f8f5f2;
-  background: #b8956a;
+  color: #ffffff;
+  background: #002147;
 }
 [data-theme="light"] .allergy-row .alert {
-  color: #c0392b;
+  color: #002147;
 }
 [data-theme="light"] .v-critical .v-value {
-  color: #c0392b;
-  text-shadow: 0 0 12px rgba(192, 57, 43, 0.15);
+  color: #002147;
+  text-shadow: none;
 }
 [data-theme="light"] .icd-code {
-  color: #c9a87c;
+  color: #002147;
 }
 [data-theme="light"] .data-label {
-  color: #c9a87c;
+  color: #002147;
 }
 [data-theme="light"] .profil-rm {
-  color: #c9a87c;
+  color: #002147;
 }
 [data-theme="light"] .ai-pulse-dot {
-  background: #c9a87c;
-  box-shadow: 0 0 8px rgba(201, 168, 124, 0.5);
+  background: #e63946;
+  box-shadow: 0 0 8px rgba(230, 57, 70, 0.5);
 }
 [data-theme="light"] .chat-msg.outgoing .chat-bubble {
-  border-color: #c9a87c;
-  background: rgba(201, 168, 124, 0.08);
+  border-color: #e63946;
+  background: rgba(230, 57, 70, 0.08);
 }
 [data-theme="light"] .omni-input:focus {
-  border-bottom-color: #c9a87c;
+  border-bottom-color: #e63946;
 }
 [data-theme="light"] .lab-ghost-btn.open,
 [data-theme="light"] .lab-ghost-btn:hover {
-  color: #c9a87c;
-  text-shadow: 0 0 12px rgba(201, 168, 124, 0.3);
+  color: #002147;
+  text-shadow: none;
 }
 [data-theme="light"] .section-title {
-  color: #8b7355;
+  color: #002147;
 }
 [data-theme="light"] .extraction-header {
-  color: #8b7355;
+  color: #002147;
 }
 [data-theme="light"] .icd-selected-panel,
 [data-theme="light"] .profil-card {
   background-image:
-    linear-gradient(to right, rgba(45, 36, 32, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(45, 36, 32, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(0, 33, 71, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 33, 71, 0.03) 1px, transparent 1px);
   background-size: 40px 40px;
+}
+
+/* Gelar section — tombol hitam/Oxford blue saja */
+[data-theme="light"] .gelar-section {
+  --c-asesmen: #002147;
+  --c-asesmen-soft: rgba(0, 33, 71, 0.08);
+  --c-asesmen-border: rgba(0, 33, 71, 0.25);
+  --c-asesmen-hover: rgba(0, 33, 71, 0.12);
+  --c-asesmen-muted: rgba(0, 33, 71, 0.5);
+  --c-asesmen-strong: #002147;
+  --c-asesmen-accent: rgba(0, 33, 71, 0.15);
+}
+[data-theme="light"] .gelar-section button {
+  border-color: #002147 !important;
+  background: rgba(0, 33, 71, 0.12) !important;
+  color: #002147 !important;
+}
+
+/* Link — text Oxford blue, border/hover accent red-orange */
+[data-theme="light"] a[href] {
+  color: #002147;
+}
+[data-theme="light"] a[href]:hover {
+  color: #001a35;
+}
+[data-theme="light"] .calculator-catalog-card:hover {
+  border-color: rgba(230, 57, 70, 0.5);
+}
+[data-theme="light"] .calculator-back-link:hover {
+  border-color: rgba(230, 57, 70, 0.5);
+  color: #002147;
+}
+
+/* Ringkasan hari ini — CTA links neumorfisme red-orange */
+[data-theme="light"] .summary-sidebar-cta {
+  background: #e63946 !important;
+  border: none !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+  box-shadow:
+    5px 5px 10px rgba(230, 57, 70, 0.3),
+    -2px -2px 6px rgba(255, 255, 255, 0.2) !important;
+  transition: all 0.2s ease !important;
+}
+[data-theme="light"] .summary-sidebar-cta:hover {
+  background: #d42f3d !important;
+  box-shadow:
+    3px 3px 6px rgba(230, 57, 70, 0.35),
+    -1px -1px 4px rgba(255, 255, 255, 0.15),
+    inset 1px 1px 2px rgba(0, 0, 0, 0.1) !important;
+  opacity: 1 !important;
+  transform: translateY(1px);
 }
 
 /* Dark Theme Overrides (#08090A + layered surfaces) */
@@ -710,6 +787,61 @@ a {
   --ls-wide: 0.04em;
   --ls-wider: 0.08em;
   --ls-widest: 0.15em;
+  --ls-2xl: 0.18em;
+  --ls-3xl: 0.22em;
+
+  /* Spacing (from sentra-design-tokens.ts) */
+  --gap-xs: 4px;
+  --gap-sm: 8px;
+  --gap-md: 12px;
+  --gap-lg: 16px;
+  --gap-xl: 24px;
+  --gap-2xl: 32px;
+  --gap-3xl: 48px;
+  --gap-4xl: 80px;
+
+  /* Radius (from sentra-design-tokens.ts) */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
+  --radius-full: 9999px;
+
+  /* Accent alpha variants (--c-asesmen) */
+  --c-asesmen-soft: rgba(230, 126, 34, 0.05);
+  --c-asesmen-border: rgba(230, 126, 34, 0.22);
+  --c-asesmen-hover: rgba(230, 126, 34, 0.12);
+  --c-asesmen-muted: rgba(230, 126, 34, 0.3);
+  --c-asesmen-strong: rgba(230, 126, 34, 0.85);
+  --c-asesmen-accent: rgba(255, 212, 168, 0.22);
+
+  /* Critical alpha variants */
+  --c-critical-soft: rgba(231, 76, 60, 0.08);
+  --c-critical-border: rgba(231, 76, 60, 0.24);
+  --c-critical-border-strong: rgba(231, 76, 60, 0.3);
+
+  /* Content layout */
+  --content-max-width: 1400px;
+  --page-max-width: 1200px;
+
+  /* Inverse text (on accent/solid buttons) */
+  --text-on-accent: #ffffff;
+
+  /* Subtle surfaces (ghost buttons, inactive pills) */
+  --bg-surface-soft: rgba(255, 255, 255, 0.012);
+
+  /* Admin / status (from sentra-design-tokens.ts additional) */
+  --c-sage: #8fa184;
+  --c-mint: #7ee2a2;
+  --c-peach: #ffd29c;
+  --c-taupe: #b7aa9c;
+  --c-ok-soft: rgba(76, 175, 80, 0.05);
+  --c-ok-border: rgba(76, 175, 80, 0.2);
+  --c-status-ok: #4caf50;
+  --c-status-warning: #f1c40f;
+  --c-status-error: #e74c3c;
+  --c-status-unknown: #666666;
 }
 
 /* ─── Sidebar tokens (fixed — tidak ikut light/dark theme) ─── */
@@ -1420,7 +1552,7 @@ a {
 
 .emr-phase-footer-btn {
   --phase-btn-color: rgba(230, 126, 34, 0.92);
-  --phase-btn-contrast: rgb(14, 23, 28);
+  --phase-btn-contrast: #002147; /* Oxford blue */
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -1532,7 +1664,7 @@ a {
 
 .emr-phase-footer-btn-critical {
   --phase-btn-color: #de8268;
-  --phase-btn-contrast: rgb(24, 14, 12);
+  --phase-btn-contrast: #002147; /* Oxford blue */
   box-shadow: inset 0 0 0 1px rgba(222, 130, 104, 0.08);
 }
 
@@ -5787,18 +5919,27 @@ a {
 /* ─── Chatbox Page ───────────────────────────── */
 .chat-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 0;
   max-width: 1400px;
   width: 100%;
   height: calc(100vh - 200px);
   border: 1px solid var(--line-base);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .chat-sidebar {
   border-right: 1px solid var(--line-base);
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+}
+.chat-sidebar::-webkit-scrollbar {
+  width: 2px;
+}
+.chat-sidebar::-webkit-scrollbar-thumb {
+  background: var(--line-base);
 }
 
 .chat-sidebar-header {
@@ -5818,16 +5959,18 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-bottom: 1px dashed var(--line-base);
   cursor: pointer;
   transition: all 0.2s;
 }
 .chat-contact:hover {
-  background: rgba(239, 236, 230, 0.02);
+  background: rgba(239, 236, 230, 0.03);
 }
 .chat-contact.active {
-  background: rgba(212, 122, 87, 0.05);
+  background: rgba(212, 122, 87, 0.06);
+  border-left: 2px solid var(--c-asesmen);
+  padding-left: 22px;
 }
 
 .chat-contact-avatar {
@@ -5983,9 +6126,13 @@ a {
   transition: all 0.2s;
 }
 
-.chat-send-btn:hover {
+.chat-send-btn:hover:not(:disabled) {
   background: var(--c-asesmen);
   color: var(--bg-canvas);
+}
+.chat-send-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 /* ─── Report Page ───────────────────────────── */

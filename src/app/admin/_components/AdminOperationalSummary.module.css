@@ -54,13 +54,12 @@
 }
 
 .liveIndicatorOnline {
-  background: var(--c-ok, #27ae60);
-  box-shadow: 0 0 0 2px
-    color-mix(in srgb, var(--c-ok, #27ae60) 25%, transparent);
+  background: var(--c-ok);
+  box-shadow: 0 0 0 2px var(--c-ok-border);
 }
 
 .liveIndicatorReconnecting {
-  background: var(--c-cdss, #e67e22);
+  background: var(--c-asesmen);
   animation: pulse 1.2s ease-in-out infinite;
 }
 
@@ -118,7 +117,7 @@
 }
 
 .kpiValueSuccess {
-  color: var(--c-ok, #27ae60);
+  color: var(--c-ok);
 }
 
 .kpiValueCritical {
@@ -126,7 +125,7 @@
 }
 
 .kpiValueAccent {
-  color: var(--c-cdss, #e67e22);
+  color: var(--c-asesmen);
 }
 
 .kpiLabel {

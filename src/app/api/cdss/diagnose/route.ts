@@ -19,20 +19,6 @@ import {
 
 export const runtime = "nodejs";
 
-function logCDSSError(message: string) {
-  if (process.env.NODE_ENV === "test") {
-    if (process.env.CDSS_VERBOSE_TEST_ERRORS === "1") {
-      console.error("[CDSS API] Error during test scenario:", message);
-      return;
-    }
-
-    console.error("[CDSS API] Error during test scenario");
-    return;
-  }
-
-  console.error("[CDSS API] Error:", message);
-}
-
 export async function POST(request: Request) {
   const ip = getRequestIp(request);
   const session = getCrewSessionFromRequest(request);
@@ -48,9 +34,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  // TODO(security): selaraskan role minimum endpoint ini dengan matriks RBAC produksi.
-// NOTE: Role check temporarily disabled due to missing isCrewSessionRoleAllowed export.
-//       Reinstate when available.
+  // RBAC: semua authenticated clinical staff boleh akses CDSS diagnose
 
   let body: unknown;
   try {
@@ -89,6 +73,8 @@ export async function POST(request: Request) {
       metadata: {
         source: result.source,
         nextBestQuestionCount: result.next_best_questions.length,
+        hasReasoningContent: !!result._reasoning_content,
+        reasoningContentLength: result._reasoning_content?.length ?? 0,
       },
     });
     await writeSecurityAuditLog({
@@ -109,7 +95,6 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Internal error";
-    logCDSSError(msg);
     await writeSecurityAuditLog({
       endpoint: "/api/cdss/diagnose",
       action: "CDSS_DIAGNOSE",

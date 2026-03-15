@@ -1,11 +1,11 @@
 // Architected and built by the one and only Claudesy.
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+
+import { getCrewSessionFromRequest } from "@/lib/server/crew-access-auth";
+import { prisma } from "@/lib/prisma";
 import { emitTeleRequest } from "@/lib/telemedicine/socket-bridge";
 
 export const runtime = "nodejs";
-
-const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,7 +43,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const session = getCrewSessionFromRequest(request);
+  if (!session) {
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized" },
+      { status: 401 },
+    );
+  }
   try {
     const requests = await prisma.telemedicineRequest.findMany({
       orderBy: { createdAt: "desc" },

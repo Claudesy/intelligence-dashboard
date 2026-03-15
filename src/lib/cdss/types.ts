@@ -95,4 +95,5 @@ export interface CDSSEngineResult {
     warnings: string[];
   };
   next_best_questions: string[];
+  _reasoning_content?: string;
 }

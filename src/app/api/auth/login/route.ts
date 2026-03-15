@@ -2,10 +2,13 @@
 import { NextResponse } from "next/server";
 import {
   createCrewSession,
-  getCrewAccessConfigStatus,
   getSessionCookieOptions,
   validateCrewAccess,
 } from "@/lib/server/crew-access-auth";
+import {
+  loginRateLimiter,
+  getClientIp,
+} from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -26,11 +29,17 @@ function parseLoginPayload(raw: unknown): LoginPayload {
 }
 
 export async function POST(request: Request) {
-  const config = getCrewAccessConfigStatus();
-  if (!config.ok) {
+  const ip = getClientIp(request);
+  const rateCheck = loginRateLimiter.check(ip);
+  if (!rateCheck.allowed) {
     return NextResponse.json(
-      { ok: false, error: config.message },
-      { status: 500 },
+      { ok: false, error: "Terlalu banyak percobaan login. Coba lagi nanti." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil(rateCheck.retryAfterMs / 1000)),
+        },
+      },
     );
   }
 
@@ -43,6 +52,9 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
+
+    // Reset rate limit on successful login
+    loginRateLimiter.reset(ip);
 
     const { token, session } = createCrewSession(user);
     const response = NextResponse.json({
@@ -63,10 +75,16 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    const isValidationError =
+      error instanceof Error &&
+      (error.message.includes("wajib diisi") ||
+        error.message.includes("tidak valid"));
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Gagal login.",
+        error: isValidationError
+          ? error.message
+          : "Gagal memproses login.",
       },
       { status: 400 },
     );

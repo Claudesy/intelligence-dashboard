@@ -10,16 +10,28 @@ const DASHBOARD_SENTRY_APP = "puskesmas-dashboard";
 let initialized = false;
 let sentryInitialized = false;
 
+function ensureDashboardSentryInitialized(): boolean {
+  if (sentryInitialized) {
+    return true;
+  }
+
+  const config = getAbysSentryConfig(DASHBOARD_SENTRY_APP);
+  if (!config.dsn) {
+    return false;
+  }
+
+  Sentry.init(config);
+  sentryInitialized = true;
+  return true;
+}
+
 export async function initializeDashboardObservability(): Promise<void> {
   if (initialized) {
     return;
   }
 
   try {
-    if (!sentryInitialized) {
-      Sentry.init(getAbysSentryConfig(DASHBOARD_SENTRY_APP));
-      sentryInitialized = true;
-    }
+    ensureDashboardSentryInitialized();
 
     await initializeAbysLangfuseTracing();
     initialized = true;
@@ -33,9 +45,8 @@ export async function captureDashboardObservabilityError(
   error: unknown,
   extra: Record<string, unknown> = {},
 ): Promise<void> {
-  if (!sentryInitialized) {
-    Sentry.init(getAbysSentryConfig(DASHBOARD_SENTRY_APP));
-    sentryInitialized = true;
+  if (!ensureDashboardSentryInitialized()) {
+    return;
   }
 
   Sentry.captureException(error, {

@@ -27,21 +27,27 @@ export const CREW_PROFILE_DEGREES = [
   "A.Md.AK",
   "S.Tr.Kes.",
   "M.Kes.",
+  "SH",
+  "MKN",
+  "CLM",
+  "CMDC",
 ] as const;
 
 export type CrewProfileDegree = (typeof CREW_PROFILE_DEGREES)[number];
 
-export const CREW_PROFILE_POSITIONS = [
-  /* ── Sentra Leadership ── */
-  "Chief Executive Developer",
+export const CREW_PROFILE_SENTRA_ROLES = [
+  "Chief Executive Officer",
   "Lead Clinical Algorithm Strategist & Medical Auditor",
   "Senior Medical Auditor & Clinical Algorithm Specialist",
   "Chief of Diagnostic Audit",
   "Head of Quality Assurance & Control",
   "Clinical & Patient Liaison Officer",
   "Corporate Liaison Officer",
+  "Infrastructure Officer",
   "Head of IT Infrastructure",
-  /* ── Puskesmas Structural ── */
+] as const;
+
+export const CREW_PROFILE_STRUCTURAL_POSITIONS = [
   "Dokter Penanggung Jawab",
   "Kepala Puskesmas",
   "Kepala Subbagian Tata Usaha",
@@ -66,7 +72,20 @@ export const CREW_PROFILE_POSITIONS = [
   "PJ UKM (Usaha Kesehatan Masyarakat) dan UKP (Usaha Kesehatan Perseorangan)",
 ] as const;
 
+export const CREW_PROFILE_POSITIONS = [
+  ...CREW_PROFILE_SENTRA_ROLES,
+  ...CREW_PROFILE_STRUCTURAL_POSITIONS,
+] as const;
+
 export type CrewProfilePosition = (typeof CREW_PROFILE_POSITIONS)[number];
+
+const CREW_PROFILE_DEGREE_ALIASES: Record<string, CrewProfileDegree> = {
+  MK: "MKN",
+};
+
+const CREW_PROFILE_POSITION_ALIASES: Record<string, CrewProfilePosition> = {
+  "Chief Executive Developer": "Chief Executive Officer",
+};
 
 export const CREW_PROFILE_MAX_DEGREES = 5;
 export const CREW_PROFILE_MAX_POSITIONS = 3;
@@ -92,6 +111,9 @@ export interface CrewProfileData {
   linkedinUrl: string;
   gravatarUrl: string;
   blogUrl: string;
+  instagramUrl: string;
+  tiktokUrl: string;
+  youtubeUrl: string;
 }
 
 export function createEmptyCrewProfile(): CrewProfileData {
@@ -116,12 +138,15 @@ export function createEmptyCrewProfile(): CrewProfileData {
     linkedinUrl: "",
     gravatarUrl: "",
     blogUrl: "",
+    instagramUrl: "",
+    tiktokUrl: "",
+    youtubeUrl: "",
   };
 }
 
 const SENTRA_ROLE_TITLES: Record<string, string> = {
-  CEO: "Chief Executive Developer",
-  CHIEF_EXECUTIVE_OFFICER: "Chief Executive Developer",
+  CEO: "Chief Executive Officer",
+  CHIEF_EXECUTIVE_OFFICER: "Chief Executive Officer",
   ADMINISTRATOR: "Administrator Sentra",
 };
 
@@ -145,7 +170,9 @@ export function resolveCrewSentraTitles(
   jobTitles: readonly string[],
   role?: string,
 ): string[] {
-  const normalized = jobTitles.map((value) => value.trim()).filter(Boolean);
+  const normalized = jobTitles
+    .map((value) => normalizeCrewProfilePosition(value) || value.trim())
+    .filter(Boolean);
   const leadershipTitle = getCrewSentraLeadershipTitle(role);
 
   if (!leadershipTitle) {
@@ -188,10 +215,28 @@ export function isCrewProfileDegree(value: string): value is CrewProfileDegree {
   return (CREW_PROFILE_DEGREES as readonly string[]).includes(value);
 }
 
+export function normalizeCrewProfileDegree(
+  value: string,
+): CrewProfileDegree | "" {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  if (isCrewProfileDegree(normalized)) return normalized;
+  return CREW_PROFILE_DEGREE_ALIASES[normalized] || "";
+}
+
 export function isCrewProfilePosition(
   value: string,
 ): value is CrewProfilePosition {
   return (CREW_PROFILE_POSITIONS as readonly string[]).includes(value);
+}
+
+export function normalizeCrewProfilePosition(
+  value: string,
+): CrewProfilePosition | "" {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  if (isCrewProfilePosition(normalized)) return normalized;
+  return CREW_PROFILE_POSITION_ALIASES[normalized] || "";
 }
 
 interface ResolveCrewProfileAvatarArgs {

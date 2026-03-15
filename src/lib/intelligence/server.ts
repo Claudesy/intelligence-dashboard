@@ -524,13 +524,33 @@ export async function listEncounterSummaries(
 ): Promise<DashboardEncounterSummary[]> {
   const records = await loadTemporaryEncounterRecords(options);
 
-  return records.map((encounter) =>
-    buildDashboardEncounterSummary({
+  // Load CDSS audit data to populate alerts for encounters with red flags
+  const { getCDSSEncounterSummaries } = await import("@/lib/cdss/workflow");
+  const cdssSummaries = await getCDSSEncounterSummaries(
+    records.map((r) => r.id),
+  );
+
+  return records.map((encounter) => {
+    const cdss = cdssSummaries.get(encounter.id);
+    const alerts: ClinicalAlert[] = [];
+
+    if (cdss?.redFlagCount && cdss.redFlagCount > 0) {
+      alerts.push({
+        id: `cdss-redflag-${encounter.id}`,
+        type: "critical_value",
+        severity: "warning",
+        message: `CDSS mendeteksi ${cdss.redFlagCount} red flag untuk encounter ini.`,
+        source: cdss.modelVersion,
+        actionRequired: true,
+      });
+    }
+
+    return buildDashboardEncounterSummary({
       encounter,
       suggestions: [],
-      alerts: [],
-    }),
-  );
+      alerts,
+    });
+  });
 }
 
 export async function getOperationalMetrics(): Promise<DashboardOperationalMetrics> {

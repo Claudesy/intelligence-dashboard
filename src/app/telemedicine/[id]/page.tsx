@@ -19,6 +19,35 @@ import type {
   SessionParticipantRole,
 } from "@/types/telemedicine.types";
 
+interface CrewSession {
+  username: string;
+  role: string;
+  displayName?: string;
+}
+
+function deriveParticipantRole(
+  session: CrewSession | null,
+  appointment: AppointmentWithDetails | null,
+): SessionParticipantRole {
+  if (!session || !appointment) return "DOCTOR";
+  const isAssignedDoctor = appointment.doctorId === session.username;
+  switch (session.role) {
+    case "DOKTER":
+      return isAssignedDoctor ? "DOCTOR" : "OBSERVER";
+    case "PERAWAT":
+      return "NURSE";
+    case "KEPALA_PUSKESMAS":
+    case "ADMIN":
+      return "OBSERVER";
+    case "CEO":
+    case "CHIEF_EXECUTIVE_OFFICER":
+    case "ADMINISTRATOR":
+      return isAssignedDoctor ? "DOCTOR" : "OBSERVER";
+    default:
+      return isAssignedDoctor ? "DOCTOR" : "OBSERVER";
+  }
+}
+
 export default function TelemedicineRoomPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -26,13 +55,12 @@ export default function TelemedicineRoomPage(): React.JSX.Element {
   const [appointment, setAppointment] = useState<AppointmentWithDetails | null>(
     null,
   );
+  const [session, setSession] = useState<CrewSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessionComplete, setSessionComplete] = useState(false);
 
-  // Untuk sekarang gunakan DOCTOR sebagai default role
-  // Nantinya bisa diambil dari session.role → mapping ke SessionParticipantRole
-  const participantRole: SessionParticipantRole = "DOCTOR";
+  const participantRole = deriveParticipantRole(session, appointment);
 
   const loadAppointment = useCallback(async () => {
     if (!id) return;
@@ -53,6 +81,27 @@ export default function TelemedicineRoomPage(): React.JSX.Element {
   useEffect(() => {
     void loadAppointment();
   }, [loadAppointment]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/session");
+        const data = (await res.json()) as {
+          user?: { username?: string; role?: string; displayName?: string };
+        };
+        const user = data.user;
+        if (user?.username && user?.role) {
+          setSession({
+            username: user.username,
+            role: user.role,
+            displayName: user.displayName,
+          });
+        }
+      } catch {
+        /* silent */
+      }
+    })();
+  }, []);
 
   const handleSessionComplete = useCallback(async (appointmentId: string) => {
     // Update status ke COMPLETED

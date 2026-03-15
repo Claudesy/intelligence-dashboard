@@ -209,44 +209,23 @@ function loadUsersFromEnv(): CrewAccessCredential[] {
   // Attempt 1: parse as-is
   try {
     return tryParseUsersJson(json);
-  } catch (err1) {
-    console.error(
-      "[crew-access] Parse attempt 1 failed:",
-      (err1 as Error).message,
-    );
+  } catch {
+    // intentionally silent — try next strategy
   }
 
   // Attempt 2: unescape \" → " (Railway kadang escape quotes)
   try {
     const unescaped = json.replace(/\\"/g, '"');
-    const result = tryParseUsersJson(unescaped);
-    console.log(
-      "[crew-access] Parse berhasil setelah unescape. Users:",
-      result.length,
-    );
-    return result;
-  } catch (err2) {
-    console.error(
-      "[crew-access] Parse attempt 2 (unescape) failed:",
-      (err2 as Error).message,
-    );
+    return tryParseUsersJson(unescaped);
+  } catch {
+    // intentionally silent — try next strategy
   }
 
   // Attempt 3: strip outer quotes jika Railway wrap dengan "..."
   try {
     const stripped = json.replace(/^["']|["']$/g, "");
-    const result = tryParseUsersJson(stripped);
-    console.log(
-      "[crew-access] Parse berhasil setelah strip outer quotes. Users:",
-      result.length,
-    );
-    return result;
-  } catch (err3) {
-    console.error(
-      "[crew-access] Parse attempt 3 (strip quotes) failed:",
-      (err3 as Error).message,
-    );
-    console.error("[crew-access] CREW_ACCESS_USERS_JSON length:", json.length);
+    return tryParseUsersJson(stripped);
+  } catch {
     return [];
   }
 }
@@ -424,27 +403,24 @@ async function verifyCrewAccessPassword(
   password: string,
   credential: CrewAccessCredential,
 ): Promise<boolean> {
-  if (credential.passwordHash) {
-    const parsed = parsePasswordHash(credential.passwordHash);
-    if (!parsed) return false;
+  if (!credential.passwordHash) return false;
 
-    const derivedKey = await deriveScryptKey(
-      password,
-      parsed.salt,
-      parsed.derivedKey.length,
-      {
-        N: parsed.N,
-        r: parsed.r,
-        p: parsed.p,
-      },
-    );
+  const parsed = parsePasswordHash(credential.passwordHash);
+  if (!parsed) return false;
 
-    if (derivedKey.length !== parsed.derivedKey.length) return false;
-    return timingSafeEqual(derivedKey, parsed.derivedKey);
-  }
+  const derivedKey = await deriveScryptKey(
+    password,
+    parsed.salt,
+    parsed.derivedKey.length,
+    {
+      N: parsed.N,
+      r: parsed.r,
+      p: parsed.p,
+    },
+  );
 
-  if (!credential.password) return false;
-  return credential.password === password;
+  if (derivedKey.length !== parsed.derivedKey.length) return false;
+  return timingSafeEqual(derivedKey, parsed.derivedKey);
 }
 
 export function listCrewAccessUsers(): CrewAccessUser[] {
@@ -618,7 +594,7 @@ export function invalidateCrewAccessUserCache(): void {
   cachedUsersMtimeMs = -1;
 }
 
-export function appendCrewAccessUserToFile(user: {
+export async function appendCrewAccessUserToFile(user: {
   username: string;
   displayName: string;
   email: string;
@@ -626,35 +602,20 @@ export function appendCrewAccessUserToFile(user: {
   profession: string;
   role: string;
   passwordHash: string;
-}): void {
-  const filePath = getUsersFilePath();
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  let users: Record<string, unknown>[] = [];
-  if (fs.existsSync(filePath)) {
-    const raw = fs.readFileSync(filePath, "utf-8").trim();
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) users = parsed;
-    }
-  }
-
-  users.push({
-    username: user.username,
-    displayName: user.displayName,
-    email: user.email,
-    institution: user.institution,
-    profession: user.profession,
-    role: user.role,
-    passwordHash: user.passwordHash,
+}): Promise<void> {
+  return withUserFileLock(async () => {
+    const records = readUsersFileRaw();
+    records.push({
+      username: user.username,
+      displayName: user.displayName,
+      email: user.email,
+      institution: user.institution,
+      profession: user.profession,
+      role: user.role,
+      passwordHash: user.passwordHash,
+    });
+    writeUsersFile(records);
   });
-
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(users, null, 2), "utf-8");
-  fs.renameSync(tempPath, filePath);
-
-  invalidateCrewAccessUserCache();
 }
 
 /* ── File locking for user writes ── */
@@ -838,18 +799,7 @@ export async function adminResetPassword(
 
 export function getCrewAccessConfigStatus(): { ok: boolean; message: string } {
   try {
-    const hasEnvJson = !!process.env.CREW_ACCESS_USERS_JSON?.trim();
-    const hasEnvSecret = !!process.env.CREW_ACCESS_SECRET?.trim();
-    console.log(
-      "[crew-access] Config check — CREW_ACCESS_USERS_JSON ada:",
-      hasEnvJson,
-      "| CREW_ACCESS_SECRET ada:",
-      hasEnvSecret,
-    );
-
     const users = getCrewAccessUsers();
-    console.log("[crew-access] Users loaded:", users.length);
-
     if (users.length === 0) {
       return {
         ok: false,
@@ -860,7 +810,6 @@ export function getCrewAccessConfigStatus(): { ok: boolean; message: string } {
     getSecret();
     return { ok: true, message: "" };
   } catch (error) {
-    console.error("[crew-access] Config status error:", error);
     return {
       ok: false,
       message:
@@ -868,5 +817,25 @@ export function getCrewAccessConfigStatus(): { ok: boolean; message: string } {
           ? error.message
           : "Konfigurasi auth tidak valid.",
     };
+  }
+}
+
+let _configChecked = false;
+
+/** Call once at app startup to validate config and warn about insecure defaults. */
+export function assertCrewAccessConfigOnStartup(): void {
+  if (_configChecked) return;
+  _configChecked = true;
+
+  if (!process.env.CREW_ACCESS_SECRET?.trim()) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "[crew-access] CREW_ACCESS_SECRET belum diatur. Produksi tidak dapat berjalan tanpa secret.",
+      );
+    }
+    // In dev, warn loudly — ephemeral secret means sessions die on restart
+    process.stderr.write(
+      "[crew-access] WARNING: CREW_ACCESS_SECRET tidak diset. Menggunakan ephemeral secret — semua session akan invalid setelah restart.\n",
+    );
   }
 }

@@ -9,19 +9,48 @@ import { useSharedIntelligenceSocket } from "./IntelligenceSocketProvider";
 
 function QuiescentBanner(): React.JSX.Element {
   return (
-    <section className="rounded-md border border-[var(--line-base)] bg-[var(--bg-card)] px-5 py-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--c-critical)]">
-            Clinical Safety Alert
-          </p>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-main)]">
-            Belum ada alert kritis aktif.
-          </p>
+    <section
+      style={{
+        borderRadius: 6,
+        border: "1px solid var(--line-base)",
+        background: "var(--bg-card)",
+        padding: "20px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            color: "var(--c-critical)",
+            marginBottom: 8,
+          }}
+        >
+          Clinical Safety Alert
         </div>
-        <div className="rounded-md border border-dashed border-[var(--line-base)] px-4 py-3 text-sm text-[var(--text-muted)]">
-          Cross-panel visibility aktif.
+        <div style={{ fontSize: 14, color: "var(--text-main)" }}>
+          Belum ada alert kritis aktif.
         </div>
+      </div>
+      <div
+        style={{
+          borderRadius: 4,
+          border: "1px dashed var(--line-base)",
+          padding: "8px 14px",
+          fontSize: 12,
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-muted)",
+          letterSpacing: "0.05em",
+        }}
+      >
+        Cross-panel visibility aktif
       </div>
     </section>
   );
@@ -41,38 +70,81 @@ function ActiveAlertBanner({
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
-      className="rounded-md border border-[var(--c-critical)] bg-[var(--bg-card)] px-5 py-4"
+      style={{
+        borderRadius: 6,
+        border: "1px solid var(--c-critical)",
+        background: "var(--bg-card)",
+        padding: "20px 24px",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap",
+      }}
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <span
-            aria-hidden="true"
-            className="mt-0.5 shrink-0 text-xl leading-none text-[var(--c-critical)]"
-          >
-            ⚠
-          </span>
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--c-critical)]">
-              Clinical Safety Alert — Kritis
-            </p>
-            <p className="mt-1 truncate text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              {encounterId}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-main)]">
-              {message}
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onAcknowledge}
-          aria-label="Acknowledge alert kritis ini"
-          className="shrink-0 rounded-md border border-[var(--c-critical)] px-4 py-2 text-sm font-medium text-[var(--c-critical)] transition-opacity hover:opacity-70 focus:outline-none focus:ring-2 focus:ring-[var(--c-critical)] focus:ring-offset-2"
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0 }}>
+        <span
+          aria-hidden="true"
+          style={{ fontSize: 20, color: "var(--c-critical)", lineHeight: 1, flexShrink: 0 }}
         >
-          Acknowledge
-        </button>
+          ⚠
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: "var(--c-critical)",
+              marginBottom: 4,
+            }}
+          >
+            Clinical Safety Alert — Kritis
+          </div>
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              opacity: 0.6,
+              marginBottom: 8,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {encounterId}
+          </div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-main)" }}>
+            {message}
+          </p>
+        </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onAcknowledge}
+        aria-label="Acknowledge alert kritis ini"
+        style={{
+          flexShrink: 0,
+          borderRadius: 4,
+          border: "1px solid var(--c-critical)",
+          padding: "8px 16px",
+          fontSize: 13,
+          fontFamily: "var(--font-mono)",
+          fontWeight: 500,
+          color: "var(--c-critical)",
+          background: "transparent",
+          cursor: "pointer",
+          letterSpacing: "0.05em",
+          transition: "opacity 0.2s",
+        }}
+      >
+        Acknowledge
+      </button>
     </section>
   );
 }
@@ -91,16 +163,26 @@ function AcknowledgedBanner({
     <section
       role="status"
       aria-live="polite"
-      className="rounded-md border border-[var(--line-base)] bg-[var(--bg-card)] px-5 py-4 opacity-60"
+      style={{
+        borderRadius: 6,
+        border: "1px solid var(--line-base)",
+        background: "var(--bg-card)",
+        padding: "16px 20px",
+        opacity: 0.6,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}
     >
-      <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="text-base text-[var(--text-muted)]">
-          ✓
-        </span>
-        <p className="text-sm text-[var(--text-muted)]">
-          Alert kritis telah di-acknowledge pada {time}.
-        </p>
-      </div>
+      <span
+        aria-hidden="true"
+        style={{ fontSize: 16, color: "var(--text-muted)" }}
+      >
+        ✓
+      </span>
+      <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+        Alert kritis telah di-acknowledge pada {time}.
+      </span>
     </section>
   );
 }
@@ -120,10 +202,7 @@ export function ClinicalSafetyAlertBannerView({
   acknowledgedAt,
   onAcknowledge,
 }: ClinicalSafetyAlertBannerViewProps): React.JSX.Element {
-  if (!activeAlert) {
-    return <QuiescentBanner />;
-  }
-
+  if (!activeAlert) return <QuiescentBanner />;
   if (isAcknowledged && acknowledgedAt) {
     return <AcknowledgedBanner acknowledgedAt={acknowledgedAt} />;
   }
@@ -142,7 +221,7 @@ export function ClinicalSafetyAlertBannerView({
   );
 }
 
-// ── Container (wires socket + hook → view) ────────────────────────────────────
+// ── Container ────────────────────────────────────────────────────────────────
 
 export default function ClinicalSafetyAlertBanner(): React.JSX.Element {
   const socket = useSharedIntelligenceSocket();

@@ -8,7 +8,10 @@ import {
   Calculator,
   Droplets,
   Heart,
+  Scale,
+  Smile,
   UserRound,
+  Wind,
 } from "lucide-react";
 import {
   MEDICAL_CALCULATORS,
@@ -27,12 +30,18 @@ const CATEGORY_ICON: Record<
   Obstetri: Baby,
   "Critical Care": Activity,
   Neurologi: Brain,
+  Pulmonologi: Wind,
+  Metabolik: Scale,
+  "Skrining Mental": Smile,
 };
 
 const CATEGORY_ORDER: CalculatorCategory[] = [
   "Umum",
   "Kardiovaskular",
   "Ginjal",
+  "Pulmonologi",
+  "Metabolik",
+  "Skrining Mental",
   "Critical Care",
   "Neurologi",
   "Obstetri",

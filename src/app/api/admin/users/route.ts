@@ -36,8 +36,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ ok: true, users: merged });
-  } catch (error) {
-    console.error("[Admin] Failed to list users:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Gagal memuat data user." },
       { status: 500 },

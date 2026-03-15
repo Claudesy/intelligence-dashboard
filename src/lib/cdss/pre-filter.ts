@@ -15,6 +15,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { buildBM25Index, scoreBM25 } from "./bm25";
+import { expandQueryWithAliases } from "./symptom-aliases";
+
 interface PenyakitEntry {
   id: string;
   nama: string;
@@ -22,9 +25,10 @@ interface PenyakitEntry {
   kompetensi?: string;
   definisi: string;
   gejala?: string[];
+  gejala_klinis?: string[];
   pemeriksaan_fisik?: string[];
   red_flags?: string[];
-  terpi?: Array<{ obat: string; dosis: string; frek: string }>;
+  terapi?: Array<{ obat: string; dosis: string; frek: string }>;
   kriteria_rujukan?: string;
   diagnosis_banding?: string[];
 }
@@ -34,6 +38,7 @@ interface PenyakitDB {
 }
 
 let _db: PenyakitEntry[] | null = null;
+let _bm25Index: ReturnType<typeof buildBM25Index> | null = null;
 
 function loadDB(): PenyakitEntry[] {
   if (_db) return _db;
@@ -49,6 +54,30 @@ function loadDB(): PenyakitEntry[] {
   }
 }
 
+function getBM25Index(db: PenyakitEntry[]): ReturnType<typeof buildBM25Index> {
+  if (_bm25Index) return _bm25Index;
+  _bm25Index = buildBM25Index(
+    db.map((d) => ({
+      id: d.id,
+      text: [
+        d.nama,
+        d.nama,
+        d.nama, // Triple weight for disease name
+        ...(d.gejala ?? []),
+        ...(d.gejala ?? []),
+        ...(d.gejala_klinis ?? []),
+        ...(d.gejala_klinis ?? []),
+        ...(d.gejala_klinis ?? []), // Triple weight for symptoms
+        ...(d.red_flags ?? []),
+        ...(d.red_flags ?? []), // Double weight for red flags
+        d.definisi ?? "",
+        ...(d.diagnosis_banding ?? []),
+      ].join(" "),
+    })),
+  );
+  return _bm25Index;
+}
+
 // Normalisasi teks: lowercase, hapus tanda baca, split jadi tokens
 function tokenize(text: string): string[] {
   return text
@@ -56,12 +85,6 @@ function tokenize(text: string): string[] {
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length >= 3);
-}
-
-// Hitung berapa banyak query tokens yang match di target string/array
-function countMatches(queryTokens: string[], targets: string[]): number {
-  const targetText = targets.join(" ").toLowerCase();
-  return queryTokens.filter((t) => targetText.includes(t)).length;
 }
 
 // Stopwords medis Indonesia yang tidak informatif
@@ -103,7 +126,7 @@ export interface FilteredDisease {
   gejala: string[];
   pemeriksaan_fisik: string[];
   red_flags: string[];
-  terpi: Array<{ obat: string; dosis: string; frek: string }>;
+  terapi: Array<{ obat: string; dosis: string; frek: string }>;
   kriteria_rujukan: string;
   diagnosis_banding: string[];
   score: number;
@@ -118,7 +141,8 @@ export function preFilterDiseases(
   if (db.length === 0) return [];
 
   const rawQuery = [keluhanUtama, keluhanTambahan ?? ""].join(" ");
-  const queryTokens = extractMedicalTokens(rawQuery);
+  const expandedQuery = expandQueryWithAliases(rawQuery);
+  const queryTokens = extractMedicalTokens(expandedQuery);
 
   if (queryTokens.length === 0) {
     // Fallback: kembalikan penyakit dengan kompetensi 4A (paling umum di FKTP)
@@ -128,36 +152,13 @@ export function preFilterDiseases(
       .map((d) => toFiltered(d, 0));
   }
 
+  // BM25 scoring — accounts for term frequency saturation + doc length normalization + IDF
+  const bm25 = getBM25Index(db);
+  const bm25Scores = scoreBM25(bm25, queryTokens);
+  const bm25Map = new Map(bm25Scores.map((s) => [s.id, s.score]));
+
   const scored = db.map((d) => {
-    let score = 0;
-
-    // Gejala — bobot tertinggi
-    if (d.gejala && d.gejala.length > 0) {
-      score += countMatches(queryTokens, d.gejala) * 3;
-    }
-
-    // Red flags
-    if (d.red_flags && d.red_flags.length > 0) {
-      score += countMatches(queryTokens, d.red_flags) * 2;
-    }
-
-    // Definisi
-    if (d.definisi) {
-      score += countMatches(queryTokens, [d.definisi]) * 1;
-    }
-
-    // Diagnosis banding
-    if (d.diagnosis_banding && d.diagnosis_banding.length > 0) {
-      score += countMatches(queryTokens, d.diagnosis_banding) * 1;
-    }
-
-    // Bonus: nama penyakit cocok langsung
-    const namaTokens = tokenize(d.nama);
-    const namaHits = queryTokens.filter((t) =>
-      namaTokens.some((n) => n.includes(t) || t.includes(n)),
-    );
-    score += namaHits.length * 4;
-
+    const score = bm25Map.get(d.id) ?? 0;
     return { disease: d, score };
   });
 
@@ -176,10 +177,10 @@ function toFiltered(d: PenyakitEntry, score: number): FilteredDisease {
     icd10: d.icd10,
     nama: d.nama,
     definisi: d.definisi ?? "",
-    gejala: d.gejala ?? [],
+    gejala: [...(d.gejala ?? []), ...(d.gejala_klinis ?? [])],
     pemeriksaan_fisik: d.pemeriksaan_fisik ?? [],
     red_flags: d.red_flags ?? [],
-    terpi: d.terpi ?? [],
+    terapi: d.terapi ?? [],
     kriteria_rujukan: d.kriteria_rujukan ?? "",
     diagnosis_banding: d.diagnosis_banding ?? [],
     score,
@@ -194,7 +195,11 @@ export function getKBStats(): {
   const db = loadDB();
   return {
     total: db.length,
-    withGejala: db.filter((d) => d.gejala && d.gejala.length > 0).length,
+    withGejala: db.filter(
+      (d) =>
+        (d.gejala && d.gejala.length > 0) ||
+        (d.gejala_klinis && d.gejala_klinis.length > 0),
+    ).length,
     withRedFlags: db.filter((d) => d.red_flags && d.red_flags.length > 0)
       .length,
   };

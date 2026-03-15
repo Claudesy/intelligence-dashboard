@@ -6,7 +6,6 @@ import path from "node:path";
 import {
   isCrewAccessGender,
   isCrewAccessServiceArea,
-  professionRequiresServiceArea,
   type CrewAccessSession,
   type CrewAccessProfession,
   type CrewAccessServiceArea,
@@ -16,8 +15,8 @@ import {
   CREW_PROFILE_MAX_POSITIONS,
   createEmptyCrewProfile,
   isCrewProfileBloodType,
-  isCrewProfileDegree,
-  isCrewProfilePosition,
+  normalizeCrewProfileDegree,
+  normalizeCrewProfilePosition,
   resolveCrewProfileAvatarUrl,
   type CrewProfileData,
   type CrewProfileDegree,
@@ -173,6 +172,38 @@ function normalizeServiceAreas(raw: unknown): CrewAccessServiceArea[] {
   );
 }
 
+function normalizeJobTitles(raw: unknown): CrewProfilePosition[] {
+  const values = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(",")
+      : [];
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => normalizeCrewProfilePosition(normalizeText(value)))
+        .filter((value): value is CrewProfilePosition => Boolean(value)),
+    ),
+  );
+}
+
+function normalizeDegrees(raw: unknown): CrewProfileDegree[] {
+  const values = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(",")
+      : [];
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => normalizeCrewProfileDegree(normalizeText(value)))
+        .filter((value): value is CrewProfileDegree => Boolean(value)),
+    ),
+  );
+}
+
 function sanitizeStoredProfile(raw: unknown): CrewProfileData {
   if (!raw || typeof raw !== "object") return createEmptyCrewProfile();
   const body = raw as Record<string, unknown>;
@@ -188,14 +219,14 @@ function sanitizeStoredProfile(raw: unknown): CrewProfileData {
     gender: isCrewAccessGender(gender) ? gender : "",
     domicile: normalizeText(body.domicile).slice(0, 120),
     bloodType: isCrewProfileBloodType(bloodType) ? bloodType : "",
-    degrees: normalizePresetArray(
-      body.degrees ?? body.degree,
-      isCrewProfileDegree,
-    ).slice(0, CREW_PROFILE_MAX_DEGREES),
-    jobTitles: normalizePresetArray(
-      body.jobTitles ?? body.jobTitle,
-      isCrewProfilePosition,
-    ).slice(0, CREW_PROFILE_MAX_POSITIONS),
+    degrees: normalizeDegrees(body.degrees ?? body.degree).slice(
+      0,
+      CREW_PROFILE_MAX_DEGREES,
+    ),
+    jobTitles: normalizeJobTitles(body.jobTitles ?? body.jobTitle).slice(
+      0,
+      CREW_PROFILE_MAX_POSITIONS,
+    ),
     employeeId: normalizeText(body.employeeId).slice(0, 64),
     strNumber: normalizeText(body.strNumber).slice(0, 64),
     sipNumber: normalizeText(body.sipNumber).slice(0, 64),
@@ -211,6 +242,9 @@ function sanitizeStoredProfile(raw: unknown): CrewProfileData {
     linkedinUrl: normalizeUrl(body.linkedinUrl).slice(0, 260),
     gravatarUrl: normalizeUrl(body.gravatarUrl).slice(0, 260),
     blogUrl: normalizeUrl(body.blogUrl).slice(0, 260),
+    instagramUrl: normalizeUrl(body.instagramUrl).slice(0, 260),
+    tiktokUrl: normalizeUrl(body.tiktokUrl).slice(0, 260),
+    youtubeUrl: normalizeUrl(body.youtubeUrl).slice(0, 260),
   };
 }
 
@@ -272,14 +306,8 @@ function validateProfileInput(
   const gender = normalizeText(body.gender);
   const domicile = normalizeText(body.domicile);
   const bloodType = normalizeText(body.bloodType);
-  const degrees = normalizePresetArray(
-    body.degrees ?? body.degree,
-    isCrewProfileDegree,
-  );
-  const jobTitles = normalizePresetArray(
-    body.jobTitles ?? body.jobTitle,
-    isCrewProfilePosition,
-  );
+  const degrees = normalizeDegrees(body.degrees ?? body.degree);
+  const jobTitles = normalizeJobTitles(body.jobTitles ?? body.jobTitle);
   const employeeId = normalizeText(body.employeeId);
   const strNumber = normalizeText(body.strNumber);
   const sipNumber = normalizeText(body.sipNumber);
@@ -291,6 +319,9 @@ function validateProfileInput(
   const linkedinUrl = normalizeUrl(body.linkedinUrl);
   const gravatarUrl = normalizeUrl(body.gravatarUrl);
   const blogUrl = normalizeUrl(body.blogUrl);
+  const instagramUrl = normalizeUrl(body.instagramUrl);
+  const tiktokUrl = normalizeUrl(body.tiktokUrl);
+  const youtubeUrl = normalizeUrl(body.youtubeUrl);
   if (fullName.length < 3 || fullName.length > 120) {
     throw new CrewProfileValidationError(
       "Nama lengkap wajib diisi 3-120 karakter.",
@@ -356,37 +387,26 @@ function validateProfileInput(
     );
   }
 
+  if (serviceAreaOther.length > 120) {
+    throw new CrewProfileValidationError(
+      "Area layanan lainnya maksimal 120 karakter.",
+    );
+  }
+
   if (
-    [githubUrl, linkedinUrl, gravatarUrl, blogUrl].some(
+    [
+      githubUrl,
+      linkedinUrl,
+      gravatarUrl,
+      blogUrl,
+      instagramUrl,
+      tiktokUrl,
+      youtubeUrl,
+    ].some(
       (value) => value.length > 260,
     )
   ) {
     throw new CrewProfileValidationError("Link profil maksimal 260 karakter.");
-  }
-
-  if (
-    professionRequiresServiceArea(session.profession) &&
-    serviceAreas.length === 0
-  ) {
-    throw new CrewProfileValidationError(
-      "Pilih minimal satu bidang layanan untuk profesi klinis.",
-    );
-  }
-
-  if (serviceAreas.includes("Lainnya") && serviceAreaOther.length < 3) {
-    throw new CrewProfileValidationError("Isi detail bidang layanan lain.");
-  }
-
-  if (!serviceAreas.includes("Lainnya") && serviceAreaOther) {
-    throw new CrewProfileValidationError(
-      "Detail bidang layanan lain hanya boleh diisi jika memilih 'Lainnya'.",
-    );
-  }
-
-  if (serviceAreaOther.length > 120) {
-    throw new CrewProfileValidationError(
-      "Detail bidang layanan lain maksimal 120 karakter.",
-    );
   }
 
   return {
@@ -407,13 +427,16 @@ function validateProfileInput(
     avatarUrl: resolveCrewProfileAvatarUrl({
       gender: gender && isCrewAccessGender(gender) ? gender : "",
       profession: session.profession,
-      serviceAreas,
+      serviceAreas: [],
     }),
     whatsappNumber,
     githubUrl,
     linkedinUrl,
     gravatarUrl,
     blogUrl,
+    instagramUrl,
+    tiktokUrl,
+    youtubeUrl,
   };
 }
 

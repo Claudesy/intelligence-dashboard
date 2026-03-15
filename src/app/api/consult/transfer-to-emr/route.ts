@@ -66,10 +66,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log(
-      `[Consult] Transfer ke EMR: consultId=${consultId} → bridge ${entry.id} pelayanan ${pelayananId}`,
-    );
-
     return NextResponse.json({
       ok: true,
       entry: {

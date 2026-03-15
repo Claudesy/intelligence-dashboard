@@ -20,12 +20,18 @@ export function getEmrTransferConfig(): EMRTransferConfig {
   return {
     baseUrl,
     loginUrl: readOptionalEnv("EMR_LOGIN_URL") ?? `${baseUrl}/login`,
-    username: readOptionalEnv("EMR_USERNAME") ?? "",
-    password: readOptionalEnv("EMR_PASSWORD") ?? "",
     sessionStoragePath: resolveRuntimePathFromEnv(
       "EMR_SESSION_STORAGE_PATH",
       "runtime/emr-session.json",
     ),
     headless: readBooleanEnv("EMR_HEADLESS", true),
+  };
+}
+
+/** Read ePuskesmas credentials directly from env — never stored in config objects. */
+export function getEMRCredentials(): { username: string; password: string } {
+  return {
+    username: readOptionalEnv("EMR_USERNAME") ?? "",
+    password: readOptionalEnv("EMR_PASSWORD") ?? "",
   };
 }

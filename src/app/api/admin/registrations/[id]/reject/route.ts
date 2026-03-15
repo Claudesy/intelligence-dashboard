@@ -32,12 +32,16 @@ export async function POST(
       message: "Pendaftaran ditolak.",
     });
   } catch (error) {
-    console.error("[Admin] Reject registration error:", error);
+    const isKnownError =
+      error instanceof Error &&
+      (error.message.includes("tidak ditemukan") ||
+        error.message.includes("sudah"));
     return NextResponse.json(
       {
         ok: false,
-        error:
-          error instanceof Error ? error.message : "Gagal menolak pendaftaran.",
+        error: isKnownError
+          ? (error as Error).message
+          : "Gagal menolak pendaftaran.",
       },
       { status: 400 },
     );

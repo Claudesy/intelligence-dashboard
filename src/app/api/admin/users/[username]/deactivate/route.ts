@@ -49,8 +49,16 @@ export async function POST(
     await deactivateCrewAccessUser(username, session.username);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Gagal menonaktifkan user.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+    const isKnownError =
+      error instanceof Error && error.message.includes("tidak ditemukan");
+    return NextResponse.json(
+      {
+        ok: false,
+        error: isKnownError
+          ? (error as Error).message
+          : "Gagal menonaktifkan user.",
+      },
+      { status: 400 },
+    );
   }
 }

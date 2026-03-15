@@ -115,7 +115,7 @@ function DisclaimerTab() {
     <div>
       <SectionHeading>Tentang Disclaimer Ini</SectionHeading>
       <Paragraph>
-        Puskesmas Intelligence Dashboard mengintegrasikan beberapa teknologi
+        Sentra Intelligence Dashboard mengintegrasikan beberapa teknologi
         kecerdasan buatan (AI) untuk mendukung alur kerja klinis. Disclaimer ini
         menjelaskan batasan, risiko, dan tanggung jawab terkait penggunaan
         fitur-fitur AI dalam sistem.
@@ -294,7 +294,7 @@ function TermsTab() {
     <div>
       <SectionHeading>Lingkup Layanan</SectionHeading>
       <Paragraph>
-        Puskesmas Intelligence Dashboard menyediakan fitur-fitur berikut untuk
+        Sentra Intelligence Dashboard menyediakan fitur-fitur berikut untuk
         mendukung operasional klinis harian di fasilitas kesehatan:
       </Paragraph>
       <BulletList
@@ -597,7 +597,7 @@ export default function LegalPage() {
           }}
         >
           Halaman ini memuat informasi hukum, disclaimer, kebijakan privasi, dan
-          ketentuan penggunaan sistem Puskesmas Intelligence Dashboard.
+          ketentuan penggunaan sistem Sentra Intelligence Dashboard.
         </p>
       </div>
 

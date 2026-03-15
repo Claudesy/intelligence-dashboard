@@ -23,8 +23,7 @@ export async function GET(request: Request) {
   try {
     const pending = listPendingRegistrations();
     return NextResponse.json({ ok: true, pending });
-  } catch (error) {
-    console.error("[Admin] List registrations error:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Gagal memuat data pendaftaran." },
       { status: 500 },

@@ -38,8 +38,47 @@ import {
   buildProblemRepresentation,
   mergeDiseaseCandidates,
 } from "./hybrid";
+import { calculateNEWS2, news2ToRedFlags } from "./news2";
+import {
+  detectEarlyWarningPatterns,
+  earlyWarningsToRedFlags,
+} from "./early-warning-patterns";
+
+// ── Circuit Breaker for DeepSeek ──────────────────────────────────────────────
+
+const CIRCUIT_BREAKER_THRESHOLD = 3;
+const CIRCUIT_BREAKER_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+let _dsConsecutiveFailures = 0;
+let _dsCircuitOpenedAt = 0;
+
+function isDeepSeekCircuitOpen(): boolean {
+  if (_dsConsecutiveFailures < CIRCUIT_BREAKER_THRESHOLD) return false;
+  if (Date.now() - _dsCircuitOpenedAt > CIRCUIT_BREAKER_COOLDOWN_MS) {
+    // Cooldown expired, allow retry (half-open state)
+    _dsConsecutiveFailures = 0;
+    return false;
+  }
+  return true;
+}
+
+function recordDeepSeekSuccess(): void {
+  _dsConsecutiveFailures = 0;
+}
+
+function recordDeepSeekFailure(): void {
+  _dsConsecutiveFailures++;
+  if (_dsConsecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+    _dsCircuitOpenedAt = Date.now();
+  }
+}
 
 // ── DeepSeek Reasoner ─────────────────────────────────────────────────────────
+
+type DeepSeekResult = {
+  response: LLMResponse;
+  reasoning_content?: string;
+};
 
 type LLMResponse = {
   suggestions?: Array<{
@@ -63,9 +102,13 @@ type LLMResponse = {
   data_quality_note?: string;
 };
 
-async function callDeepSeekReasoner(prompt: string): Promise<LLMResponse> {
+async function callDeepSeekReasoner(prompt: string): Promise<DeepSeekResult> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("DEEPSEEK_API_KEY tidak dikonfigurasi");
+
+  if (isDeepSeekCircuitOpen()) {
+    throw new Error("DeepSeek circuit breaker OPEN — cooldown aktif setelah kegagalan beruntun");
+  }
 
   const systemPrompt = `Kamu adalah Iskandar Engine V2 — sistem Clinical Decision Support untuk dokter umum di Puskesmas Indonesia. Jawab HANYA dalam JSON valid sesuai schema yang diminta. Jangan tambahkan markdown, komentar, atau teks di luar JSON.`;
 
@@ -88,6 +131,7 @@ async function callDeepSeekReasoner(prompt: string): Promise<LLMResponse> {
   });
 
   if (!response.ok) {
+    recordDeepSeekFailure();
     const err = await response.text();
     throw new Error(
       `DeepSeek API error ${response.status}: ${err.slice(0, 200)}`,
@@ -101,12 +145,29 @@ async function callDeepSeekReasoner(prompt: string): Promise<LLMResponse> {
   };
 
   const content = data.choices?.[0]?.message?.content ?? "{}";
+  const reasoningContent = data.choices?.[0]?.message?.reasoning_content;
+
   // Strip markdown fences jika ada
   const clean = content
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
-  return JSON.parse(clean) as LLMResponse;
+
+  try {
+    const parsed = JSON.parse(clean) as LLMResponse;
+    recordDeepSeekSuccess();
+    return { response: parsed, reasoning_content: reasoningContent };
+  } catch {
+    // Recovery: extract JSON object via regex if direct parse fails
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as LLMResponse;
+      recordDeepSeekSuccess();
+      return { response: parsed, reasoning_content: reasoningContent };
+    }
+    recordDeepSeekFailure();
+    throw new Error("DeepSeek returned non-JSON response");
+  }
 }
 
 // ── Knowledge Base Context Builder ───────────────────────────────────────────
@@ -149,6 +210,16 @@ function checkVitalRedFlags(
       });
     }
   }
+  if (v.diastolic !== undefined && v.diastolic >= 120) {
+    flags.push({
+      severity: "emergency",
+      condition: "Hipertensi Emergensi (Diastolik)",
+      action:
+        "Evaluasi kerusakan organ target, stabilisasi, rujuk emergensi",
+      criteria_met: [`Diastolik ${v.diastolic} mmHg ≥ 120`],
+      icd_codes: ["I10"],
+    });
+  }
   if (v.spo2 !== undefined && v.spo2 < 90 && v.spo2 > 0) {
     flags.push({
       severity: "emergency",
@@ -174,13 +245,24 @@ function checkVitalRedFlags(
       });
     }
   }
-  if (v.temperature !== undefined && v.temperature >= 40) {
-    flags.push({
-      severity: "urgent",
-      condition: "Hiperpireksia",
-      action: "Antipiretik agresif, cari sumber infeksi, pertimbangkan rujukan",
-      criteria_met: [`Suhu ${v.temperature}°C ≥ 40`],
-    });
+  if (v.temperature !== undefined) {
+    if (v.temperature >= 40) {
+      flags.push({
+        severity: "urgent",
+        condition: "Hiperpireksia",
+        action:
+          "Antipiretik agresif, cari sumber infeksi, pertimbangkan rujukan",
+        criteria_met: [`Suhu ${v.temperature}°C ≥ 40`],
+      });
+    } else if (v.temperature < 35 && v.temperature > 0) {
+      flags.push({
+        severity: "urgent",
+        condition: "Hipotermia",
+        action:
+          "Evaluasi penyebab (sepsis, hipotiroid, paparan dingin), rewarming, monitoring ketat",
+        criteria_met: [`Suhu ${v.temperature}°C < 35`],
+      });
+    }
   }
   if (v.respiratory_rate !== undefined) {
     if (v.respiratory_rate > 30) {
@@ -429,13 +511,23 @@ export async function runDiagnosisEngine(
   // 1. Hardcoded vital signs red flags (tidak butuh LLM)
   const vitalRedFlags = checkVitalRedFlags(input);
 
+  // 1b. NEWS2 composite scoring (graduated early detection)
+  const news2 = calculateNEWS2(input.vital_signs);
+  const news2Flags = news2ToRedFlags(news2);
+
+  // 1c. Disease-specific early warning patterns
+  const earlyWarnings = detectEarlyWarningPatterns(input, news2);
+  const earlyWarningFlags = earlyWarningsToRedFlags(earlyWarnings);
+
   // 2. Check at least one reasoning API key tersedia
   const hasDeepSeek = !!process.env.DEEPSEEK_API_KEY;
   const hasGemini = !!process.env.GEMINI_API_KEY;
   if (!hasDeepSeek && !hasGemini) {
+    // Even without AI, NEWS2 + early warning patterns still work
+    const fallbackFlags = [...vitalRedFlags, ...earlyWarningFlags, ...news2Flags];
     return buildFallbackResult(
       input,
-      vitalRedFlags,
+      fallbackFlags,
       startTime,
       "DEEPSEEK_API_KEY dan GEMINI_API_KEY keduanya tidak dikonfigurasi",
     );
@@ -492,14 +584,15 @@ export async function runDiagnosisEngine(
   // 5. Call reasoning LLM: DeepSeek Reasoner (primary) → Gemini 2.5 Flash-Lite (fallback)
   let parsed: LLMResponse | null = null;
   let modelUsed = "deepseek-reasoner";
+  let reasoningContent: string | undefined;
 
   // 5a. Try DeepSeek Reasoner
   try {
-    parsed = await callDeepSeekReasoner(prompt);
-    console.log("[IDE-V2] DeepSeek Reasoner berhasil");
+    const dsResult = await callDeepSeekReasoner(prompt);
+    parsed = dsResult.response;
+    reasoningContent = dsResult.reasoning_content;
   } catch (dsErr) {
     const dsMsg = dsErr instanceof Error ? dsErr.message : "DeepSeek error";
-    console.warn("[IDE-V2] DeepSeek gagal, fallback ke Gemini:", dsMsg);
 
     // 5b. Fallback: Gemini 2.5 Flash-Lite
     const geminiKey = process.env.GEMINI_API_KEY;
@@ -526,10 +619,8 @@ export async function runDiagnosisEngine(
       const raw = result.response.text();
       parsed = JSON.parse(raw) as LLMResponse;
       modelUsed = "gemini-2.5-flash-lite (fallback)";
-      console.log("[IDE-V2] Gemini fallback berhasil");
     } catch (gemErr) {
       const gemMsg = gemErr instanceof Error ? gemErr.message : "Gemini error";
-      console.error("[IDE-V2] Kedua LLM gagal:", gemMsg);
       return buildFallbackResult(
         input,
         vitalRedFlags,
@@ -592,12 +683,16 @@ export async function runDiagnosisEngine(
     criteria_met: f.criteria_met ?? [],
   }));
 
-  // Vital flags didahulukan, LLM flags menyusul (deduplicate by condition name)
+  // Merge all red flags: vitals → early warning → NEWS2 → LLM (deduplicate by condition)
   const existingConditions = new Set(vitalRedFlags.map((f) => f.condition));
-  const mergedRedFlags = [
-    ...vitalRedFlags,
-    ...llmRedFlags.filter((f) => !existingConditions.has(f.condition)),
-  ];
+  const mergedRedFlags = [...vitalRedFlags];
+
+  for (const flag of [...earlyWarningFlags, ...news2Flags, ...llmRedFlags]) {
+    if (!existingConditions.has(flag.condition)) {
+      existingConditions.add(flag.condition);
+      mergedRedFlags.push(flag);
+    }
+  }
 
   // 8. Build alerts
   const avgConfidence =
@@ -653,6 +748,7 @@ export async function runDiagnosisEngine(
       warnings,
     },
     next_best_questions: hybrid.nextBestQuestions,
+    _reasoning_content: reasoningContent,
   };
 }
 

@@ -11,6 +11,7 @@ import {
   LineElement,
   PointElement,
   Tooltip,
+  type TooltipItem,
 } from "chart.js";
 import { useEffect, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
@@ -41,6 +42,7 @@ export interface AdminSession {
 interface KPI {
   totalCrew: number;
   pendingRegistrations: number;
+  onlineToday: number;
   lb1Runs: number;
   lb1SuccessRuns: number;
   lb1FailedRuns: number;
@@ -111,6 +113,12 @@ interface ServerMetrics {
   } | null;
 }
 
+interface UsageTodayData {
+  hours: string[];
+  dashboardCounts: number[];
+  emrClinicalCounts: number[];
+}
+
 interface OverviewResponse {
   ok: boolean;
   kpi: KPI;
@@ -120,7 +128,15 @@ interface OverviewResponse {
   lb1Recent: LB1Entry[];
   emrRecent: EMREntry[];
   crew: CrewMember[];
-  pendingRegistrations: { id: string }[];
+  pendingRegistrations: { id: string; username: string; displayName: string; profession: string; institution: string; createdAt: string; status: string }[];
+  usageToday: UsageTodayData;
+  recentLogins: string[];
+  topUsers: Array<{
+    username: string;
+    dashboardCount: number;
+    emrClinicalCount: number;
+    totalActivity: number;
+  }>;
 }
 
 interface OnlineUser {
@@ -232,40 +248,95 @@ function healthLabel(
 /* ── Alert Item ── */
 
 interface AlertItem {
-  source: "LB1" | "EMR";
+  source: "PENDING" | "SYSTEM";
   timestamp: string;
   message: string;
+  priority: "high" | "critical";
 }
 
 function computeAlerts(
-  lb1Recent: LB1Entry[],
-  emrRecent: EMREntry[],
+  pendingRegistrations: { id: string; username: string; displayName: string; createdAt: string }[],
+  moduleHealth: ModuleHealth,
+  serverMetrics: ServerMetrics | null,
 ): AlertItem[] {
   const alerts: AlertItem[] = [];
 
-  for (const entry of lb1Recent) {
-    if (entry.status !== "success") {
+  // 1. Pending Registrations (High Priority)
+  if (pendingRegistrations.length > 0) {
+    const oldestPending = pendingRegistrations
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
+    const hoursAgo = Math.floor(
+      (Date.now() - new Date(oldestPending.createdAt).getTime()) / (1000 * 60 * 60),
+    );
+    
+    alerts.push({
+      source: "PENDING",
+      timestamp: oldestPending.createdAt,
+      message: `${pendingRegistrations.length} registrasi menunggu approval${hoursAgo > 24 ? ` (terlama ${Math.floor(hoursAgo / 24)} hari)` : hoursAgo > 0 ? ` (terlama ${hoursAgo} jam)` : ""}`,
+      priority: "high",
+    });
+  }
+
+  // 2. Critical System Errors
+  // Module Health Issues
+  if (moduleHealth.lb1.status === "error") {
+    alerts.push({
+      source: "SYSTEM",
+      timestamp: moduleHealth.lb1.lastRun || new Date().toISOString(),
+      message: `LB1 module error - ${moduleHealth.lb1.lastStatus || "unknown status"}`,
+      priority: "critical",
+    });
+  }
+
+  if (moduleHealth.emr.status === "error") {
+    alerts.push({
+      source: "SYSTEM",
+      timestamp: moduleHealth.emr.lastRun || new Date().toISOString(),
+      message: `EMR module error - ${moduleHealth.emr.lastStatus || "unknown status"}`,
+      priority: "critical",
+    });
+  }
+
+  if (moduleHealth.emr.status === "warning") {
+    alerts.push({
+      source: "SYSTEM",
+      timestamp: moduleHealth.emr.lastRun || new Date().toISOString(),
+      message: `EMR module warning - ${moduleHealth.emr.lastStatus || "partial success"}`,
+      priority: "high",
+    });
+  }
+
+  // Server/Database Issues
+  if (serverMetrics) {
+    // Check memory usage (if heap used > 90% of heap total)
+    const heapUsagePercent = (serverMetrics.heapUsedMb / serverMetrics.heapTotalMb) * 100;
+    if (heapUsagePercent > 90) {
       alerts.push({
-        source: "LB1",
-        timestamp: entry.timestamp,
-        message: `Run ${MONTH_NAMES[entry.month] || entry.month} ${entry.year} gagal (status: ${entry.status})`,
+        source: "SYSTEM",
+        timestamp: new Date().toISOString(),
+        message: `Memory usage tinggi: ${Math.round(heapUsagePercent)}% (${serverMetrics.heapUsedMb}MB / ${serverMetrics.heapTotalMb}MB)`,
+        priority: "critical",
+      });
+    }
+
+    // Check RSS memory (if > 1GB)
+    if (serverMetrics.memoryRssMb > 1024) {
+      alerts.push({
+        source: "SYSTEM",
+        timestamp: new Date().toISOString(),
+        message: `RSS memory tinggi: ${serverMetrics.memoryRssMb}MB`,
+        priority: "high",
       });
     }
   }
 
-  for (const entry of emrRecent) {
-    if (entry.state === "failed" || entry.state === "cancelled") {
-      alerts.push({
-        source: "EMR",
-        timestamp: entry.timestamp,
-        message: entry.error || `Transfer gagal (state: ${entry.state})`,
-      });
-    }
-  }
+  // Sort: critical first, then by timestamp (newest first)
+  alerts.sort((a, b) => {
+    if (a.priority === "critical" && b.priority !== "critical") return -1;
+    if (a.priority !== "critical" && b.priority === "critical") return 1;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
 
-  alerts.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
   return alerts;
 }
 
@@ -273,8 +344,7 @@ function computeAlerts(
 
 interface MetricSnapshot {
   time: string;
-  heapMb: number;
-  rssMb: number;
+  uptimeSeconds: number;
 }
 
 export default function AdminCommandCenter({
@@ -311,8 +381,7 @@ export default function AdminCommandCenter({
             setMetricHistory([
               {
                 time: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`,
-                heapMb: body.serverMetrics.heapUsedMb,
-                rssMb: body.serverMetrics.memoryRssMb,
+                uptimeSeconds: body.serverMetrics.uptimeSeconds,
               },
             ]);
           }
@@ -351,8 +420,7 @@ export default function AdminCommandCenter({
             ...prev,
             {
               time: `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`,
-              heapMb: body.serverMetrics.heapUsedMb,
-              rssMb: body.serverMetrics.memoryRssMb,
+              uptimeSeconds: body.serverMetrics.uptimeSeconds,
             },
           ];
           return next.length > 30 ? next.slice(-30) : next;
@@ -427,27 +495,33 @@ export default function AdminCommandCenter({
     serverTime,
     lb1Recent,
     emrRecent,
+    crew,
     pendingRegistrations,
+    usageToday,
+    recentLogins,
+    topUsers,
   } = data;
   const onlineCount = onlineUsers.length;
   const pendingCount = pendingRegistrations?.length ?? 0;
-  const alerts = computeAlerts(lb1Recent, emrRecent);
+  const alerts = computeAlerts(pendingRegistrations, moduleHealth, serverMetrics);
 
-  /* ── Chart 1: Aktivitas Dashboard (LB1 kunjungan per periode) ── */
+  // Helper: Get user info from username
+  const getUserInfo = (username: string): CrewMember | null => {
+    return (crew || []).find((c) => c.username === username) || null;
+  };
 
-  const lb1SuccessEntries = lb1Recent
-    .filter((r) => r.status === "success")
-    .reverse();
-  const activityLabels = lb1SuccessEntries.map(
-    (r) => `${MONTH_NAMES[r.month] || r.month} ${r.year}`,
-  );
+  // Ensure arrays exist
+  const safeRecentLogins = recentLogins || [];
+  const safeTopUsers = topUsers || [];
+
+  /* ── Chart 1: Aktivitas Dashboard (Penggunaan Dashboard & EMR Klinis hari ini) ── */
 
   const activityChartData = {
-    labels: activityLabels,
+    labels: usageToday?.hours || [],
     datasets: [
       {
-        label: "Rawat Jalan",
-        data: lb1SuccessEntries.map((r) => r.rawatJalan),
+        label: "Dashboard",
+        data: usageToday?.dashboardCounts || [],
         borderColor: "#E67E22",
         backgroundColor: "rgba(230,126,34,0.08)",
         tension: 0.3,
@@ -456,8 +530,8 @@ export default function AdminCommandCenter({
         fill: true,
       },
       {
-        label: "Rawat Inap",
-        data: lb1SuccessEntries.map((r) => r.rawatInap),
+        label: "EMR Klinis",
+        data: usageToday?.emrClinicalCounts || [],
         borderColor: "#A0A0A0",
         backgroundColor: "rgba(160,160,160,0.04)",
         tension: 0.3,
@@ -491,29 +565,24 @@ export default function AdminCommandCenter({
     },
   };
 
-  /* ── Chart 2: Performa Server (real-time memory line chart) ── */
+  /* ── Chart 2: Performa Server (server uptime) ── */
+
+  // Format uptime seconds to hours for display
+  const formatUptimeHours = (seconds: number): number => {
+    return Math.round((seconds / 3600) * 100) / 100; // Convert to hours with 2 decimals
+  };
 
   const serverChartData = {
     labels: metricHistory.map((s) => s.time),
     datasets: [
       {
-        label: "Heap (MB)",
-        data: metricHistory.map((s) => s.heapMb),
+        label: "Uptime (jam)",
+        data: metricHistory.map((s) => formatUptimeHours(s.uptimeSeconds)),
         borderColor: "#E67E22",
         backgroundColor: "rgba(230,126,34,0.08)",
         tension: 0.3,
         pointRadius: 3,
         pointBackgroundColor: "#E67E22",
-        fill: true,
-      },
-      {
-        label: "RSS (MB)",
-        data: metricHistory.map((s) => s.rssMb),
-        borderColor: "#A0A0A0",
-        backgroundColor: "rgba(160,160,160,0.04)",
-        tension: 0.3,
-        pointRadius: 3,
-        pointBackgroundColor: "#A0A0A0",
         fill: true,
       },
     ],
@@ -528,7 +597,22 @@ export default function AdminCommandCenter({
         display: true,
         labels: { color: "#A0A0A0", font: { size: 10 } },
       },
-      tooltip: { mode: "index" as const, intersect: false },
+      tooltip: {
+        mode: "index" as const,
+        intersect: false,
+        callbacks: {
+          label: (context: TooltipItem<"line">) => {
+            const hours = context.parsed.y ?? 0;
+            const days = Math.floor(hours / 24);
+            const remainingHours = Math.floor(hours % 24);
+            const minutes = Math.floor((hours % 1) * 60);
+            if (days > 0) {
+              return `Uptime: ${days}d ${remainingHours}h ${minutes}m`;
+            }
+            return `Uptime: ${remainingHours}h ${minutes}m`;
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -536,29 +620,26 @@ export default function AdminCommandCenter({
         grid: { color: "rgba(255,255,255,0.04)" },
       },
       y: {
-        ticks: { color: "#777", font: { size: 10 } },
+        ticks: {
+          color: "#777",
+          font: { size: 10 },
+          callback: (value: number | string) => {
+            const hours = typeof value === "number" ? value : parseFloat(value);
+            const days = Math.floor(hours / 24);
+            const remainingHours = Math.floor(hours % 24);
+            if (days > 0) {
+              return `${days}d ${remainingHours}h`;
+            }
+            return `${remainingHours}h`;
+          },
+        },
         grid: { color: "rgba(255,255,255,0.04)" },
-        beginAtZero: false,
+        beginAtZero: true,
       },
     },
   };
 
   const isRailway = !!serverMetrics?.railway;
-
-  /* ── Server Time Display ── */
-
-  const serverDate = new Date(serverTime);
-  const serverDateStr = serverDate.toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const serverTimeStr = serverDate.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
 
   /* ── Module Health Entries ── */
 
@@ -572,71 +653,6 @@ export default function AdminCommandCenter({
 
   return (
     <div className={styles.root}>
-      {/* ── Server Info + Module Health Row ── */}
-      <div className={`${styles.surfaceCard} ${styles.topGrid}`}>
-        {/* Server Time */}
-        <div className={styles.timeCard}>
-          <div
-            className={`${styles.sectionEyebrow} ${styles.sectionEyebrowAccent}`}
-          >
-            Live System Time
-          </div>
-          <div>
-            <div className={styles.timeValue}>{serverDateStr}</div>
-            <div className={styles.timeSubValue}>{serverTimeStr}</div>
-          </div>
-          <div className={styles.uptimeWrap}>
-            <div className={styles.uptimeCard}>
-              <span className={styles.uptimeLabel}>Uptime</span>
-              <span className={styles.uptimeValue}>
-                {formatUptime(kpi.serverUptimeSeconds)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Module Health Indicators */}
-        <div className={styles.moduleColumn}>
-          <div className={styles.sectionEyebrow}>Module Health</div>
-          <div className={styles.moduleGrid}>
-            {modules.map((mod) => (
-              <div key={mod.key} className={styles.moduleItem}>
-                <div className={styles.moduleHeader}>
-                  <div
-                    className={`${styles.moduleDot} ${healthDotVariant(mod.key, moduleHealth, socketConnected)}`}
-                  />
-                  <span className={styles.moduleLabel}>{mod.label}</span>
-                </div>
-                <span className={styles.moduleStatus}>
-                  {healthLabel(mod.key, moduleHealth, socketConnected)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.queueCard}>
-          <div className={styles.sectionEyebrow}>Queue Snapshot</div>
-          <div className={styles.queueStats}>
-            <div className={styles.queueValueRow}>
-              <span className={styles.queueNumber}>{pendingCount}</span>
-              <span className={styles.queueCaption}>pending registrations</span>
-            </div>
-            <div className={styles.queueValueRow}>
-              <span
-                className={
-                  socketConnected
-                    ? `${styles.queueNumberSmall} ${styles.queueNumberOnline}`
-                    : styles.queueNumberSmall
-                }
-              >
-                {onlineCount}
-              </span>
-              <span className={styles.queueCaption}>crew online realtime</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ── KPI Cards Row ── */}
       <div className={styles.kpiGrid}>
@@ -653,19 +669,14 @@ export default function AdminCommandCenter({
           sub={socketConnected ? "realtime" : "disconnected"}
         />
         <KPICard
-          label="LB1 RUNS"
-          value={kpi.lb1Runs}
-          sub={`${kpi.lb1SuccessRuns} sukses`}
+          label="ONLINE TODAY"
+          value={kpi.onlineToday}
+          sub="user yang login hari ini"
         />
         <KPICard
-          label="TOTAL KUNJUNGAN"
-          value={kpi.lb1TotalVisits}
-          sub="dari LB1"
-        />
-        <KPICard
-          label="EMR TRANSFERS"
-          value={kpi.emrTransfers}
-          sub={`${kpi.emrSuccess} sukses`}
+          label="PENDING REGISTRATION"
+          value={pendingCount}
+          sub={pendingCount > 0 ? "menunggu approval" : "tidak ada"}
         />
       </div>
 
@@ -675,10 +686,10 @@ export default function AdminCommandCenter({
         <div className={styles.chartCard}>
           <p className={styles.chartTitle}>AKTIVITAS DASHBOARD</p>
           <div className={styles.chartCanvas}>
-            {lb1SuccessEntries.length > 0 ? (
+            {usageToday && usageToday.hours.length > 0 ? (
               <Line data={activityChartData} options={activityChartOptions} />
             ) : (
-              <EmptyState text="Belum ada data LB1" />
+              <EmptyState text="Belum ada data aktivitas hari ini" />
             )}
           </div>
         </div>
@@ -708,39 +719,110 @@ export default function AdminCommandCenter({
         </div>
       </div>
 
-      {/* ── Active Users + Alerts Row ── */}
+      {/* ── User Dashboard + Alerts Row ── */}
       <div className={styles.usersAlertsGrid}>
-        {/* Active Users */}
+        {/* User Dashboard */}
         <div className={styles.chartCard}>
           <div className={styles.chartHeader}>
-            <p className={styles.chartTitleCompact}>ACTIVE USERS</p>
-            <span className={styles.onlineCountBadge}>
-              {onlineCount} online
-            </span>
+            <p className={styles.chartTitleCompact}>USER DASHBOARD</p>
           </div>
-          <div className={styles.userList}>
-            {onlineUsers.length > 0 ? (
-              onlineUsers.map((user) => (
-                <div key={user.userId} className={styles.userRow}>
-                  <div className={`${styles.userDot} ${styles.statusOk}`} />
-                  <div className={styles.userInfo}>
-                    <div className={styles.userName}>{user.name}</div>
-                    <div className={styles.userMeta}>
-                      {user.profession} · {formatRole(user.role)}
+
+          {/* User Statistics */}
+          <div className={styles.userStatsGrid}>
+            <div className={styles.userStatCard}>
+              <div className={styles.userStatValue}>{kpi.totalCrew}</div>
+              <div className={styles.userStatLabel}>Total Crew</div>
+            </div>
+            <div className={styles.userStatCard}>
+              <div className={styles.userStatValue}>{kpi.onlineToday}</div>
+              <div className={styles.userStatLabel}>Login Hari Ini</div>
+            </div>
+            <div className={styles.userStatCard}>
+              <div className={styles.userStatValue}>{onlineCount}</div>
+              <div className={styles.userStatLabel}>Online Now</div>
+            </div>
+            <div className={styles.userStatCard}>
+              <div className={styles.userStatValue}>{pendingCount}</div>
+              <div className={styles.userStatLabel}>Pending</div>
+            </div>
+          </div>
+
+          {/* Recent Logins */}
+          <div className={styles.userSection}>
+            <div className={styles.userSectionTitle}>
+              Recent Logins ({safeRecentLogins.length})
+            </div>
+            <div className={styles.userList}>
+              {safeRecentLogins.length > 0 ? (
+                safeRecentLogins.slice(0, 5).map((username) => {
+                  const userInfo = getUserInfo(username);
+                  if (!userInfo) return null;
+                  return (
+                    <div key={username} className={styles.userRow}>
+                      <div className={`${styles.userDot} ${styles.statusOk}`} />
+                      <div className={styles.userInfo}>
+                        <div className={styles.userName}>{userInfo.displayName}</div>
+                        <div className={styles.userMeta}>
+                          {userInfo.profession} · {formatRole(userInfo.role)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <EmptyState text="Belum ada login hari ini" />
+              )}
+            </div>
+          </div>
+
+          {/* Pending Registrations */}
+          {pendingCount > 0 && (
+            <div className={styles.userSection}>
+              <div className={styles.userSectionTitle}>
+                Pending Registrations ({pendingCount})
+              </div>
+              <div className={styles.userList}>
+                {pendingRegistrations.slice(0, 5).map((reg) => (
+                  <div key={reg.id} className={styles.userRow}>
+                    <div className={`${styles.userDot} ${styles.statusWarning}`} />
+                    <div className={styles.userInfo}>
+                      <div className={styles.userName}>{reg.displayName}</div>
+                      <div className={styles.userMeta}>
+                        {reg.profession} · {timeAgo(reg.createdAt)}
+                      </div>
                     </div>
                   </div>
-                  <span className={styles.liveBadge}>LIVE</span>
-                </div>
-              ))
-            ) : (
-              <EmptyState
-                text={
-                  socketConnected
-                    ? "Tidak ada user online"
-                    : "Socket disconnected"
-                }
-              />
-            )}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top Users */}
+          <div className={styles.userSection}>
+            <div className={styles.userSectionTitle}>
+              Top Users (Hari Ini)
+            </div>
+            <div className={styles.userList}>
+              {safeTopUsers.length > 0 ? (
+                safeTopUsers.slice(0, 5).map((topUser) => {
+                  const userInfo = getUserInfo(topUser.username);
+                  if (!userInfo) return null;
+                  return (
+                    <div key={topUser.username} className={styles.userRow}>
+                      <div className={`${styles.userDot} ${styles.statusOk}`} />
+                      <div className={styles.userInfo}>
+                        <div className={styles.userName}>{userInfo.displayName}</div>
+                        <div className={styles.userMeta}>
+                          {topUser.totalActivity} aktivitas ({topUser.dashboardCount} dashboard, {topUser.emrClinicalCount} EMR)
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <EmptyState text="Belum ada aktivitas hari ini" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -760,7 +842,7 @@ export default function AdminCommandCenter({
                 <div key={`alert-${i}`} className={styles.alertRow}>
                   <span
                     className={
-                      alert.source === "LB1"
+                      alert.source === "PENDING"
                         ? `${styles.alertSource} ${styles.alertSourceLb1}`
                         : `${styles.alertSource} ${styles.alertSourceEmr}`
                     }
@@ -768,7 +850,11 @@ export default function AdminCommandCenter({
                     {alert.source}
                   </span>
                   <div className={styles.alertBody}>
-                    <div className={styles.alertMessage}>{alert.message}</div>
+                    <div className={styles.alertMessage}>
+                      {alert.priority === "critical" && "🔴 "}
+                      {alert.priority === "high" && "⚠️ "}
+                      {alert.message}
+                    </div>
                   </div>
                   <span className={styles.alertTime}>
                     {timeAgo(alert.timestamp)}

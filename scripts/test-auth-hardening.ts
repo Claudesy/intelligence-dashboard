@@ -457,7 +457,7 @@ async function main(): Promise<void> {
     assert.deepEqual(
       profileUpdatePayload.profile?.serviceAreas,
       ["IGD"],
-      "Profile update must persist service areas",
+      "Profile update must preserve selected service areas",
     );
     assert.deepEqual(
       profileUpdatePayload.profile?.jobTitles,

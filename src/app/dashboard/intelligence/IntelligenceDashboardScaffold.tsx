@@ -10,11 +10,17 @@ import { IntelligenceSocketProvider } from "./IntelligenceSocketProvider";
 
 function PanelContentSkeleton(): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="h-16 animate-pulse rounded-md border border-[var(--line-base)] bg-[var(--bg-card)]"
+          style={{
+            height: 64,
+            borderRadius: 4,
+            border: "1px solid var(--line-base)",
+            background: "var(--bg-card)",
+            animation: "pulse 2s ease-in-out infinite",
+          }}
         />
       ))}
     </div>
@@ -44,16 +50,45 @@ function IntelligencePanel({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="rounded-md border border-[var(--line-base)] bg-[var(--bg-card)]">
-      <div className="border-b border-[var(--line-base)] px-5 py-4">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-[var(--c-asesmen)]">
+    <section
+      style={{
+        border: "1px solid var(--line-base)",
+        borderRadius: 6,
+        background: "var(--bg-card)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          borderBottom: "1px solid var(--line-base)",
+          padding: "20px 24px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            color: "var(--text-muted)",
+            opacity: 0.5,
+            marginBottom: 8,
+          }}
+        >
           {subtitle}
-        </p>
-        <h2 className="mt-2 text-lg font-medium text-[var(--text-main)]">
+        </div>
+        <h2
+          style={{
+            fontSize: 17,
+            fontWeight: 500,
+            color: "var(--text-main)",
+            letterSpacing: "0.01em",
+          }}
+        >
           {title}
         </h2>
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div style={{ padding: "20px 24px" }}>{children}</div>
     </section>
   );
 }
@@ -71,11 +106,28 @@ function AccessNotice({
   message: string;
 }): React.JSX.Element {
   return (
-    <div className="rounded-md border border-dashed border-[var(--line-base)] px-4 py-3 text-sm text-[var(--text-muted)]">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--c-asesmen)]">
+    <div
+      style={{
+        borderRadius: 6,
+        border: "1px dashed var(--line-base)",
+        padding: "16px 20px",
+        fontSize: 13,
+        color: "var(--text-muted)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          fontFamily: "var(--font-mono)",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "var(--c-asesmen)",
+          marginBottom: 8,
+        }}
+      >
         {title}
-      </p>
-      <p className="mt-2 leading-6">{message}</p>
+      </div>
+      <p style={{ lineHeight: 1.6 }}>{message}</p>
     </div>
   );
 }
@@ -86,92 +138,120 @@ export default function IntelligenceDashboardScaffold({
 }: IntelligenceDashboardScaffoldProps): React.JSX.Element {
   if (!access.hasAnyAccess) {
     return (
-      <div className="w-full px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-          <section className="rounded-md border border-[var(--line-base)] bg-[var(--bg-card)] px-5 py-5">
-            <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--c-asesmen)]">
-              Dashboard Intelligence
-            </p>
-            <h1 className="mt-2 text-2xl font-medium tracking-[0.01em] text-[var(--text-main)] sm:text-3xl">
-              Akses dashboard dibatasi
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)] sm:text-[15px]">
-              Role saat ini belum memiliki izin untuk membuka panel
-              intelligence.
-            </p>
-          </section>
+      <div style={{ width: "100%", maxWidth: 1200, padding: "16px 0 64px" }}>
+        <div className="page-header">
+          <div className="page-title">Intelligence Monitor</div>
+          <div className="page-subtitle">Akses dashboard dibatasi</div>
+        </div>
+        <div
+          style={{
+            border: "1px dashed var(--line-base)",
+            borderRadius: 6,
+            padding: "32px 24px",
+            textAlign: "center",
+            color: "var(--text-muted)",
+            fontSize: 14,
+          }}
+        >
+          Role saat ini belum memiliki izin untuk membuka panel intelligence.
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full px-4 pb-16 pt-4 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <IntelligenceSocketProvider
-          enableCdssSuggestions={access.canViewInsights}
-        >
-          <header className="flex flex-col gap-4 rounded-md border border-[var(--line-base)] bg-[var(--bg-card)] px-5 py-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-[var(--c-asesmen)]">
-                Dashboard Intelligence
-              </p>
-              <h1 className="text-2xl font-medium tracking-[0.01em] text-[var(--text-main)] sm:text-3xl">
-                Situational Awareness untuk Shift Klinik
-              </h1>
-              <p className="max-w-3xl text-sm leading-6 text-[var(--text-muted)] sm:text-[15px]">
-                Real-time patient queue, AI insights, e-klaim readiness, dan
-                operational summary.
-              </p>
+    <div style={{ width: "100%", maxWidth: 1400, padding: "0 0 64px" }}>
+      <IntelligenceSocketProvider
+        enableCdssSuggestions={access.canViewInsights}
+      >
+        {/* ── Header ── */}
+        <div className="page-header" style={{ maxWidth: 1400, width: "100%" }}>
+          <div>
+            <div className="page-title">Intelligence Monitor</div>
+            <div className="page-subtitle">
+              Situational awareness untuk shift klinik — real-time patient
+              queue, AI insights, dan operational summary.
             </div>
-            {statusContent}
-          </header>
+          </div>
+        </div>
 
-          {!access.canViewInsights && (
+        {/* ── Live Status Strip ── */}
+        <div style={{ marginBottom: 24 }}>{statusContent}</div>
+
+        {/* ── Access Notices ── */}
+        {!access.canViewInsights && (
+          <div style={{ marginBottom: 16 }}>
             <AccessNotice
               title="Clinical Visibility"
               message="AI Insights hanya tersedia untuk role klinis."
             />
-          )}
-
-          {!access.canViewMetrics && (
+          </div>
+        )}
+        {!access.canViewMetrics && (
+          <div style={{ marginBottom: 16 }}>
             <AccessNotice
               title="Management Visibility"
               message="Operational Summary hanya tersedia untuk role manajemen."
             />
+          </div>
+        )}
+
+        {/* ── Safety Alert ── */}
+        {access.canViewAlerts && (
+          <div style={{ marginBottom: 24 }}>
+            <ClinicalSafetyAlertBanner />
+          </div>
+        )}
+
+        {/* ── Main Grid: Queue + Insights/Ops ── */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: 24,
+          }}
+        >
+          {/* Row 1: Patient Queue (full width) */}
+          {access.canViewEncounters && (
+            <IntelligencePanel
+              title="Patient Queue"
+              subtitle="Antrian Encounter"
+            >
+              <PatientQueuePanel />
+            </IntelligencePanel>
           )}
 
-          {access.canViewAlerts && <ClinicalSafetyAlertBanner />}
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-            {access.canViewEncounters && (
-              <IntelligencePanel title="Patient Queue" subtitle="FR-001">
-                <PatientQueuePanel />
+          {/* Row 2: Insights + Operational side by side */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                access.canViewInsights && access.canViewMetrics
+                  ? "1.4fr 1fr"
+                  : "1fr",
+              gap: 24,
+            }}
+          >
+            {access.canViewInsights && (
+              <IntelligencePanel
+                title="AI Insights"
+                subtitle="CDSS Engine Output"
+              >
+                <AIInsightsPanel />
               </IntelligencePanel>
             )}
 
-            <div className="grid gap-6">
-              {access.canViewInsights && (
-                <IntelligencePanel
-                  title="Insights Workspace"
-                  subtitle="FR-002 · FR-003 · FR-004"
-                >
-                  <AIInsightsPanel />
-                </IntelligencePanel>
-              )}
-
-              {access.canViewMetrics && (
-                <IntelligencePanel
-                  title="Operational Summary"
-                  subtitle="FR-006"
-                >
-                  <OperationalSummaryPanel />
-                </IntelligencePanel>
-              )}
-            </div>
+            {access.canViewMetrics && (
+              <IntelligencePanel
+                title="Operational Summary"
+                subtitle="Metrik Shift"
+              >
+                <OperationalSummaryPanel />
+              </IntelligencePanel>
+            )}
           </div>
-        </IntelligenceSocketProvider>
-      </div>
+        </div>
+      </IntelligenceSocketProvider>
     </div>
   );
 }

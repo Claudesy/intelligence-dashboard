@@ -12,7 +12,15 @@ function createPrismaClient(): PrismaClient {
   if (!connectionString) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
-  const pool = new Pool({ connectionString });
+  const url = new URL(connectionString);
+  if (
+    url.searchParams.has("sslmode") &&
+    !url.searchParams.get("sslmode")?.includes("verify-full") &&
+    !url.searchParams.has("uselibpqcompat")
+  ) {
+    url.searchParams.set("sslmode", "verify-full");
+  }
+  const pool = new Pool({ connectionString: url.toString() });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }

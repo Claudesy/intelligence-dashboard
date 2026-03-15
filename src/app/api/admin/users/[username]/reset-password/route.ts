@@ -51,8 +51,18 @@ export async function POST(
     await adminResetPassword(username, body.newPassword);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Gagal mereset password.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+    const isKnownError =
+      error instanceof Error &&
+      (error.message.includes("tidak ditemukan") ||
+        error.message.includes("minimal"));
+    return NextResponse.json(
+      {
+        ok: false,
+        error: isKnownError
+          ? (error as Error).message
+          : "Gagal mereset password.",
+      },
+      { status: 400 },
+    );
   }
 }

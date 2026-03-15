@@ -8,54 +8,87 @@ function resolveConnectionLabel(
   isConnected: boolean,
   isReconnecting: boolean,
 ): string {
-  if (isReconnecting) {
-    return "Memperbarui...";
-  }
-
-  if (isConnected) {
-    return "Live";
-  }
-
-  return "Placeholder";
-}
-
-function resolveSourceLabel(isConnected: boolean): string {
-  return isConnected ? "/intelligence namespace" : "Preview statis";
+  if (isReconnecting) return "Memperbarui...";
+  if (isConnected) return "Live";
+  return "Offline";
 }
 
 export default function IntelligenceDashboardLiveStatus(): React.JSX.Element {
   const socket = useSharedIntelligenceSocket();
 
   const latestEvent = socket.lastEncounterUpdate ?? socket.lastCriticalAlert;
-  const latestEventCopy = latestEvent
-    ? `Event terakhir ${latestEvent.encounterId} · ${getIntelligenceEventStatusLabel(
-        latestEvent.status,
-      )}`
-    : "Belum ada event live. Scaffold tetap memakai data aman non-PHI.";
+  const connLabel = resolveConnectionLabel(
+    socket.isConnected,
+    socket.isReconnecting,
+  );
+  const isLive = socket.isConnected;
 
   return (
-    <div className="grid gap-2 text-sm text-[var(--text-muted)] sm:grid-cols-2 lg:min-w-[320px]">
-      <div className="rounded-md border border-[var(--line-base)] px-4 py-3">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--c-asesmen)]">
-          Status
-        </div>
-        <div className="mt-2 text-[var(--text-main)]">
-          {resolveConnectionLabel(socket.isConnected, socket.isReconnecting)}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "auto auto 1fr",
+        gap: 16,
+        alignItems: "center",
+        border: "1px solid var(--line-base)",
+        borderRadius: 6,
+        padding: "16px 20px",
+        background: "var(--bg-card)",
+      }}
+    >
+      {/* Status dot + label */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: isLive ? "#4ade80" : "var(--text-muted)",
+            boxShadow: isLive ? "0 0 8px #4ade80" : "none",
+          }}
+        />
+        <div
+          style={{
+            fontSize: 13,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.1em",
+            color: isLive ? "#4ade80" : "var(--text-muted)",
+            textTransform: "uppercase",
+          }}
+        >
+          {connLabel}
         </div>
       </div>
-      <div className="rounded-md border border-[var(--line-base)] px-4 py-3">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--c-asesmen)]">
-          Data Source
-        </div>
-        <div className="mt-2 text-[var(--text-main)]">
-          {resolveSourceLabel(socket.isConnected)}
-        </div>
+
+      {/* Data source */}
+      <div
+        style={{
+          fontSize: 12,
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-muted)",
+          letterSpacing: "0.05em",
+          opacity: 0.6,
+          borderLeft: "1px solid var(--line-base)",
+          paddingLeft: 16,
+        }}
+      >
+        {isLive ? "/intelligence namespace" : "Disconnected"}
       </div>
-      <div className="rounded-md border border-dashed border-[var(--line-base)] px-4 py-3 sm:col-span-2">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--c-asesmen)]">
-          Live Preview
-        </div>
-        <div className="mt-2 text-[var(--text-main)]">{latestEventCopy}</div>
+
+      {/* Latest event */}
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          textAlign: "right",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {latestEvent
+          ? `${latestEvent.encounterId} · ${getIntelligenceEventStatusLabel(latestEvent.status)}`
+          : "To be filled — belum ada event live"}
       </div>
     </div>
   );

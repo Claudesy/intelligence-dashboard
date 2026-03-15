@@ -37,6 +37,7 @@ interface SentryCaptureModule {
 }
 
 const initializedApps = new Set<string>();
+const missingDsnWarnedApps = new Set<string>();
 
 const PHI_FIELD_PATTERNS = [
   /patientid/i,
@@ -86,6 +87,26 @@ export function scrubAbysSentryEvent<T>(event: T): T {
   return scrubPhiValue(event) as T;
 }
 
+export function hasAbysSentryDsn(): boolean {
+  return Boolean(process.env.SENTRY_DSN?.trim());
+}
+
+function warnMissingAbysSentryDsn(appName: string): void {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  if (missingDsnWarnedApps.has(appName)) {
+    return;
+  }
+
+  missingDsnWarnedApps.add(appName);
+  console.warn(
+    `[Abys/Sentry] SENTRY_DSN is not set for app "${appName}". ` +
+      "Sentry will not capture events. Set this secret in GitHub Repository Secrets and Vercel.",
+  );
+}
+
 /**
  * Returns the Sentry configuration for a given Abys application.
  *
@@ -98,10 +119,7 @@ export function getAbysSentryConfig(appName: string): SentryConfig {
   const dsn = process.env.SENTRY_DSN;
 
   if (!dsn) {
-    console.warn(
-      `[Abys/Sentry] SENTRY_DSN is not set for app "${appName}". ` +
-        "Sentry will not capture events. Set this secret in GitHub Repository Secrets and Vercel."
-    );
+    warnMissingAbysSentryDsn(appName);
   }
 
   return {
@@ -149,6 +167,11 @@ export async function initializeAbysSentry(appName: string): Promise<boolean> {
     return true;
   }
 
+  if (!hasAbysSentryDsn()) {
+    warnMissingAbysSentryDsn(appName);
+    return false;
+  }
+
   const sentry = await getAbysSentryModule();
   if (!sentry) {
     return false;
@@ -164,6 +187,11 @@ export async function captureAbysSentryException(
   error: unknown,
   extra: Record<string, unknown> = {},
 ): Promise<void> {
+  if (!hasAbysSentryDsn()) {
+    warnMissingAbysSentryDsn(appName);
+    return;
+  }
+
   const sentry = await getAbysSentryModule();
   if (!sentry) {
     return;

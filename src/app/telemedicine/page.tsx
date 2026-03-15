@@ -1033,7 +1033,8 @@ export default function TelemedicinePage(): React.JSX.Element {
     });
 
     socket.on("assist:consult", (payload: AssistConsult) => {
-      // Hanya tampilkan jika ini dokter yang ditarget
+      // CONTRACT: targetDoctorId harus sama persis dengan session.displayName
+      // (EMR/Ghost Protocols mengirim displayName dokter yang ditarget)
       setDoctorName((currentName) => {
         if (payload.targetDoctorId === currentName) {
           setConsults((prev) =>

@@ -13,9 +13,11 @@ import {
   CREW_PROFILE_POSITIONS,
   isCrewProfileDegree,
   isCrewProfilePosition,
+  resolveCrewProfileAvatarUrl,
   type CrewProfileData,
 } from "@/lib/crew-profile";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { io, type Socket } from "socket.io-client";
 import styles from "./AdminUserAccess.module.css";
 
 /* ── Types ── */
@@ -117,6 +119,9 @@ function normalizeProfile(profile: unknown): CrewProfileData | null {
     linkedinUrl: ensureText(source.linkedinUrl).trim(),
     gravatarUrl: ensureText(source.gravatarUrl).trim(),
     blogUrl: ensureText(source.blogUrl).trim(),
+    instagramUrl: ensureText(source.instagramUrl).trim(),
+    tiktokUrl: ensureText(source.tiktokUrl).trim(),
+    youtubeUrl: ensureText(source.youtubeUrl).trim(),
   };
 }
 
@@ -233,15 +238,6 @@ function timeAgo(timestamp: string): string {
   return `${days}d lalu`;
 }
 
-const AVATAR_MAP: Record<string, string> = {
-  Dokter: "/avatar/doctor-w.png",
-  "Dokter Gigi": "/avatar/denstist-w.webp",
-  Perawat: "/avatar/nurse-w.png",
-  Bidan: "/avatar/doctor-w.png",
-  Apoteker: "/avatar/pharmacy-w.png",
-  "Triage Officer": "/avatar/nurse-w.png",
-};
-
 /* ── Component ── */
 
 export default function AdminUserAccess() {
@@ -262,6 +258,20 @@ export default function AdminUserAccess() {
 
   /* Selection */
   const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+
+  /* Socket for online users */
+  const socketRef = useRef<Socket | null>(null);
+
+  /* User stats from overview */
+  const [onlineToday, setOnlineToday] = useState(0);
+  const [onlineNow, setOnlineNow] = useState(0);
+  const [recentLogins, setRecentLogins] = useState<string[]>([]);
+  const [topUsers, setTopUsers] = useState<Array<{
+    username: string;
+    dashboardCount: number;
+    emrClinicalCount: number;
+    totalActivity: number;
+  }>>([]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -308,13 +318,32 @@ export default function AdminUserAccess() {
       const data = (await res.json()) as {
         ok: boolean;
         pendingRegistrations?: unknown[];
+        kpi?: { onlineToday?: number };
+        recentLogins?: string[];
+        topUsers?: Array<{
+          username: string;
+          dashboardCount: number;
+          emrClinicalCount: number;
+          totalActivity: number;
+        }>;
       };
-      if (data.ok && data.pendingRegistrations) {
-        setPendingRegs(
-          data.pendingRegistrations
-            .map((item) => normalizePendingRegistration(item))
-            .filter((item): item is PendingRegistration => item !== null),
-        );
+      if (data.ok) {
+        if (data.pendingRegistrations) {
+          setPendingRegs(
+            data.pendingRegistrations
+              .map((item) => normalizePendingRegistration(item))
+              .filter((item): item is PendingRegistration => item !== null),
+          );
+        }
+        if (data.kpi?.onlineToday !== undefined) {
+          setOnlineToday(data.kpi.onlineToday);
+        }
+        if (data.recentLogins) {
+          setRecentLogins(data.recentLogins);
+        }
+        if (data.topUsers) {
+          setTopUsers(data.topUsers);
+        }
       }
     } catch {
       /* noop */
@@ -326,6 +355,28 @@ export default function AdminUserAccess() {
     void fetchInstitutions();
     void fetchPendingRegistrations();
   }, [fetchUsers, fetchInstitutions, fetchPendingRegistrations]);
+
+  /* Socket.IO for online users */
+  useEffect(() => {
+    const socket = io({
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("user:join");
+    });
+
+    socket.on("users:online", (users: Array<{ userId: string }>) => {
+      setOnlineNow(users.length);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, []);
 
   /* ── Approve / Reject handlers ── */
 
@@ -465,11 +516,18 @@ export default function AdminUserAccess() {
           <div className={styles.kpiSub}>user terdaftar</div>
         </div>
 
+        {/* Login Hari Ini */}
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiLabel}>LOGIN HARI INI</div>
+          <div className={styles.kpiValue}>{onlineToday}</div>
+          <div className={styles.kpiSub}>user yang login hari ini</div>
+        </div>
+
         {/* Online Sekarang */}
         <div className={styles.kpiCard}>
           <div className={styles.kpiLabel}>ONLINE SEKARANG</div>
-          <div className={styles.kpiValue}>-</div>
-          <div className={styles.kpiSub}>lihat di Command Center</div>
+          <div className={styles.kpiValue}>{onlineNow}</div>
+          <div className={styles.kpiSub}>user sedang online</div>
         </div>
 
         {/* Pending Registrasi */}
@@ -489,13 +547,6 @@ export default function AdminUserAccess() {
             {pendingCount}
           </div>
           <div className={styles.kpiSub}>menunggu review</div>
-        </div>
-
-        {/* Roles Aktif */}
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiLabel}>ROLES AKTIF</div>
-          <div className={styles.kpiValue}>{activeRolesCount}</div>
-          <div className={styles.kpiSub}>dari {ROLES.length} total roles</div>
         </div>
       </div>
 
@@ -704,12 +755,12 @@ function PendingCard({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const avatar =
-    reg.profile.gender === "Laki-laki"
-      ? reg.profession === "Perawat" || reg.profession === "Triage Officer"
-        ? "/avatar/nurse-m.png"
-        : "/avatar/doctor-m.png"
-      : AVATAR_MAP[reg.profession] || "/avatar/doctor-w.png";
+  const avatar = resolveCrewProfileAvatarUrl({
+    gender: reg.profile.gender as CrewProfileData["gender"],
+    profession: reg.profession,
+    serviceAreas: reg.credentials
+      .serviceAreas as CrewProfileData["serviceAreas"],
+  });
 
   return (
     <div className={styles.pendingCard}>
@@ -824,6 +875,9 @@ function UserEditPanel({
   const [linkedinUrl, setLinkedinUrl] = useState(profile?.linkedinUrl || "");
   const [gravatarUrl, setGravatarUrl] = useState(profile?.gravatarUrl || "");
   const [blogUrl, setBlogUrl] = useState(profile?.blogUrl || "");
+  const [instagramUrl, setInstagramUrl] = useState(profile?.instagramUrl || "");
+  const [tiktokUrl, setTiktokUrl] = useState(profile?.tiktokUrl || "");
+  const [youtubeUrl, setYoutubeUrl] = useState(profile?.youtubeUrl || "");
 
   /* UI state */
   const [saving, setSaving] = useState(false);
@@ -872,6 +926,9 @@ function UserEditPanel({
     setLinkedinUrl(p?.linkedinUrl || "");
     setGravatarUrl(p?.gravatarUrl || "");
     setBlogUrl(p?.blogUrl || "");
+    setInstagramUrl(p?.instagramUrl || "");
+    setTiktokUrl(p?.tiktokUrl || "");
+    setYoutubeUrl(p?.youtubeUrl || "");
     setSaveMsg("");
     setResetPwMode(false);
     setNewPassword("");
@@ -943,6 +1000,9 @@ function UserEditPanel({
           linkedinUrl,
           gravatarUrl,
           blogUrl,
+          instagramUrl,
+          tiktokUrl,
+          youtubeUrl,
         }),
       });
       const body = (await res.json()) as { ok: boolean; error?: string };
@@ -1529,6 +1589,37 @@ function UserEditPanel({
                   placeholder="blog.docsynapse.id"
                 />
               </div>
+            </div>
+
+            <div className={styles.twoColumnGrid}>
+              <div>
+                <label className={styles.fieldLabel}>INSTAGRAM</label>
+                <input
+                  className={styles.fieldInput}
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="instagram.com/username"
+                />
+              </div>
+              <div>
+                <label className={styles.fieldLabel}>TIKTOK</label>
+                <input
+                  className={styles.fieldInput}
+                  value={tiktokUrl}
+                  onChange={(e) => setTiktokUrl(e.target.value)}
+                  placeholder="tiktok.com/@username"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={styles.fieldLabel}>YOUTUBE</label>
+              <input
+                className={styles.fieldInput}
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="youtube.com/@channel"
+              />
             </div>
 
             <button

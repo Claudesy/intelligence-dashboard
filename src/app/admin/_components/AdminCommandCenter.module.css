@@ -1,34 +1,36 @@
+/* AdminCommandCenter — tokens from sentra-design-tokens.ts */
+
 .root {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--gap-xl);
 }
 
 .statusMessage {
-  padding: 40px 0;
+  padding: var(--gap-4xl) 0;
 }
 
 .loadingMessage {
   color: var(--text-muted);
-  font-size: 13px;
-  letter-spacing: 0.1em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-wider);
 }
 
 .errorMessage {
   color: var(--c-critical);
-  font-size: 14px;
+  font-size: var(--text-xs);
 }
 
 .surfaceCard,
 .chartCard,
 .kpiCard {
   border: 1px solid var(--line-base);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.014);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
 }
 
 .surfaceCard {
-  padding: 16px 18px;
+  padding: var(--gap-lg) var(--gap-md);
 }
 
 .topGrid,
@@ -41,24 +43,13 @@
 
 .topGrid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
-}
-
-.timeCard,
-.moduleColumn,
-.queueCard {
-  display: grid;
-  gap: 8px;
-}
-
-.timeCard {
-  padding-right: 12px;
+  gap: var(--gap-md);
 }
 
 .sectionEyebrow {
   color: var(--text-muted);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-2xl);
   text-transform: uppercase;
 }
 
@@ -66,73 +57,34 @@
   color: var(--c-asesmen);
 }
 
-.timeValue {
-  color: var(--text-main);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.timeSubValue {
-  color: #c8bdaf;
-  font-size: 13px;
-}
-
-.uptimeWrap {
-  padding-top: 2px;
-}
-
-.uptimeCard {
-  display: grid;
-  gap: 3px;
-  max-width: 180px;
-  padding: 10px 12px;
-  border: 1px solid rgba(76, 175, 80, 0.2);
-  background: rgba(76, 175, 80, 0.05);
-}
-
-.uptimeLabel {
-  color: #7ee2a2;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.uptimeValue {
-  color: var(--text-main);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
 .moduleColumn,
 .queueCard {
-  gap: 10px;
+  gap: var(--gap-sm);
 }
 
 .moduleGrid {
   grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-  gap: 8px;
+  gap: var(--gap-sm);
 }
 
 .moduleItem {
   display: grid;
-  gap: 6px;
-  padding: 9px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.012);
+  gap: var(--gap-xs);
+  padding: var(--gap-xs) var(--gap-sm);
+  border: 1px solid var(--line-base);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-soft);
 }
 
 .moduleHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-sm);
 }
 
 .moduleDot,
 .userDot {
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
@@ -147,46 +99,46 @@
 }
 
 .statusOk {
-  background: #4caf50;
+  background: var(--c-status-ok);
   box-shadow: 0 0 10px rgba(76, 175, 80, 0.33);
 }
 
 .statusWarning {
-  background: #f1c40f;
+  background: var(--c-status-warning);
   box-shadow: 0 0 10px rgba(241, 196, 15, 0.33);
 }
 
 .statusError {
-  background: #e74c3c;
+  background: var(--c-status-error);
   box-shadow: 0 0 10px rgba(231, 76, 60, 0.33);
 }
 
 .statusUnknown {
-  background: #666;
+  background: var(--c-status-unknown);
   box-shadow: 0 0 10px rgba(102, 102, 102, 0.33);
 }
 
 .moduleLabel {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--ls-wider);
 }
 
 .moduleStatus {
   color: var(--text-main);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .queueStats {
   display: grid;
-  gap: 8px;
+  gap: var(--gap-sm);
 }
 
 .queueValueRow {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--gap-sm);
 }
 
 .queueNumber,
@@ -197,36 +149,36 @@
 }
 
 .queueNumber {
-  font-size: 24px;
+  font-size: var(--text-xl);
 }
 
 .queueNumberSmall {
-  font-size: 20px;
+  font-size: var(--text-lg);
 }
 
 .queueNumberOnline {
-  color: #7ee2a2;
+  color: var(--c-mint);
 }
 
 .queueCaption {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 
 .kpiGrid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
+  gap: var(--gap-md);
 }
 
 .kpiCard {
   position: relative;
   overflow: hidden;
-  padding: 16px 16px 14px;
+  padding: var(--gap-lg) var(--gap-lg) var(--gap-md);
 }
 
 .kpiCardAccent {
-  border-color: rgba(230, 126, 34, 0.24);
-  background: rgba(230, 126, 34, 0.05);
+  border-color: var(--c-asesmen-border);
+  background: var(--c-asesmen-soft);
 }
 
 .kpiTopLine {
@@ -238,38 +190,38 @@
 }
 
 .kpiTopLineAccent {
-  background: rgba(255, 212, 168, 0.22);
+  background: var(--c-asesmen-accent);
 }
 
 .kpiBadge {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: var(--gap-sm);
+  right: var(--gap-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 20px;
   height: 20px;
-  padding: 0 6px;
-  border: 1px solid rgba(230, 126, 34, 0.3);
-  border-radius: 999px;
-  background: rgba(230, 126, 34, 0.08);
-  color: #ffd29c;
-  font-size: 10px;
+  padding: 0 var(--gap-xs);
+  border: 1px solid var(--c-asesmen-border);
+  border-radius: var(--radius-full);
+  background: var(--c-asesmen-soft);
+  color: var(--c-peach);
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 
 .kpiLabel {
   margin: 0;
   color: var(--text-muted);
-  font-size: 10px;
-  letter-spacing: 0.15em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-widest);
 }
 
 .kpiValue {
-  margin: 8px 0 6px;
+  margin: var(--gap-sm) 0 var(--gap-xs);
   color: var(--text-main);
-  font-size: 28px;
+  font-size: var(--text-2xl);
   font-weight: 600;
   line-height: 1;
 }
@@ -280,9 +232,9 @@
 
 .kpiSub {
   margin: 0;
-  color: #b7aa9c;
+  color: var(--c-taupe);
   opacity: 0.9;
-  font-size: 13px;
+  font-size: var(--text-xs);
 }
 
 .chartGrid,
@@ -291,26 +243,26 @@
 }
 
 .chartGrid {
-  gap: 14px;
+  gap: var(--gap-md);
 }
 
 .usersAlertsGrid {
-  gap: 20px;
+  gap: var(--gap-xl);
 }
 
 .chartCard {
-  padding: 18px 20px;
+  padding: var(--gap-md) var(--gap-xl);
 }
 
 .chartTitle,
 .chartTitleCompact {
   color: var(--text-muted);
-  font-size: 11px;
-  letter-spacing: 0.15em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-widest);
 }
 
 .chartTitle {
-  margin: 0 0 14px;
+  margin: 0 0 var(--gap-md);
 }
 
 .chartTitleCompact {
@@ -321,29 +273,29 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: var(--gap-md);
 }
 
 .chartMeta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-sm);
 }
 
 .railwayBadge {
-  border: 1px solid rgba(230, 126, 34, 0.2);
-  border-radius: 4px;
-  padding: 2px 7px;
-  background: rgba(230, 126, 34, 0.1);
+  border: 1px solid var(--c-asesmen-border);
+  border-radius: var(--radius-md);
+  padding: 2px var(--gap-xs);
+  background: var(--c-asesmen-soft);
   color: var(--c-asesmen);
-  font-size: 9px;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-wider);
 }
 
 .chartMetaText {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .chartCanvas {
@@ -352,27 +304,74 @@
 
 .onlineCountBadge,
 .liveBadge {
-  color: #4caf50;
+  color: var(--c-status-ok);
   font-weight: 600;
 }
 
 .onlineCountBadge {
-  font-size: 10px;
+  font-size: var(--text-xs);
+}
+
+.userStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-lg);
+}
+
+.userStatCard {
+  text-align: center;
+  padding: var(--gap-md);
+  border: 1px solid var(--line-base);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.userStatValue {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.2;
+  margin-bottom: var(--gap-xs);
+}
+
+.userStatLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wider);
+}
+
+.userSection {
+  margin-bottom: var(--gap-lg);
+}
+
+.userSection:last-child {
+  margin-bottom: 0;
+}
+
+.userSectionTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: var(--gap-sm);
+  padding-bottom: var(--gap-xs);
+  border-bottom: 1px solid var(--line-base);
 }
 
 .userList {
   display: grid;
-  gap: 6px;
+  gap: var(--gap-xs);
 }
 
 .userRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.012);
+  gap: var(--gap-sm);
+  padding: var(--gap-xs) var(--gap-sm);
+  border: 1px solid var(--line-base);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-soft);
 }
 
 .userInfo {
@@ -382,29 +381,29 @@
 
 .userName {
   color: var(--text-main);
-  font-size: 13px;
+  font-size: var(--text-xs);
   font-weight: 500;
 }
 
 .userMeta {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--text-xs);
 }
 
 .liveBadge {
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: var(--text-xs);
+  letter-spacing: var(--ls-wider);
 }
 
 .alertCountBadge {
-  color: #e74c3c;
-  font-size: 10px;
+  color: var(--c-status-error);
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
 .alertList {
   display: grid;
-  gap: 6px;
+  gap: var(--gap-xs);
   max-height: 320px;
   overflow-y: auto;
 }
@@ -412,30 +411,30 @@
 .alertRow {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 9px 11px;
-  border-left: 3px solid rgba(231, 76, 60, 0.4);
-  border-radius: 6px;
-  background: rgba(231, 76, 60, 0.04);
+  gap: var(--gap-sm);
+  padding: var(--gap-xs) var(--gap-sm);
+  border-left: 3px solid var(--c-critical-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-critical-soft);
 }
 
 .alertSource {
   margin-top: 1px;
   flex-shrink: 0;
-  border-radius: 3px;
-  padding: 2px 6px;
-  font-size: 9px;
+  border-radius: var(--radius-sm);
+  padding: 2px var(--gap-xs);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-wider);
 }
 
 .alertSourceLb1 {
-  background: rgba(230, 126, 34, 0.12);
+  background: var(--c-asesmen-soft);
   color: var(--c-asesmen);
 }
 
 .alertSourceEmr {
-  background: rgba(160, 160, 160, 0.12);
+  background: var(--bg-surface-soft);
   color: var(--text-muted);
 }
 
@@ -446,7 +445,7 @@
 
 .alertMessage {
   color: var(--text-main);
-  font-size: 15px;
+  font-size: var(--text-sm);
   line-height: 1.4;
 }
 
@@ -455,7 +454,7 @@
   flex-shrink: 0;
   color: var(--text-muted);
   opacity: 0.6;
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .emptyState {
@@ -463,10 +462,10 @@
   place-items: center;
   min-height: 60px;
   height: 100%;
-  border: 1px dashed rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.012);
+  border: 1px dashed var(--line-base);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface-soft);
   color: var(--text-muted);
   opacity: 0.72;
-  font-size: 14px;
+  font-size: var(--text-xs);
 }

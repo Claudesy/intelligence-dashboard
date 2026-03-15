@@ -91,8 +91,18 @@ function normalizeExternalHref(value: string): string {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
+function normalizeWhatsappHref(value: string): string {
+  if (!value) return "";
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 8) return "";
+  const international = digits.startsWith("0")
+    ? `62${digits.slice(1)}`
+    : digits;
+  return `https://wa.me/${international}`;
+}
+
 type DetailProfileLink = {
-  key: "githubUrl" | "linkedinUrl" | "gravatarUrl" | "blogUrl";
+  key: "githubUrl" | "linkedinUrl" | "gravatarUrl" | "blogUrl" | "whatsappNumber" | "email";
   label: string;
   href: string;
   iconSrc: string;
@@ -162,9 +172,9 @@ export default function HubProfileDetailPage() {
 
   const fullName =
     member?.profile?.fullName || member?.displayName || username || "Crew";
-  const displayTitle = member?.profile?.degrees?.length
-    ? `${member.profile.degrees.join(" ")} ${fullName}`
-    : fullName;
+  const degreesLabel = member?.profile?.degrees?.length
+    ? member.profile.degrees.join(", ")
+    : "";
   const jobTitle = resolveCrewSentraTitle(
     member?.profile?.jobTitles ?? [],
     member?.role,
@@ -191,7 +201,6 @@ export default function HubProfileDetailPage() {
     { label: "Jabatan Sentra", value: jobTitle },
     { label: "Profesi", value: professionLabel },
     { label: "Role Sentra", value: accessRoleLabel },
-    { label: "Jam Aktif", value: shiftLabel },
   ];
   const detailCards = [
     {
@@ -202,16 +211,8 @@ export default function HubProfileDetailPage() {
           : "Belum diisi",
     },
     { label: "Domisili", value: member?.profile?.domicile || "Belum diisi" },
-    {
-      label: "Golongan Darah",
-      value: member?.profile?.bloodType || "Belum diisi",
-    },
     { label: "Area Layanan", value: serviceAreaLabel },
     { label: "Institusi", value: member?.institution || "Belum diisi" },
-    {
-      label: "Tambahan",
-      value: member?.profile?.institutionAdditional || "Belum diisi",
-    },
   ];
   const credentialChips = [
     member?.profile?.employeeId ? "NIP tersedia" : "",
@@ -246,6 +247,20 @@ export default function HubProfileDetailPage() {
       href: normalizeExternalHref(member?.profile?.blogUrl || ""),
       iconSrc: "/social/blog.svg",
       color: "#a5ddb1",
+    },
+    {
+      key: "whatsappNumber",
+      label: "WhatsApp",
+      href: normalizeWhatsappHref(member?.profile?.whatsappNumber || ""),
+      iconSrc: "/social/whatsapp.svg",
+      color: "#25D366",
+    },
+    {
+      key: "email",
+      label: "Email",
+      href: member?.email ? `mailto:${member.email}` : "",
+      iconSrc: "/social/email.svg",
+      color: "#d6d0c4",
     },
   ] satisfies DetailProfileLink[];
   const visibleProfileLinks = profileLinks.filter((item) => Boolean(item.href));
@@ -322,7 +337,7 @@ export default function HubProfileDetailPage() {
               padding: "10px 14px",
               borderRadius: 999,
               border: "1px solid var(--line-base)",
-              background: "rgba(255,255,255,0.03)",
+              background: "var(--bg-canvas-v3)",
               color: "var(--text-main)",
               textDecoration: "none",
               fontSize: 12,
@@ -432,8 +447,19 @@ export default function HubProfileDetailPage() {
                         letterSpacing: "-0.03em",
                       }}
                     >
-                      {displayTitle}
+                      {fullName}
                     </div>
+                    {degreesLabel && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                          marginTop: 4,
+                        }}
+                      >
+                        {degreesLabel}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -447,7 +473,7 @@ export default function HubProfileDetailPage() {
                             padding: "5px 10px",
                             borderRadius: 999,
                             border: "1px solid var(--line-base)",
-                            background: "rgba(255,255,255,0.03)",
+                            background: "var(--bg-canvas-v3)",
                           }}
                         >
                           {item}
@@ -461,12 +487,113 @@ export default function HubProfileDetailPage() {
                           padding: "5px 10px",
                           borderRadius: 999,
                           border: "1px solid var(--line-base)",
-                          background: "rgba(255,255,255,0.03)",
+                          background: "var(--bg-canvas-v3)",
                         }}
                       >
                         Credential belum lengkap
                       </span>
                     )}
+                  </div>
+
+                  {/* Ringkasan profile — humanized */}
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--text-muted)",
+                      lineHeight: 1.65,
+                      marginTop: 4,
+                      borderTop: "1px solid var(--line-base)",
+                      paddingTop: 10,
+                    }}
+                  >
+                    {professionLabel} di{" "}
+                    <span style={{ color: "var(--text-main)" }}>
+                      {member?.institution || "institusi belum diisi"}
+                    </span>
+                    {jobTitle && jobTitle !== "Belum ditentukan"
+                      ? `, menjabat sebagai ${jobTitle}`
+                      : ""}
+                    .
+                    {degreesLabel
+                      ? ` Menyandang gelar ${degreesLabel}.`
+                      : ""}
+                    {member?.email
+                      ? ` Dapat dihubungi melalui ${member.email}.`
+                      : ""}
+                  </div>
+
+                  {/* Link Resmi — desain identik dengan halaman profile user */}
+                  <div style={{ marginTop: 6 }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "var(--text-muted)",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Link Resmi
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                      {profileLinks.map((item) => {
+                        const hasLink = Boolean(item.href);
+                        const iconMask = (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              display: "inline-block",
+                              width: 26,
+                              height: 26,
+                              flexShrink: 0,
+                              background: hasLink
+                                ? "#C8A57F"
+                                : "var(--text-muted)",
+                              opacity: hasLink ? 1 : 0.55,
+                              WebkitMaskImage: `url(${item.iconSrc})`,
+                              maskImage: `url(${item.iconSrc})`,
+                              WebkitMaskRepeat: "no-repeat",
+                              maskRepeat: "no-repeat",
+                              WebkitMaskPosition: "center",
+                              maskPosition: "center",
+                              WebkitMaskSize: "contain",
+                              maskSize: "contain",
+                            }}
+                          />
+                        );
+                        const shared: React.CSSProperties = {
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 28,
+                          height: 28,
+                          textDecoration: "none",
+                        };
+                        if (!hasLink) {
+                          return (
+                            <div
+                              key={item.key}
+                              title={item.label}
+                              style={shared}
+                            >
+                              {iconMask}
+                            </div>
+                          );
+                        }
+                        return (
+                          <a
+                            key={item.key}
+                            href={item.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={item.label}
+                            style={shared}
+                          >
+                            {iconMask}
+                          </a>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -475,7 +602,7 @@ export default function HubProfileDetailPage() {
                 style={{
                   borderRadius: 18,
                   border: "1px solid var(--line-base)",
-                  background: "rgba(255,255,255,0.02)",
+                  background: "var(--bg-canvas-v3)",
                   padding: "16px",
                   display: "grid",
                   gap: 10,
@@ -506,7 +633,7 @@ export default function HubProfileDetailPage() {
                     />
                   </div>
                 ) : null}
-                {identityCards.map((item) => (
+                {[...identityCards, ...detailCards].map((item) => (
                   <div
                     key={item.label}
                     style={{
@@ -542,165 +669,9 @@ export default function HubProfileDetailPage() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 16,
-              marginBottom: 20,
-            }}
-          >
-            {detailCards.map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  borderRadius: 16,
-                  border: "1px solid var(--line-base)",
-                  background:
-                    "linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))",
-                  padding: "14px 15px",
-                  display: "grid",
-                  gap: 6,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                  }}
-                >
-                  {item.label}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-main)",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
+          {/* Detail cards merged into rank card above */}
 
-          <div
-            style={{
-              borderRadius: 16,
-              border: "1px solid var(--line-base)",
-              background:
-                "linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))",
-              padding: "16px 18px",
-              display: "grid",
-              gap: 10,
-              marginBottom: 20,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-              }}
-            >
-              Link Resmi
-            </span>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {visibleProfileLinks.length > 0 ? (
-                visibleProfileLinks.map((item) => (
-                  <a
-                    key={item.key}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 12px",
-                      borderRadius: 999,
-                      border: "1px solid var(--line-base)",
-                      background: "rgba(255,255,255,0.02)",
-                      color: item.color,
-                      textDecoration: "none",
-                      fontSize: 12,
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    <img
-                      src={item.iconSrc}
-                      alt={`${item.label} logo`}
-                      style={{
-                        width: 15,
-                        height: 15,
-                        objectFit: "contain",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span>{item.label}</span>
-                  </a>
-                ))
-              ) : (
-                <span
-                  style={{
-                    fontSize: 14,
-                    color: "var(--text-muted)",
-                    lineHeight: 1.55,
-                  }}
-                >
-                  Link resmi belum ditambahkan.
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div
-            style={{
-              borderRadius: 16,
-              border: "1px solid var(--line-base)",
-              background:
-                "linear-gradient(160deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))",
-              padding: "16px 18px",
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-              }}
-            >
-              Ringkasan Profile
-            </span>
-            <span
-              style={{
-                fontSize: 14,
-                color: "var(--text-main)",
-                lineHeight: 1.65,
-              }}
-            >
-              {displayTitle} bertugas sebagai {professionLabel.toLowerCase()}{" "}
-              dengan role Sentra {accessRoleLabel.toLowerCase()}. Jabatan Sentra
-              saat ini {jobTitle.toLowerCase()} dan jam aktif terstruktur pada{" "}
-              {shiftLabel}. Email akun tercatat sebagai{" "}
-              {member?.email || "belum diisi"}.
-            </span>
-            <span
-              style={{
-                fontSize: 13,
-                color: "var(--text-muted)",
-                lineHeight: 1.55,
-              }}
-            >
-              Gelar: {joinValue(member?.profile?.degrees ?? [])}
-            </span>
-          </div>
+          {/* Link resmi + ringkasan sudah di-embed ke card utama di atas */}
         </>
       )}
     </div>

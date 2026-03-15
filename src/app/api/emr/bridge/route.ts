@@ -75,8 +75,7 @@ export async function POST(request: Request) {
         pelayananId: entry.pelayananId,
       },
     });
-  } catch (error) {
-    console.error("[Bridge] POST error:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Gagal membuat transfer request." },
       { status: 500 },
@@ -131,8 +130,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(response);
-  } catch (error) {
-    console.error("[Bridge] GET error:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Gagal memuat antrian bridge." },
       { status: 500 },

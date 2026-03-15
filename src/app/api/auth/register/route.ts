@@ -1,10 +1,31 @@
 // Masterplan and masterpiece by Claudesy.
 import { NextResponse } from "next/server";
 import { createCrewAccessRegistration } from "@/lib/server/crew-access-registration";
+import {
+  registerRateLimiter,
+  getClientIp,
+} from "@/lib/server/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const rateCheck = registerRateLimiter.check(ip);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Terlalu banyak permintaan pendaftaran. Coba lagi nanti.",
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil(rateCheck.retryAfterMs / 1000)),
+        },
+      },
+    );
+  }
+
   try {
     const payload = await request.json();
     const result = await createCrewAccessRegistration(payload);
@@ -20,13 +41,18 @@ export async function POST(request: Request) {
       { status: 202 },
     );
   } catch (error) {
+    const isValidationError =
+      error instanceof Error &&
+      (error.message.includes("wajib") ||
+        error.message.includes("tidak valid") ||
+        error.message.includes("sudah terdaftar") ||
+        error.message.includes("tidak dikenali"));
     return NextResponse.json(
       {
         ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Pendaftaran gagal diproses.",
+        error: isValidationError
+          ? (error as Error).message
+          : "Pendaftaran gagal diproses.",
       },
       { status: 400 },
     );

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { io, Socket } from "socket.io-client";
 import dynamic from "next/dynamic";
 
@@ -22,11 +23,13 @@ const StaffMap = dynamic(() => import("@/components/map/StaffMap"), {
       style={{
         width: "100%",
         height: "100%",
-        background: "linear-gradient(145deg, #1a1a1a, #0f0f0f)",
+        background: "var(--bg-canvas-v2)",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "#666",
+        gap: 12,
+        color: "var(--text-muted)",
         fontSize: 13,
         letterSpacing: "0.1em",
       }}
@@ -35,12 +38,13 @@ const StaffMap = dynamic(() => import("@/components/map/StaffMap"), {
         style={{
           width: 40,
           height: 40,
-          border: "2px solid #E67E22",
+          border: "2px solid var(--c-asesmen)",
           borderTopColor: "transparent",
           borderRadius: "50%",
           animation: "spin 1s linear infinite",
         }}
       />
+      <span>Memuat peta...</span>
     </div>
   ),
 });
@@ -53,6 +57,7 @@ type OnlineUser = {
   profession: string;
   institution: string;
   socketId: string;
+  joinedAt?: number;
 };
 
 type SessionUser = {
@@ -75,8 +80,16 @@ type ChatMessage = {
 };
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
-function now() {
+function now(): string {
   return new Date().toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatJoinedAt(joinedAt?: number): string {
+  if (!joinedAt) return now();
+  return new Date(joinedAt).toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -117,10 +130,10 @@ function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
         width: 10,
         height: 10,
         borderRadius: "50%",
-        background: isOnline ? "#4ADE80" : "#666",
-        boxShadow: isOnline ? "0 0 8px #4ADE80" : "none",
+        background: isOnline ? "var(--c-ok)" : "var(--text-muted)",
+        boxShadow: isOnline ? "0 0 8px var(--c-ok)" : "none",
         animation: isOnline ? "pulse 2s infinite" : "none",
-        border: "2px solid #1a1a1a",
+        border: "2px solid var(--bg-canvas)",
       }}
     />
   );
@@ -166,15 +179,8 @@ export default function AcarsPage() {
 
         socket.on("connect", () => {
           setConnected(true);
-          // Join broadcast room immediately on connect
           socket!.emit("room:join", "broadcast");
-          socket!.emit("user:join", {
-            userId: session.username,
-            name: session.displayName,
-            role: session.role,
-            profession: session.profession,
-            institution: session.institution,
-          });
+          socket!.emit("user:join");
         });
 
         socket.on("disconnect", () => setConnected(false));
@@ -212,6 +218,18 @@ export default function AcarsPage() {
     container.scrollTop = container.scrollHeight;
   }, [messages]);
 
+  // Reset unread count when user focuses on tab
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        setUnreadCount(0);
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, []);
+
   const sendMessage = useCallback(() => {
     const text = input.trim();
     if (!text || !socketRef.current || !currentUser) return;
@@ -237,22 +255,18 @@ export default function AcarsPage() {
     }
   }
 
-  // Build staff locations for map from online users
-  const staffLocations = onlineUsers.map((u) => ({
-    id: u.userId,
-    name: u.name,
-    role: u.profession || u.role,
-    institution: u.institution || "Puskesmas Balowerti Kota Kediri",
-    isOnline: true,
-    gender: "male" as const,
-    avatarUrl: getAvatarUrl(u.profession, u.role),
-    location: {
-      lat: DEFAULT_CENTER[0] + (Math.random() - 0.5) * 0.0004,
-      lng: DEFAULT_CENTER[1] + (Math.random() - 0.5) * 0.0004,
-      label: u.institution || "Puskesmas",
-    },
-    color: getUserColor(u.role),
-  }));
+  // Staff map: no fake locations — server does not provide GPS. Show center only until real data exists.
+  const staffLocations: Array<{
+    id: string;
+    name: string;
+    role: string;
+    institution: string;
+    isOnline: boolean;
+    gender: "male" | "female";
+    avatarUrl: string;
+    location: { lat: number; lng: number; label: string };
+    color: string;
+  }> = [];
 
   const myColor = currentUser ? getUserColor(currentUser.role) : "#E67E22";
   const myAvatar = currentUser
@@ -292,10 +306,10 @@ export default function AcarsPage() {
         }}
       >
         <div>
-          <div className="page-title">ACARS</div>
+          <div className="page-title">Sentra Network</div>
           <div className="page-subtitle">
-            Active communication and coordination radar system untuk kolaborasi
-            klinis internal.
+            ACARS — Active communication and coordination radar system untuk
+            kolaborasi klinis internal.
           </div>
           <div className="page-header-divider" />
         </div>
@@ -318,7 +332,7 @@ export default function AcarsPage() {
               style={{
                 fontSize: 11,
                 letterSpacing: "0.1em",
-                color: connected ? "#4ADE80" : "#666",
+                color: connected ? "var(--c-ok)" : "var(--text-muted)",
               }}
             >
               {connected ? "LIVE" : "OFFLINE"}
@@ -372,17 +386,36 @@ export default function AcarsPage() {
         </div>
       </div>
 
-      {/* Map Section */}
+      {/* Map Section — no fake markers until GPS data available */}
       <div
         style={{
           maxWidth: ACARS_PAGE_WIDTH,
           width: "100%",
           height: 450,
           overflow: "hidden",
+          position: "relative",
           ...ACARS_PANEL_STYLE,
         }}
       >
         <StaffMap staff={staffLocations} center={DEFAULT_CENTER} zoom={19} />
+        {staffLocations.length === 0 && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(0,0,0,0.4)",
+              color: "var(--text-muted)",
+              fontSize: 13,
+              letterSpacing: "0.08em",
+            }}
+          >
+            Lokasi GPS crew belum tersedia. Directory di bawah menunjukkan
+            daftar crew online.
+          </div>
+        )}
       </div>
 
       {/* User List / SCARS Directory */}
@@ -477,20 +510,19 @@ export default function AcarsPage() {
           const color = getUserColor(user.role);
           const avatar = getAvatarUrl(user.profession, user.role);
           const isMe = currentUser?.username === user.userId;
-          return (
-            <div
-              key={user.userId}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "280px 1fr 200px 150px 120px",
-                gap: 16,
-                padding: "16px 20px",
-                alignItems: "center",
-                background: isMe ? "rgba(255,255,255,0.03)" : "transparent",
-                borderLeft: `2px solid ${isMe ? "var(--c-asesmen)" : "transparent"}`,
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-              }}
-            >
+          const rowStyle = {
+            display: "grid",
+            gridTemplateColumns: "280px 1fr 200px 150px 120px",
+            gap: 16,
+            padding: "16px 20px",
+            alignItems: "center",
+            background: isMe ? "rgba(255,255,255,0.03)" : "transparent",
+            borderLeft: `2px solid ${isMe ? "var(--c-asesmen)" : "transparent"}`,
+            borderBottom: "1px solid rgba(255,255,255,0.03)",
+            ...(isMe ? {} : { cursor: "pointer", textDecoration: "none" }),
+          } as React.CSSProperties;
+          const rowContent = (
+            <>
               {/* Name */}
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div
@@ -571,9 +603,9 @@ export default function AcarsPage() {
                   alignItems: "center",
                   gap: 8,
                   padding: "4px 10px",
-                  background: "rgba(255,255,255,0.02)",
+                  background: "var(--c-ok-soft)",
                   borderRadius: 4,
-                  border: "1px solid rgba(74,222,128,0.25)",
+                  border: "1px solid var(--c-ok-border)",
                   width: "fit-content",
                 }}
               >
@@ -582,8 +614,8 @@ export default function AcarsPage() {
                     width: 6,
                     height: 6,
                     borderRadius: "50%",
-                    background: "#4ADE80",
-                    boxShadow: "0 0 6px #4ADE80",
+                    background: "var(--c-ok)",
+                    boxShadow: "0 0 6px var(--c-ok)",
                   }}
                 />
                 <span
@@ -591,7 +623,7 @@ export default function AcarsPage() {
                     fontSize: 10,
                     fontWeight: 600,
                     letterSpacing: "0.1em",
-                    color: "#4ADE80",
+                    color: "var(--c-ok)",
                   }}
                 >
                   ONLINE
@@ -603,13 +635,26 @@ export default function AcarsPage() {
                 style={{
                   fontSize: 12,
                   letterSpacing: "0.08em",
-                  color: "#4ADE80",
+                  color: "var(--c-ok)",
                   textAlign: "right",
                 }}
               >
-                {now()}
+                {formatJoinedAt(user.joinedAt)}
               </div>
+            </>
+          );
+          return isMe ? (
+            <div key={user.userId} style={rowStyle}>
+              {rowContent}
             </div>
+          ) : (
+            <Link
+              key={user.userId}
+              href={`/acars/${user.userId}`}
+              style={rowStyle}
+            >
+              {rowContent}
+            </Link>
           );
         })}
       </div>
@@ -706,7 +751,7 @@ export default function AcarsPage() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: isMe ? myColor : "#888",
+                    color: isMe ? myColor : "var(--text-muted)",
                     marginBottom: 4,
                   }}
                 >

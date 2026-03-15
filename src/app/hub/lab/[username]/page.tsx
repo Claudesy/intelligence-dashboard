@@ -174,9 +174,9 @@ export default function HubProfileLabPage() {
 
   const fullName =
     member?.profile?.fullName || member?.displayName || username || "Crew";
-  const displayTitle = member?.profile?.degrees?.length
-    ? `${member.profile.degrees.join(" ")} ${fullName}`
-    : fullName;
+  const degreesLabel = member?.profile?.degrees?.length
+    ? member.profile.degrees.join(", ")
+    : "";
   const jobTitle = member?.profile?.jobTitles?.[0] || "Belum diatur";
   const professionLabel = formatProfessionLabel(member?.profession || "");
   const accessRoleLabel = formatRole(member?.role || "");
@@ -217,8 +217,8 @@ export default function HubProfileLabPage() {
       count: String(
         Math.max(serviceAreas.length, jobTitle === "Belum diatur" ? 0 : 1),
       ).padStart(2, "0"),
-      label: "status",
-      accent: shiftLabel.replace(" WIB", ""),
+      label: "area",
+      accent: jobTitle !== "Belum diatur" ? jobTitle.toUpperCase() : "CREW",
       accentColor: "#f0b264",
     },
   ];
@@ -235,7 +235,6 @@ export default function HubProfileLabPage() {
     <div
       style={{
         width: "100%",
-        minHeight: "100%",
         display: "grid",
         justifyItems: "center",
         padding: "0 16px 48px",
@@ -339,7 +338,6 @@ export default function HubProfileLabPage() {
           <div
             style={{
               position: "relative",
-              minHeight: 760,
               borderRadius: 18,
               overflow: "hidden",
               border: "1px solid rgba(143,173,164,0.14)",
@@ -485,11 +483,23 @@ export default function HubProfileLabPage() {
                   letterSpacing: "-0.04em",
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   textTransform: "lowercase",
-                  marginBottom: 6,
+                  marginBottom: 4,
                 }}
               >
-                {displayTitle}
+                {fullName}
               </div>
+              {degreesLabel && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "rgba(209, 214, 208, 0.48)",
+                    letterSpacing: "0.04em",
+                    marginBottom: 2,
+                  }}
+                >
+                  {degreesLabel}
+                </div>
+              )}
 
               <div
                 style={{

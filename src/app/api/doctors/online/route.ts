@@ -3,12 +3,10 @@
 // Called by Assist (Chrome Extension) to populate "Send to Doctor" selector
 
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { isCrewAuthorizedRequest } from "@/lib/server/crew-access-auth";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
-
-const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
   if (!isCrewAuthorizedRequest(request)) {
@@ -32,8 +30,7 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json({ ok: true, doctors });
-  } catch (err) {
-    console.error("[Doctors/Online] GET error:", err);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Server error" },
       { status: 500 },

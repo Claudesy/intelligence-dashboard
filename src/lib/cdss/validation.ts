@@ -13,6 +13,7 @@ type PenyakitEntry = {
   gejala?: string[];
   gejala_klinis?: string[];
   kriteria_rujukan?: string;
+  terapi?: Array<{ obat?: string; dosis?: string; frek?: string }>;
 };
 
 type PenyakitDB = {
@@ -27,7 +28,8 @@ type ValidationIssue =
   | "name_mismatch"
   | "sex_implausible"
   | "pregnancy_implausible"
-  | "age_implausible";
+  | "age_implausible"
+  | "allergy_conflict";
 
 type SuggestionValidationDetail = {
   suggestion: ValidatedSuggestion;
@@ -253,6 +255,74 @@ function assessAgePlausibility(input: CDSSEngineInput, text: string): string[] {
   return messages;
 }
 
+type TerapiEntry = { obat?: string; dosis?: string; frek?: string };
+
+function checkAllergyConflict(
+  allergies: string[],
+  terpiList: TerapiEntry[] | undefined,
+): string[] {
+  if (!allergies || allergies.length === 0 || !terpiList || terpiList.length === 0)
+    return [];
+
+  const normalizedAllergies = allergies.map((a) => normalizeText(a));
+  const conflicts: string[] = [];
+
+  for (const t of terpiList) {
+    const drugName = normalizeText(t.obat ?? "");
+    if (!drugName) continue;
+
+    for (const allergy of normalizedAllergies) {
+      // Match if allergy term appears in drug name or vice versa
+      if (
+        drugName.includes(allergy) ||
+        allergy.includes(drugName) ||
+        // Common drug class matching
+        matchesDrugClass(allergy, drugName)
+      ) {
+        conflicts.push(
+          `Obat "${t.obat}" berpotensi konflik dengan alergi "${allergies[normalizedAllergies.indexOf(allergy)]}"`,
+        );
+      }
+    }
+  }
+
+  return conflicts;
+}
+
+/** Simple drug class matching for common allergy-drug relationships */
+function matchesDrugClass(allergy: string, drug: string): boolean {
+  const classMap: Array<{ allergyTerms: string[]; drugTerms: string[] }> = [
+    {
+      allergyTerms: ["penisilin", "penicillin", "amoxicillin", "amoksisilin", "ampicillin", "ampisilin"],
+      drugTerms: ["amoxicillin", "amoksisilin", "ampicillin", "ampisilin", "penisilin", "penicillin", "amoxiclav", "co-amoxiclav"],
+    },
+    {
+      allergyTerms: ["sulfa", "sulfon", "sulfonamid", "cotrimoxazole", "kotrimoksazol"],
+      drugTerms: ["cotrimoxazole", "kotrimoksazol", "sulfasalazin", "sulfadiazin", "trimetoprim"],
+    },
+    {
+      allergyTerms: ["nsaid", "ibuprofen", "aspirin", "asam mefenamat", "diklofenak", "diclofenac"],
+      drugTerms: ["ibuprofen", "aspirin", "asam mefenamat", "mefenamic", "diklofenak", "diclofenac", "ketorolac", "piroxicam", "meloxicam", "natrium diklofenak"],
+    },
+    {
+      allergyTerms: ["sefalosporin", "cephalosporin", "cefadroxil", "ceftriaxone", "cefixime"],
+      drugTerms: ["cefadroxil", "ceftriaxone", "cefixime", "cefotaxime", "cephalexin", "sefaleksin"],
+    },
+    {
+      allergyTerms: ["metronidazol", "metronidazole"],
+      drugTerms: ["metronidazol", "metronidazole"],
+    },
+  ];
+
+  for (const cls of classMap) {
+    const allergyMatch = cls.allergyTerms.some((t) => allergy.includes(t));
+    const drugMatch = cls.drugTerms.some((t) => drug.includes(t));
+    if (allergyMatch && drugMatch) return true;
+  }
+
+  return false;
+}
+
 function buildEntryText(entry: PenyakitEntry): string {
   return normalizeText(
     [
@@ -323,6 +393,18 @@ function validateSuggestion(
     if (ageMessages.length > 0) {
       issues.push("age_implausible");
       messages.push(...ageMessages.map((message) => `${code}: ${message}`));
+    }
+
+    // Drug-allergy cross-reference
+    const allergyConflicts = checkAllergyConflict(
+      input.allergies ?? [],
+      entry.terapi,
+    );
+    if (allergyConflicts.length > 0) {
+      issues.push("allergy_conflict");
+      messages.push(
+        ...allergyConflicts.map((c) => `${code}: ⚠ ALERGI — ${c}`),
+      );
     }
   }
 

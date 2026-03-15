@@ -1,7 +1,7 @@
 /**
  * @abyss/types — Intelligence Dashboard Types
  * ───────────────────────────────────────────
- * Shared contracts for the Puskesmas Intelligence Dashboard route,
+ * Shared contracts for the Sentra Intelligence Dashboard route,
  * API responses, and realtime event payloads.
  */
 

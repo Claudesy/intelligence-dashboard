@@ -94,14 +94,21 @@ interface CrewAccessRegistrationRecord {
 }
 
 function getRegistrationRequestsFilePath(): string {
-  return (
-    process.env.CREW_ACCESS_REGISTRATION_REQUESTS_FILE?.trim() ||
-    path.join(
-      process.cwd(),
-      "runtime",
-      "crew-access-registration-requests.json",
-    )
+  const envPath = process.env.CREW_ACCESS_REGISTRATION_REQUESTS_FILE?.trim();
+  const defaultPath = path.join(
+    process.cwd(),
+    "runtime",
+    "crew-access-registration-requests.json",
   );
+  const resolvedPath = envPath ? path.resolve(envPath) : defaultPath;
+  // Ensure the path stays within the project workspace directory
+  const workspaceRoot = process.cwd();
+  if (!resolvedPath.startsWith(workspaceRoot)) {
+    throw new Error(
+      "Invalid registration requests file path: must be inside the workspace.",
+    );
+  }
+  return resolvedPath;
 }
 
 function getRegistrationLockFilePath(): string {
@@ -257,6 +264,16 @@ function validateRegistrationPayload(
     body.jobTitles ?? body.jobTitle,
     isCrewProfilePosition,
   );
+  // Detect duplicate job titles (positions) before deduplication
+  const rawTitleInput = body.jobTitles ?? body.jobTitle;
+  const rawJobTitles: unknown[] = Array.isArray(rawTitleInput)
+    ? (rawTitleInput as unknown[])
+    : typeof rawTitleInput === "string"
+      ? [rawTitleInput]
+      : [];
+  if (rawJobTitles.length > jobTitles.length) {
+    throw new Error("Jabatan atau posisi tidak boleh duplikat.");
+  }
   const employeeId = normalizeText(body.employeeId);
   const strNumber = normalizeText(body.strNumber);
   const sipNumber = normalizeText(body.sipNumber);
@@ -274,7 +291,7 @@ function validateRegistrationPayload(
     ),
   );
 
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   if (!emailPattern.test(email)) {
     throw new Error("Email wajib valid.");
   }
@@ -469,7 +486,7 @@ export async function approveRegistration(
     }
 
     // Append to active users file
-    appendCrewAccessUserToFile({
+    await appendCrewAccessUserToFile({
       username: record.username,
       displayName: record.displayName,
       email: record.email,

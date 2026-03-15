@@ -89,9 +89,6 @@ export function createBridgeEntry(
     payload,
   };
   writeEntry(entry);
-  console.log(
-    `[Bridge] Created entry ${entry.id} for pelayanan ${pelayananId} by ${createdBy}`,
-  );
   return entry;
 }
 
@@ -159,7 +156,6 @@ export function claimBridgeEntry(
   entry.claimedBy = claimedBy;
   writeEntry(entry);
 
-  console.log(`[Bridge] Entry ${id} claimed by ${claimedBy}`);
   return entry;
 }
 
@@ -180,7 +176,6 @@ export function updateBridgeEntryStatus(
   }
   writeEntry(entry);
 
-  console.log(`[Bridge] Entry ${id} → ${status}${error ? `: ${error}` : ""}`);
   return entry;
 }
 

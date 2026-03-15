@@ -19,15 +19,16 @@ interface CrewUser {
   role: string;
 }
 
+// Placeholder user — passwordHash ini bukan hash asli.
+// Set CREW_ACCESS_USERS_JSON atau runtime/crew-access-users.json untuk dev yang nyata.
 export const CREW_USERS: CrewUser[] = [
   {
-    username: "claudesy",
-    displayName: "Claudesy",
-    email: "claudesy.id@gmail.com",
+    username: "dev-user",
+    displayName: "Dev User",
+    email: "dev@local.invalid",
     institution: "Puskesmas Balowerti Kota Kediri",
     profession: "Dokter",
     role: "CEO",
-    passwordHash:
-      "scrypt$16384$8$1$M0mghQ0B1wI-TWzZnIIYbg$lsxBbWdqgSAhVrrev9VTDSwB_nUKdybbv6Z0eghYwse8ffFIvvpczPSp5a239NbTs6Vf8Znnte0_8iuj8jAXfw",
+    passwordHash: "PLACEHOLDER_NOT_A_REAL_HASH",
   },
 ];

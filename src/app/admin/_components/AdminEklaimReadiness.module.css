@@ -64,7 +64,7 @@
 }
 
 .kpiValueReady {
-  color: var(--c-ok, #27ae60);
+  color: var(--c-ok);
 }
 
 .kpiValueProblem {
@@ -146,7 +146,7 @@
 }
 
 .readinessDotReady {
-  background: var(--c-ok, #27ae60);
+  background: var(--c-ok);
 }
 
 .readinessDotProblem {
@@ -203,15 +203,15 @@
 }
 
 .readinessBadgeReady {
-  background: color-mix(in srgb, var(--c-ok, #27ae60) 12%, transparent);
-  color: var(--c-ok, #27ae60);
-  border: 1px solid currentColor;
+  background: var(--c-ok-soft);
+  color: var(--c-ok);
+  border: 1px solid var(--c-ok-border);
 }
 
 .readinessBadgeProblem {
-  background: color-mix(in srgb, var(--c-critical) 12%, transparent);
+  background: var(--c-critical-soft);
   color: var(--c-critical);
-  border: 1px solid currentColor;
+  border: 1px solid var(--c-critical-border);
 }
 
 /* ─── Expand Arrow ────────────────────────────────────────── */
@@ -256,13 +256,13 @@
 }
 
 .issueCardCritical {
-  background: color-mix(in srgb, var(--c-critical) 8%, transparent);
+  background: var(--c-critical-soft);
   border-left-color: var(--c-critical);
 }
 
 .issueCardWarning {
-  background: color-mix(in srgb, var(--c-cdss, #e67e22) 8%, transparent);
-  border-left-color: var(--c-cdss, #e67e22);
+  background: var(--c-asesmen-soft);
+  border-left-color: var(--c-asesmen);
 }
 
 .issueCode {
@@ -279,7 +279,7 @@
 }
 
 .issueCodeWarning {
-  color: var(--c-cdss, #e67e22);
+  color: var(--c-asesmen);
 }
 
 .issueMessage {

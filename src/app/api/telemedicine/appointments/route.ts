@@ -125,14 +125,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   // Kirim notifikasi WhatsApp dengan link join (non-blocking)
   if (patientPhone && patientName && doctorName) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-    if (!baseUrl) {
-      console.warn(
-        "[Telemedicine] NEXT_PUBLIC_BASE_URL tidak di-set — notifikasi WhatsApp dilewati",
-      );
-    }
+    // Jika baseUrl tidak di-set, WhatsApp notification dilewati
     if (baseUrl) {
       const joinUrl = `${baseUrl}/join/${patientJoinToken}`;
-      sendWhatsAppNotification({
+      void sendWhatsAppNotification({
         appointmentId: appointment.id,
         patientName,
         patientPhone,
@@ -140,7 +136,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         scheduledAt: appointment.scheduledAt,
         consultationType: appointment.consultationType,
         joinUrl,
-      }).catch((err) => console.warn("[WhatsApp] Notifikasi gagal:", err));
+      }).catch(() => {/* fire-and-forget */});
     }
   }
 

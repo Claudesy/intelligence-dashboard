@@ -41,6 +41,19 @@ crew-access-users.json
 /output/
 test-*.png
 
+# lockfiles (monorepo uses pnpm)
+package-lock.json
+yarn.lock
+
 # local AI / planning metadata
 .claude/
 .taskmaster/
+.aider*
+.cursor/
+.lanes/
+.vscode/
+
+# docs (local only, not for production)
+docs/document-extraction-engine.md
+docs/extraction-quality-scoring-system.md
+TECHNICAL.md

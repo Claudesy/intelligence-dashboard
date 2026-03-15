@@ -1,11 +1,10 @@
 // Architected and built by Claudesy.
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+
 import { getCrewSessionFromRequest } from "@/lib/server/crew-access-auth";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
-
-const prisma = new PrismaClient();
 
 // Public — website fetch ini untuk tampil badge dokter online
 export async function GET() {

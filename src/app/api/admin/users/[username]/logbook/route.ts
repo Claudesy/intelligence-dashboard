@@ -107,8 +107,7 @@ export async function GET(
     });
 
     return NextResponse.json({ ok: true, entries, total, page, pageSize });
-  } catch (error) {
-    console.error("[Admin] Failed to fetch logbook:", error);
+  } catch {
     return NextResponse.json(
       { ok: false, error: "Gagal memuat logbook." },
       { status: 500 },

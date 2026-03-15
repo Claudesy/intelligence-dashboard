@@ -1,9 +1,18 @@
 // Architected and built by the one and only Claudesy.
+
+// Suppress known Node.js deprecation warnings (url.parse required by Next.js handle())
+process.removeAllListeners("warning");
+process.on("warning", (warning: Error & { code?: string }) => {
+  if (warning.name === "DeprecationWarning" && warning.code === "DEP0169") return;
+  if (warning.message?.includes("SSL modes")) return;
+  process.stderr.write(`${warning.name}: ${warning.message}\n`);
+});
+
 import { GoogleGenAI, Modality, type Session } from "@google/genai";
 import { createServer } from "http";
 import next from "next";
 import { Server as SocketIOServer } from "socket.io";
-import { parse } from "url";
+import { parse } from "node:url";
 import {
   buildAudreyCoreSystemPrompt,
   getAudreyPreferredAddress,
@@ -16,6 +25,7 @@ import { setIntelligenceNamespace } from "./src/lib/intelligence/socket-bridge";
 import { setNotamSocketIO } from "./src/lib/notam/socket-bridge";
 import { getCrewSessionFromCookieHeader } from "./src/lib/server/crew-access-auth";
 import { listAllCrewProfiles } from "./src/lib/server/crew-access-profile";
+import { trackUserLoginToday } from "./src/lib/server/online-today-tracker";
 import { setTeleSocketIO } from "./src/lib/telemedicine/socket-bridge";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -32,15 +42,19 @@ type UserPresence = {
   profession: string;
   institution: string;
   socketId: string;
+  joinedAt: number;
 };
 
 const onlineUsers = new Map<string, UserPresence>();
 
 app.prepare().then(async () => {
-  await initializeDashboardObservability();
+  try {
+    await initializeDashboardObservability();
+  } catch {
+    // Observability optional — silent skip
+  }
   const httpServer = createServer((req, res) => {
-    const parsedUrl = parse(req.url!, true);
-    handle(req, res, parsedUrl);
+    handle(req, res, parse(req.url!, true));
   });
 
   const io = new SocketIOServer(httpServer, {
@@ -53,7 +67,7 @@ app.prepare().then(async () => {
         ...(process.env.NODE_ENV !== "production"
           ? [
               "http://localhost:3000",
-              "http://localhost:7000",
+              "http://localhost:3001",
               /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
               /^chrome-extension:\/\//,
             ]
@@ -75,17 +89,13 @@ app.prepare().then(async () => {
     const cookieHeader = socket.handshake.headers.cookie ?? "";
     const session = getCrewSessionFromCookieHeader(cookieHeader);
     if (!session) {
-      console.log("[Intelligence] Socket rejected — invalid session");
       return next(new Error("Sesi tidak valid. Silakan login kembali."));
     }
     socket.data.session = session;
     next();
   });
-  intelligenceNS.on("connection", (socket) => {
-    console.log(`[Intelligence] Client terhubung: ${socket.id}`);
-    socket.on("disconnect", () => {
-      console.log(`[Intelligence] Client terputus: ${socket.id}`);
-    });
+  intelligenceNS.on("connection", () => {
+    // Connection handled by namespace middleware
   });
   setIntelligenceNamespace(intelligenceNS);
 
@@ -94,9 +104,6 @@ app.prepare().then(async () => {
     const cookieHeader = socket.handshake.headers.cookie ?? "";
     const session = getCrewSessionFromCookieHeader(cookieHeader);
     if (!session) {
-      console.log(
-        "[Auth] Socket connection rejected — invalid or missing session cookie",
-      );
       return next(new Error("Sesi tidak valid. Silakan login kembali."));
     }
     socket.data.session = session;
@@ -108,6 +115,9 @@ app.prepare().then(async () => {
 
     // User join: register to online list using server-verified identity + fullName from profile
     socket.on("user:join", () => {
+      // Track unique user login for today
+      trackUserLoginToday(session.username);
+      
       const profiles = listAllCrewProfiles();
       const profile = profiles.get(session.username);
       onlineUsers.set(session.username, {
@@ -117,8 +127,11 @@ app.prepare().then(async () => {
         profession: session.profession,
         institution: session.institution,
         socketId: socket.id,
+        joinedAt: Date.now(),
       });
       void socket.join("crew");
+      // Dokter join personal room for targeted consult delivery
+      void socket.join(`doctor:${profile?.fullName || session.displayName}`);
       io.to("crew").emit("users:online", Array.from(onlineUsers.values()));
     });
 
@@ -145,7 +158,6 @@ app.prepare().then(async () => {
       const trimmed = roomId.trim();
       if (!trimmed || trimmed.length > MAX_ROOM_ID_LENGTH) return;
       socket.join(trimmed);
-      console.log(`[Room] ${session.username} joined: ${trimmed}`);
     });
 
     // Send message — validate payload, enforce server-verified identity, check room membership
@@ -163,11 +175,15 @@ app.prepare().then(async () => {
       if (text.length > MAX_MESSAGE_TEXT_LENGTH) return;
       if (!socket.rooms.has(roomId)) return;
 
+      const profiles = listAllCrewProfiles();
+      const profile = profiles.get(session.username);
+      const senderName = profile?.fullName || session.displayName;
+
       io.to(roomId).emit("message:receive", {
         id,
         roomId,
         senderId: session.username,
-        senderName: session.displayName,
+        senderName,
         text,
         time,
       });
@@ -224,7 +240,6 @@ app.prepare().then(async () => {
         profession: session.profession,
       };
       const preferredAddress = getAudreyPreferredAddress(sessionUser);
-      console.log(`[Audrey] voice:start — user: ${preferredAddress}`);
 
       try {
         const ai = new GoogleGenAI({ apiKey, apiVersion: "v1alpha" });
@@ -270,7 +285,6 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
           },
           callbacks: {
             onopen: () => {
-              console.log("[Audrey] Gemini Live connected!");
               socket.emit("voice:ready");
             },
             onmessage: (msg: {
@@ -318,18 +332,15 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
               }
             },
             onerror: (e: ErrorEvent) => {
-              console.error("[Audrey] Gemini error:", e.message);
               socket.emit("voice:error", e.message);
             },
-            onclose: (e: { code?: number; reason?: string }) => {
-              console.log("[Audrey] Gemini closed", e?.code, e?.reason);
+            onclose: () => {
               socket.emit("voice:closed");
             },
           },
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error("[Audrey] catch error:", msg);
         socket.emit("voice:error", msg);
       }
     });
@@ -348,7 +359,6 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
           await geminiSession.sendRealtimeInput({ audio: { data, mimeType } });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.error("[Audrey] audio_chunk error:", msg);
           socket.emit("voice:error", `Audio stream error: ${msg}`);
           geminiSession = null;
         }
@@ -364,7 +374,6 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
         firstChunkSent = false;
         turnStartedAt = Date.now();
         geminiSession.sendRealtimeInput({ activityStart: {} });
-        console.log("[Audrey] voice:ptt_start — activityStart sent");
       } catch {
         /* ignore */
       }
@@ -375,7 +384,6 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
       if (!geminiSession) return;
       try {
         geminiSession.sendRealtimeInput({ activityEnd: {} });
-        console.log("[Audrey] voice:end_turn — activityEnd sent");
       } catch {
         /* ignore */
       }
@@ -386,12 +394,8 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
       if (!geminiSession) return;
       try {
         geminiSession.sendRealtimeInput({ activityEnd: {} });
-        console.log("[Audrey] voice:interrupt — activityEnd sent");
-      } catch (e) {
-        console.error(
-          "[Audrey] interrupt error:",
-          e instanceof Error ? e.message : String(e),
-        );
+      } catch {
+        /* ignore */
       }
     });
 
@@ -424,15 +428,16 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
   function startListening(port: number) {
     const host = process.env.HOST || "0.0.0.0";
     httpServer.listen(port, host, () => {
-      console.log(`▲ ACARS WebSocket Server ready on http://${host}:${port}`);
+      const displayHost = host === "0.0.0.0" ? "localhost" : host;
+      console.log(`▲ ACARS WebSocket Server ready on http://${displayHost}:${port}`);
     });
   }
 
   httpServer.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
-      const PORT = parseInt(process.env.PORT || "7000");
+      const PORT = parseInt(process.env.PORT || "3000");
       const fallback = PORT + 1;
-      console.log(`⚠ Port ${PORT} in use, trying ${fallback}...`);
+      console.log(`⚠ Port ${PORT} sibuk, mencoba ${fallback}...`);
       process.env.PORT = String(fallback);
       httpServer.removeAllListeners("error");
       startListening(fallback);
@@ -441,5 +446,5 @@ Jika ada yang bilang "say hello buat audience" atau "sapa audience", jawab sebag
     }
   });
 
-  startListening(parseInt(process.env.PORT || "7000"));
+  startListening(parseInt(process.env.PORT || "3000"));
 });

@@ -823,7 +823,7 @@ export default function CrewAccessGate({ children }: CrewAccessGateProps) {
                       </select>
                     </label>
 
-                    <div style={{ display: "grid", gap: 6 }}>
+                    <div className="gelar-section" style={{ display: "grid", gap: 6 }}>
                       <span
                         style={{ fontSize: 14, color: "var(--text-muted)" }}
                       >

@@ -4,7 +4,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { isCrewAuthorizedRequest } from "@/lib/server/crew-access-auth";
 import { runEMRTransfer } from "@/lib/emr/engine";
-import { getEmrTransferConfig } from "@/lib/emr/config";
+import { getEmrTransferConfig, getEMRCredentials } from "@/lib/emr/config";
 import type { RMETransferPayload } from "@/lib/emr/types";
 
 // In-memory transfer status (reset on server restart)
@@ -37,8 +37,9 @@ export async function POST(req: NextRequest) {
   }
 
   const config = getEmrTransferConfig();
+  const credentials = getEMRCredentials();
 
-  if (!config.username || !config.password) {
+  if (!credentials.username || !credentials.password) {
     return NextResponse.json(
       { error: "EMR_USERNAME dan EMR_PASSWORD belum dikonfigurasi" },
       { status: 503 },

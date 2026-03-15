@@ -1,8 +1,9 @@
 // Claudesy's vision, brought to life.
 /**
  * Sentra EMR Auto-Fill Engine — Type Definitions
- * Ported from Sentra Assist (Chrome Extension) → Dashboard (Playwright)
- * Diagnosis engine types EXCLUDED — Chief sedang menulis engine baru.
+ * @canonical-source — This is the SINGLE SOURCE OF TRUTH for EMR bridge types.
+ * Ghost Protocol (app/ghost-protocols/utils/types.ts) must mirror shared types.
+ * Run `node scripts/verify-emr-types-sync.js` to validate sync.
  */
 
 // ============================================================================
@@ -306,8 +307,6 @@ export interface RMETransferProgressEvent {
 export interface EMRTransferConfig {
   baseUrl: string;
   loginUrl: string;
-  username: string;
-  password: string;
   sessionStoragePath: string;
   headless?: boolean;
   sessionTtlMs?: number;

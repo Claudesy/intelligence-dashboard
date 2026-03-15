@@ -7,19 +7,27 @@ const FOOTER_LINK_GROUPS = [
   {
     title: "Jelajah",
     links: [
-      { href: "/emr", label: "EMR Klinis" },
+      { href: "/emr", label: "Clinical Mind Algorithm" },
+      { href: "/hub", label: "Sentra HUB" },
       { href: "/voice", label: "Consult Audrey" },
-      { href: "/icdx", label: "Ascriva ICDX" },
+      { href: "/acars", label: "Sentra Network" },
+    ],
+  },
+  {
+    title: "Clinical Tools",
+    links: [
+      { href: "/icdx", label: "Smart ICD-10" },
+      { href: "/calculator", label: "SenCall" },
+      { href: "/critical-mind", label: "Critical Mind" },
       { href: "/report", label: "Report" },
     ],
   },
   {
-    title: "Clinical Stack",
+    title: "Komunikasi",
     links: [
-      { href: "/emr", label: "CDSS & Assessment" },
-      { href: "/emr", label: "Prognosis" },
-      { href: "/emr", label: "Pharmacology" },
-      { href: "/report", label: "SP3 & LB1" },
+      { href: "/chat", label: "Team Chat" },
+      { href: "/telemedicine", label: "Telemedicine" },
+      { href: "/dashboard/intelligence", label: "Intelligence Monitor" },
     ],
   },
   {
@@ -43,13 +51,13 @@ export default function AppFooter() {
       <div className="app-footer-hero">
         <div className="app-footer-hero-main">
           <div className="app-footer-kicker">Sentra Healthcare Solutions</div>
-          <h2 className="app-footer-title">Puskesmas Intelligence Dashboard</h2>
+          <h2 className="app-footer-title">Sentra Intelligence Dashboard</h2>
         </div>
 
         <div className="app-footer-summary">
           <p>
-            Sistem Rekam Medis Elektronik (EMR) klinis ini saat ini masih dalam
-            tahap pengembangan intensif. Dengan demikian, fitur, data, dan
+            Sentra Intelligence Dashboard saat ini masih dalam tahap
+            pengembangan intensif. Dengan demikian, fitur, data, dan
             fungsionalitas yang tersedia mungkin belum sepenuhnya akurat dan
             stabil.
           </p>
@@ -57,10 +65,6 @@ export default function AppFooter() {
             Seluruh hak kekayaan intelektual, properti, dan konten yang terkait
             dengan sistem ini adalah milik Sentra Healthcare Artificial
             Intelligent.
-          </p>
-          <p>
-            Dilarang keras menggandakan, mendistribusikan, memodifikasi, atau
-            menggunakan sistem ini tanpa izin tertulis dari pemilik yang sah.
           </p>
         </div>
       </div>

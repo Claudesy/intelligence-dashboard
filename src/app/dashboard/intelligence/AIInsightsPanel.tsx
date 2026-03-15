@@ -49,10 +49,7 @@ function formatConfidence(value: number): string {
 }
 
 function formatDateTime(value: string | null): string {
-  if (!value) {
-    return "-";
-  }
-
+  if (!value) return "-";
   return new Date(value).toLocaleString("id-ID", {
     day: "2-digit",
     month: "short",
@@ -60,6 +57,29 @@ function formatDateTime(value: string | null): string {
     minute: "2-digit",
   });
 }
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  borderRadius: 4,
+  border: "1px solid var(--line-base)",
+  background: "transparent",
+  padding: "8px 12px",
+  fontSize: 13,
+  color: "var(--text-main)",
+  outline: "none",
+  fontFamily: "var(--font-sans)",
+};
+
+const actionBtnBase: React.CSSProperties = {
+  borderRadius: 4,
+  padding: "8px 14px",
+  fontSize: 13,
+  fontFamily: "var(--font-mono)",
+  letterSpacing: "0.05em",
+  cursor: "pointer",
+  background: "transparent",
+  transition: "opacity 0.2s",
+};
 
 export function AIInsightsPanelContent({
   snapshot,
@@ -80,14 +100,35 @@ export function AIInsightsPanelContent({
 }): React.JSX.Element {
   if (snapshot.isIdle) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-md border border-dashed border-[var(--line-base)] px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            Idle State
-          </p>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-main)]">
-            Menunggu event CDSS pertama untuk encounter aktif.
-          </p>
+      <div
+        style={{
+          padding: "40px 24px",
+          textAlign: "center",
+          color: "var(--text-muted)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 28,
+            fontFamily: "var(--font-mono)",
+            opacity: 0.2,
+            marginBottom: 12,
+          }}
+        >
+          ◇
+        </div>
+        <div style={{ fontSize: 14, marginBottom: 4 }}>
+          Menunggu event CDSS pertama
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.05em",
+            opacity: 0.5,
+          }}
+        >
+          To be filled — insights muncul saat encounter diproses engine
         </div>
       </div>
     );
@@ -95,23 +136,75 @@ export function AIInsightsPanelContent({
 
   if (snapshot.isDegraded) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-md border border-dashed border-[var(--c-critical)]/50 bg-[var(--bg-card)] px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--c-critical)]">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            borderRadius: 4,
+            border: "1px dashed var(--c-critical)",
+            padding: "16px 20px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--c-critical)",
+              marginBottom: 8,
+            }}
+          >
             Degraded State
-          </p>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-main)]">
+          </div>
+          <p
+            style={{
+              fontSize: 14,
+              lineHeight: 1.6,
+              color: "var(--text-main)",
+            }}
+          >
             {snapshot.degradedMessage}
           </p>
         </div>
         {snapshot.validation.violations.length > 0 && (
-          <div className="rounded-md border border-[var(--line-base)] px-4 py-4">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <div
+            style={{
+              borderRadius: 4,
+              border: "1px solid var(--line-base)",
+              padding: "16px 20px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
               Guardrail Findings
-            </p>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-muted)]">
+            </div>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
               {snapshot.validation.violations.map((violation) => (
-                <li key={violation.code}>
+                <li
+                  key={violation.code}
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    color: "var(--text-muted)",
+                  }}
+                >
                   {violation.code}: {violation.message}
                 </li>
               ))}
@@ -123,41 +216,129 @@ export function AIInsightsPanelContent({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 rounded-md border border-[var(--line-base)] px-4 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <AIDisclosureBadge />
-          <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
-            Engine {snapshot.engineVersion ?? "unknown"}
-          </span>
-        </div>
-        <p className="text-sm leading-6 text-[var(--text-muted)]">
-          Processed {formatDateTime(snapshot.processedAt)} · Latency{" "}
-          {snapshot.latencyMs ?? 0}ms
-        </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Engine info */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 12,
+          borderRadius: 4,
+          border: "1px solid var(--line-base)",
+          padding: "12px 16px",
+        }}
+      >
+        <AIDisclosureBadge />
+        <span
+          style={{
+            fontSize: 11,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--text-muted)",
+          }}
+        >
+          Engine {snapshot.engineVersion ?? "unknown"}
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            color: "var(--text-muted)",
+            marginLeft: "auto",
+          }}
+        >
+          {formatDateTime(snapshot.processedAt)} · {snapshot.latencyMs ?? 0}ms
+        </span>
       </div>
 
+      {/* Clinical Alerts */}
       {snapshot.alerts.length > 0 && (
-        <div className="rounded-md border border-[var(--c-critical)]/35 bg-[var(--bg-card)] px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--c-critical)]">
+        <div
+          style={{
+            borderRadius: 4,
+            border: "1px solid var(--c-critical)",
+            padding: "16px 20px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--c-critical)",
+              marginBottom: 12,
+            }}
+          >
             Clinical Alerts
-          </p>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-main)]">
+          </div>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
             {snapshot.alerts.map((alert) => (
-              <li key={alert.id}>{alert.message}</li>
+              <li
+                key={alert.id}
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  color: "var(--text-main)",
+                }}
+              >
+                {alert.message}
+              </li>
             ))}
           </ul>
         </div>
       )}
 
+      {/* Guardrail Warnings */}
       {snapshot.validation.warnings.length > 0 && (
-        <div className="rounded-md border border-[var(--line-base)] px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+        <div
+          style={{
+            borderRadius: 4,
+            border: "1px solid var(--line-base)",
+            padding: "16px 20px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              marginBottom: 12,
+            }}
+          >
             Guardrail Warnings
-          </p>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-muted)]">
+          </div>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
             {snapshot.validation.warnings.map((warning) => (
-              <li key={warning.code}>
+              <li
+                key={warning.code}
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: "var(--text-muted)",
+                }}
+              >
                 {warning.code}: {warning.message}
               </li>
             ))}
@@ -165,121 +346,248 @@ export function AIInsightsPanelContent({
         </div>
       )}
 
-      <div className="space-y-4">
-        {snapshot.suggestions.map((suggestion) => {
-          const draftState = getDraftState(overrideState, suggestion.id);
+      {/* Suggestions */}
+      {snapshot.suggestions.map((suggestion) => {
+        const draftState = getDraftState(overrideState, suggestion.id);
 
-          return (
-            <article
-              key={suggestion.id}
-              className="rounded-md border border-[var(--line-base)] bg-[var(--bg-card)] px-4 py-4"
+        return (
+          <article
+            key={suggestion.id}
+            style={{
+              borderRadius: 4,
+              border: "1px solid var(--line-base)",
+              background: "var(--bg-card)",
+              padding: "20px",
+            }}
+          >
+            {/* Badges */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 12,
+              }}
             >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-[var(--line-base)] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                      {suggestion.primaryDiagnosis.icd10Code}
-                    </span>
-                    <span className="rounded-full border border-[var(--c-asesmen)]/40 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-[var(--c-asesmen)]">
-                      Confidence {formatConfidence(suggestion.confidence)}
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                      {suggestion.disclosureLabel}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-medium text-[var(--text-main)]">
-                      {suggestion.primaryDiagnosis.description}
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-                      {suggestion.reasoning}
-                    </p>
-                  </div>
-                  {suggestion.supportingEvidence.length > 0 && (
-                    <ul className="space-y-2 text-sm leading-6 text-[var(--text-muted)]">
-                      {suggestion.supportingEvidence.map((item) => (
-                        <li key={item}>• {item}</li>
-                      ))}
-                    </ul>
-                  )}
+              <span
+                style={{
+                  borderRadius: 20,
+                  border: "1px solid var(--line-base)",
+                  padding: "3px 10px",
+                  fontSize: 10,
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {suggestion.primaryDiagnosis.icd10Code}
+              </span>
+              <span
+                style={{
+                  borderRadius: 20,
+                  border: "1px solid var(--c-asesmen)",
+                  padding: "3px 10px",
+                  fontSize: 10,
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--c-asesmen)",
+                }}
+              >
+                Confidence {formatConfidence(suggestion.confidence)}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "var(--text-muted)",
+                  opacity: 0.6,
+                }}
+              >
+                {suggestion.disclosureLabel}
+              </span>
+            </div>
+
+            {/* Diagnosis name + reasoning */}
+            <h3
+              style={{
+                fontSize: 16,
+                fontWeight: 500,
+                color: "var(--text-main)",
+                marginBottom: 8,
+              }}
+            >
+              {suggestion.primaryDiagnosis.description}
+            </h3>
+            <p
+              style={{
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              {suggestion.reasoning}
+            </p>
+
+            {/* Supporting evidence */}
+            {suggestion.supportingEvidence.length > 0 && (
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: "0 0 16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                {suggestion.supportingEvidence.map((item) => (
+                  <li
+                    key={item}
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    • {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Override inputs */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "160px 1fr",
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--text-muted)",
+                    marginBottom: 6,
+                  }}
+                >
+                  Final ICD-10
                 </div>
+                <input
+                  value={draftState.finalIcd}
+                  onChange={(event) =>
+                    onDraftChange?.(suggestion.id, {
+                      finalIcd: event.target.value,
+                    })
+                  }
+                  placeholder={suggestion.primaryDiagnosis.icd10Code}
+                  style={inputStyle}
+                />
               </div>
-
-              <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,180px)_minmax(0,1fr)]">
-                <label className="space-y-2 text-sm text-[var(--text-main)]">
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                    Final ICD-10
-                  </span>
-                  <input
-                    value={draftState.finalIcd}
-                    onChange={(event) =>
-                      onDraftChange?.(suggestion.id, {
-                        finalIcd: event.target.value,
-                      })
-                    }
-                    placeholder={suggestion.primaryDiagnosis.icd10Code}
-                    className="w-full rounded-md border border-[var(--line-base)] bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none"
-                  />
-                </label>
-                <label className="space-y-2 text-sm text-[var(--text-main)]">
-                  <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                    Alasan override
-                  </span>
-                  <input
-                    value={draftState.reason}
-                    onChange={(event) =>
-                      onDraftChange?.(suggestion.id, {
-                        reason: event.target.value,
-                      })
-                    }
-                    placeholder="Opsional untuk accept, wajib secara operasional untuk modify/reject."
-                    className="w-full rounded-md border border-[var(--line-base)] bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none"
-                  />
-                </label>
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--text-muted)",
+                    marginBottom: 6,
+                  }}
+                >
+                  Alasan override
+                </div>
+                <input
+                  value={draftState.reason}
+                  onChange={(event) =>
+                    onDraftChange?.(suggestion.id, {
+                      reason: event.target.value,
+                    })
+                  }
+                  placeholder="Opsional untuk accept, wajib untuk modify/reject."
+                  style={inputStyle}
+                />
               </div>
+            </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void onSubmitOverride(suggestion.id, "accept")}
-                  disabled={draftState.status === "submitting"}
-                  className="rounded-md border border-[var(--c-asesmen)] px-3 py-2 text-sm text-[var(--c-asesmen)] disabled:opacity-60"
-                >
-                  Terima suggestion
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onSubmitOverride(suggestion.id, "modify")}
-                  disabled={draftState.status === "submitting"}
-                  className="rounded-md border border-[var(--line-base)] px-3 py-2 text-sm text-[var(--text-main)] disabled:opacity-60"
-                >
-                  Simpan override
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void onSubmitOverride(suggestion.id, "reject")}
-                  disabled={draftState.status === "submitting"}
-                  className="rounded-md border border-[var(--c-critical)] px-3 py-2 text-sm text-[var(--c-critical)] disabled:opacity-60"
-                >
-                  Tolak suggestion
-                </button>
-              </div>
+            {/* Action buttons */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => void onSubmitOverride(suggestion.id, "accept")}
+                disabled={draftState.status === "submitting"}
+                style={{
+                  ...actionBtnBase,
+                  border: "1px solid var(--c-asesmen)",
+                  color: "var(--c-asesmen)",
+                  opacity: draftState.status === "submitting" ? 0.5 : 1,
+                }}
+              >
+                Terima
+              </button>
+              <button
+                type="button"
+                onClick={() => void onSubmitOverride(suggestion.id, "modify")}
+                disabled={draftState.status === "submitting"}
+                style={{
+                  ...actionBtnBase,
+                  border: "1px solid var(--line-base)",
+                  color: "var(--text-main)",
+                  opacity: draftState.status === "submitting" ? 0.5 : 1,
+                }}
+              >
+                Override
+              </button>
+              <button
+                type="button"
+                onClick={() => void onSubmitOverride(suggestion.id, "reject")}
+                disabled={draftState.status === "submitting"}
+                style={{
+                  ...actionBtnBase,
+                  border: "1px solid var(--c-critical)",
+                  color: "var(--c-critical)",
+                  opacity: draftState.status === "submitting" ? 0.5 : 1,
+                }}
+              >
+                Tolak
+              </button>
+            </div>
 
-              {draftState.message && (
-                <p
-                  className={`mt-3 text-sm ${
+            {/* Draft message */}
+            {draftState.message && (
+              <p
+                style={{
+                  marginTop: 12,
+                  fontSize: 13,
+                  color:
                     draftState.status === "error"
-                      ? "text-[var(--c-critical)]"
-                      : "text-[var(--text-muted)]"
-                  }`}
-                >
-                  {draftState.message}
-                </p>
-              )}
-            </article>
-          );
-        })}
-      </div>
+                      ? "var(--c-critical)"
+                      : "var(--text-muted)",
+                }}
+              >
+                {draftState.message}
+              </p>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -298,9 +606,7 @@ export default function AIInsightsPanel(): React.JSX.Element {
 
   useEffect(() => {
     const payload = buildSnapshotObservabilityPayload(snapshot);
-    if (!payload) {
-      return;
-    }
+    if (!payload) return;
 
     const fingerprint = getObservabilityFingerprint(payload);
     if (
@@ -319,16 +625,13 @@ export default function AIInsightsPanel(): React.JSX.Element {
 
     void fetch("/api/dashboard/intelligence/observability", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     })
       .then((response) => {
         if (!response.ok) {
           throw new Error("Failed to report intelligence observability.");
         }
-
         observabilityDeliveryRef.current = markObservabilityDeliverySucceeded(
           observabilityDeliveryRef.current,
           fingerprint,
@@ -364,9 +667,7 @@ export default function AIInsightsPanel(): React.JSX.Element {
     const suggestion = snapshot.suggestions.find(
       (item) => item.id === suggestionId,
     );
-    if (!snapshot.encounterId || !suggestion) {
-      return;
-    }
+    if (!snapshot.encounterId || !suggestion) return;
 
     const draftState = getDraftState(overrideState, suggestionId);
     if (action !== "accept" && !draftState.reason.trim()) {
@@ -405,9 +706,7 @@ export default function AIInsightsPanel(): React.JSX.Element {
     try {
       const response = await fetch("/api/dashboard/intelligence/override", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           encounterId: snapshot.encounterId,
           action,

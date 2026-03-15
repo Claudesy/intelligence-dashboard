@@ -47,17 +47,8 @@ const CONSULTATION_TYPE_LABEL: Record<ConsultationType, string> = {
 export async function sendWhatsAppNotification(
   payload: NotificationPayload,
 ): Promise<void> {
-  if (!payload.patientPhone) {
-    console.info("[WhatsApp] Nomor HP pasien tidak tersedia, skip notifikasi");
-    return;
-  }
-
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) {
-    console.warn(
-      "[WhatsApp] Konfigurasi WhatsApp belum diset, skip notifikasi",
-    );
-    return;
-  }
+  if (!payload.patientPhone) return;
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) return;
 
   const tanggal = formatTanggalIndonesia(payload.scheduledAt);
   const jam = formatJam(payload.scheduledAt);
@@ -109,10 +100,7 @@ export async function sendWhatsAppNotification(
 export async function sendAppointmentReminder(
   payload: NotificationPayload & { patientPhone: string },
 ): Promise<void> {
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) {
-    console.warn("[WhatsApp] Konfigurasi WhatsApp belum diset, skip reminder");
-    return;
-  }
+  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_ID) return;
 
   const phone = payload.patientPhone.replace(/^0/, "62").replace(/\D/g, "");
   const jam = formatJam(payload.scheduledAt);

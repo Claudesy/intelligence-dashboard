@@ -7,7 +7,7 @@ import React from "react";
 // PKM Dashboard — VideoRoom Component
 // ============================================================
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import {
   RoomContext,
   RoomAudioRenderer,
@@ -68,12 +68,18 @@ export function VideoRoom({
     onSessionEnd: () => onSessionComplete(appointment.id),
   });
 
+  const connectRef = useRef(connect);
+  const disconnectRef = useRef(disconnect);
+  connectRef.current = connect;
+  disconnectRef.current = disconnect;
   useEffect(() => {
-    void connect();
+    void connectRef.current();
     return () => {
-      void disconnect();
+      void disconnectRef.current();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Mount-only: connect on mount, disconnect on unmount. Refs ensure we call latest impl.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleEndCall = useCallback(async () => {
     await disconnect();
