@@ -2495,7 +2495,7 @@ export default function ProfilUserPage() {
                   </div>
                 </div>
                 <a
-                  href="/docs/ghost-protocol"
+                  href="/downloads/sentra-assist-chrome.zip"
                   download
                   className="summary-sidebar-cta"
                   style={{
