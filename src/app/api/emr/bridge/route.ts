@@ -19,6 +19,10 @@ export const runtime = "nodejs";
 /**
  * POST /api/emr/bridge — Create a new transfer request
  * Body: { pelayananId, patientName?, payload: RMETransferPayload }
+ *
+ * Auth: Session cookie only (NOT automation token).
+ * Design decision: Only logged-in Dashboard users create transfers.
+ * Ghost Protocols extension uses GET/PATCH with token auth to poll & process.
  */
 export async function POST(request: Request) {
   const session = getCrewSessionFromRequest(request);
@@ -91,7 +95,14 @@ export async function POST(request: Request) {
  *   stats=true (include queue stats)
  */
 export async function GET(request: Request) {
+  const correlationId =
+    request.headers.get("x-correlation-id") || "no-correlation";
+  console.log(`[Bridge] GET /api/emr/bridge — correlationId: ${correlationId}`);
+
   if (!isCrewAuthorizedRequest(request)) {
+    console.warn(
+      `[Bridge] GET /api/emr/bridge — 401 Unauthorized — correlationId: ${correlationId}`,
+    );
     return NextResponse.json(
       { ok: false, error: "Unauthorized" },
       { status: 401 },

@@ -11,5 +11,9 @@ startCommand = "npm run start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
+[deploy.volumes]
+# Persistent storage for bridge queue — survives deploys & restarts
+"/app/runtime/bridge-queue" = "bridge_queue_data"
+
 [environments.production]
 NODE_ENV = "production"

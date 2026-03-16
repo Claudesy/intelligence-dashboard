@@ -20,7 +20,13 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const correlationId =
+    request.headers.get("x-correlation-id") || "no-correlation";
+
   if (!isCrewAuthorizedRequest(request)) {
+    console.warn(
+      `[Bridge] GET /api/emr/bridge/[id] — 401 — correlationId: ${correlationId}`,
+    );
     return NextResponse.json(
       { ok: false, error: "Unauthorized" },
       { status: 401 },
@@ -51,7 +57,13 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const correlationId =
+    request.headers.get("x-correlation-id") || "no-correlation";
+
   if (!isCrewAuthorizedRequest(request)) {
+    console.warn(
+      `[Bridge] PATCH /api/emr/bridge/[id] — 401 — correlationId: ${correlationId}`,
+    );
     return NextResponse.json(
       { ok: false, error: "Unauthorized" },
       { status: 401 },
@@ -67,6 +79,10 @@ export async function PATCH(
       result?: RMETransferResult;
       error?: string;
     };
+
+    console.log(
+      `[Bridge] PATCH /api/emr/bridge/${id} action:${body.action} — correlationId: ${correlationId}`,
+    );
 
     if (!body.action) {
       return NextResponse.json(
