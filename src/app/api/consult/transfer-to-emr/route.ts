@@ -6,6 +6,7 @@ import {
   CLINICAL_CASE_AUDIT_EVENTS,
 } from "@/lib/audit/clinical-case-audit";
 import { createBridgeEntry } from "@/lib/emr/bridge-queue";
+import { prisma } from "@/lib/prisma";
 import { getCrewSessionFromRequest } from "@/lib/server/crew-access-auth";
 import { getAcceptedConsult } from "@/lib/telemedicine/consult-accepted";
 import { validateTransferBody } from "@/lib/telemedicine/consult-api-validation";
@@ -65,6 +66,20 @@ export async function POST(req: NextRequest) {
         createdAt: entry.createdAt,
       },
     });
+
+    // Update ConsultLog status to track EMR transfer
+    try {
+      await prisma.consultLog.update({
+        where: { consultId },
+        data: {
+          status: "transferred",
+          bridgeEntryId: entry.id,
+          transferredAt: new Date(),
+        },
+      });
+    } catch {
+      // Silent — consult mungkin dari flow lama sebelum migrasi ConsultLog
+    }
 
     return NextResponse.json({
       ok: true,

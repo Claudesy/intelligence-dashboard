@@ -327,6 +327,48 @@ model ClinicalReport {
   @@map("clinical_reports")
 }
 
+model ConsultLog {
+  id              String    @id @default(cuid())
+  consultId       String    @unique @map("consult_id")
+  status          String    @default("received") // received | accepted | transferred | completed
+
+  // Patient
+  patientName     String?   @map("patient_name")
+  patientRm       String?   @map("patient_rm")
+  patientAge      Int?      @map("patient_age")
+  patientGender   String?   @map("patient_gender")
+
+  // Clinical
+  keluhanUtama    String?   @map("keluhan_utama")
+  ttv             Json?
+  riskFactors     Json?     @map("risk_factors")
+  penyakitKronis  Json?     @map("penyakit_kronis")
+  anthropometrics Json?
+
+  // Routing
+  senderUserId    String?   @map("sender_user_id")
+  senderName      String?   @map("sender_name")
+  targetDoctorId  String?   @map("target_doctor_id")
+  acceptedBy      String?   @map("accepted_by")
+  acceptedAt      DateTime? @map("accepted_at")
+
+  // Bridge
+  bridgeEntryId   String?   @map("bridge_entry_id")
+  transferredAt   DateTime? @map("transferred_at")
+  completedAt     DateTime? @map("completed_at")
+
+  // Timestamps
+  sentAt          DateTime? @map("sent_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([status], map: "consult_logs_status_idx")
+  @@index([targetDoctorId], map: "consult_logs_target_doctor_idx")
+  @@index([patientRm], map: "consult_logs_patient_rm_idx")
+  @@index([createdAt], map: "consult_logs_created_at_idx")
+  @@map("consult_logs")
+}
+
 model ClinicalCaseAuditEvent {
   id            String   @id @default(cuid())
   eventType     String   @map("event_type")

@@ -5,6 +5,7 @@ import {
   appendClinicalCaseAuditEvent,
   CLINICAL_CASE_AUDIT_EVENTS,
 } from "@/lib/audit/clinical-case-audit";
+import { prisma } from "@/lib/prisma";
 import { getCrewSessionFromRequest } from "@/lib/server/crew-access-auth";
 import { appendAcceptedConsult } from "@/lib/telemedicine/consult-accepted";
 import { validateAcceptBody } from "@/lib/telemedicine/consult-api-validation";
@@ -53,6 +54,20 @@ export async function POST(req: NextRequest) {
         acceptedAt,
       },
     });
+
+    // Update ConsultLog status to track acceptance
+    try {
+      await prisma.consultLog.update({
+        where: { consultId },
+        data: {
+          status: "accepted",
+          acceptedBy: session.displayName,
+          acceptedAt: new Date(acceptedAt),
+        },
+      });
+    } catch {
+      // Silent — consult mungkin dari flow lama sebelum migrasi ConsultLog
+    }
 
     return NextResponse.json({ ok: true, consultId });
   } catch (err) {
