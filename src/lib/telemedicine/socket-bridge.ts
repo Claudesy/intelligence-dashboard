@@ -46,7 +46,6 @@ export interface AssistConsultPayload {
 
 export function emitAssistConsult(payload: AssistConsultPayload): void {
   if (!_io) return;
-  // Emit to targeted doctor room only — avoids leaking patient data to all crew
-  const doctorRoom = `doctor:${payload.targetDoctorId}`;
-  _io.to(doctorRoom).emit("assist:consult", payload);
+  // Broadcast ke crew room — client-side filters by targetDoctorId
+  _io.to("crew").emit("assist:consult", payload);
 }
