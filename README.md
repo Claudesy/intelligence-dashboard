@@ -35,6 +35,7 @@ _Architect & Built by [Claudesy](https://github.com/DocSynapse)_
   - [Building for Production](#building-for-production)
 - [Available Scripts](#available-scripts)
 - [API Reference](#api-reference)
+- [Clinical Reports](#clinical-reports)
 - [Deployment](#deployment)
 - [Related Documentation](#related-documentation)
 - [Security](#security)
@@ -386,6 +387,21 @@ TELEMEDICINE_PUBLIC_BASE_URL=https://<your-domain>/telemedicine/waiting
 > **Privacy Note:** Session recordings contain sensitive PHI (Protected Health Information). Ensure storage is encrypted at rest and access is restricted to authorized clinical staff only.
 
 ---
+
+## Clinical Reports
+
+Clinical report module provides structured clinical documentation with built-in validation, audit trail, and PDF rendering capability.
+
+**Endpoints:**
+- `GET /api/report/clinical` — List reports with optional dokter filter
+- `POST /api/report/clinical` — Create new clinical report (with Zod validation)
+- `DELETE /api/report/clinical?id=xxx` — Delete report
+
+**Key Features:**
+- Full Zod schema validation on all inputs
+- PHI-safe audit trail (no patient name/MRN in logs)
+- Dual storage (PostgreSQL + file fallback)
+- HTML-to-PDF rendering with professional template
 
 ## API Reference
 

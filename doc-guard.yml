@@ -1,0 +1,280 @@
+# ============================================================
+# SYNAPSE — CI Documentation Guard
+# Architected & Built by Claudesy — 2026
+# ============================================================
+# PURPOSE: Runs on every PR opened by Jules (or any branch).
+# Validates documentation quality automatically.
+# Jules will auto-fix failures and re-push to the PR branch.
+# ============================================================
+
+name: ⚡ SYNAPSE — Doc Guard
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  push:
+    branches: [main, develop]
+    paths:
+      - '**.md'
+      - 'docs/**'
+
+jobs:
+
+  # ── JOB 1: AI File Leak Check ─────────────────────────────
+  ai-file-guard:
+    name: 🚫 AI/Agent File Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for AI/Agent files in repo
+        run: |
+          echo "Scanning for AI/Agent configuration files..."
+
+          FORBIDDEN_PATTERNS=(
+            "CLAUDE.md" "CLAUDE.local.md"
+            "AGENTS.md" "AGENTS.local.md"
+            ".cursorrules"
+            "COGNITORIUM_LOG.md"
+            "inferred_facts.json"
+            "gap_report.json"
+            "repo_manifest.json"
+            "qa_report.json"
+            "agent-config"
+            "llm-config"
+            "ai-config"
+            "qwen_"
+            "pipeline-state.json"
+          )
+
+          FOUND=0
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            MATCHES=$(find . -not -path './.git/*' -name "*${pattern}*" 2>/dev/null || true)
+            if [ -n "$MATCHES" ]; then
+              echo "❌ BLOCKED — Found forbidden file: $MATCHES"
+              FOUND=$((FOUND + 1))
+            fi
+          done
+
+          # Check for .mdc files (Cursor rules)
+          MDC_FILES=$(find . -not -path './.git/*' -name "*.mdc" 2>/dev/null || true)
+          if [ -n "$MDC_FILES" ]; then
+            echo "❌ BLOCKED — .mdc Cursor rule files found: $MDC_FILES"
+            FOUND=$((FOUND + 1))
+          fi
+
+          # Check for .cursor/ directory
+          if [ -d ".cursor" ]; then
+            echo "❌ BLOCKED — .cursor/ directory found in repo"
+            FOUND=$((FOUND + 1))
+          fi
+
+          if [ $FOUND -gt 0 ]; then
+            echo ""
+            echo "FAILED: $FOUND AI/Agent file(s) detected."
+            echo "These files are LOCAL-ONLY (Qwen domain)."
+            echo "Add them to .gitignore and remove from tracked files."
+            exit 1
+          fi
+
+          echo "✅ No AI/Agent files found — repo is clean"
+
+  # ── JOB 2: Repo Efficiency Check ─────────────────────────
+  repo-efficiency:
+    name: ⚡ Repo Efficiency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check repo size and large files
+        run: |
+          echo "Checking repo efficiency..."
+
+          # Find files > 200KB (docs should never be this large)
+          LARGE=$(find . -not -path './.git/*' -not -path './node_modules/*' \
+            -not -path './.next/*' -not -path './dist/*' \
+            -size +200k -name "*.md" 2>/dev/null || true)
+
+          if [ -n "$LARGE" ]; then
+            echo "⚠️  Large markdown files detected (>200KB):"
+            echo "$LARGE"
+            echo "Consider splitting these documents."
+          fi
+
+          # No binary blobs in docs/
+          BINARIES=$(find ./docs -not -path './.git/*' \
+            -not -name "*.md" -not -name "*.png" -not -name "*.jpg" \
+            -not -name "*.svg" -not -name "*.pdf" \
+            -type f 2>/dev/null || true)
+
+          if [ -n "$BINARIES" ]; then
+            echo "⚠️  Non-standard files in docs/:"
+            echo "$BINARIES"
+          fi
+
+          echo "✅ Repo efficiency check passed"
+
+  # ── JOB 3: Documentation Completeness ────────────────────
+  doc-completeness:
+    name: 📋 DCS Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check mandatory documents exist
+        run: |
+          echo "Running Documentation Completeness Score (DCS) check..."
+
+          REQUIRED=(
+            "README.md"
+            "CHANGELOG.md"
+            "LICENSE"
+            "SECURITY.md"
+            ".env.example"
+          )
+
+          MISSING=0
+          PRESENT=0
+          TOTAL=${#REQUIRED[@]}
+
+          for doc in "${REQUIRED[@]}"; do
+            if [ -f "$doc" ]; then
+              echo "  ✅ $doc"
+              PRESENT=$((PRESENT + 1))
+            else
+              echo "  ❌ $doc — MISSING"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          DCS=$(echo "scale=0; $PRESENT * 100 / $TOTAL" | bc)
+          echo ""
+          echo "─────────────────────────────────────────"
+          echo "  DCS Score: ${DCS}% ($PRESENT/$TOTAL)"
+
+          if [ $DCS -lt 60 ]; then
+            echo "  STATUS: ❌ CRITICAL GAP — DCS below 60%"
+            echo "─────────────────────────────────────────"
+            exit 1
+          elif [ $DCS -lt 80 ]; then
+            echo "  STATUS: ⚠️  NEEDS WORK — DCS below 80%"
+            echo "─────────────────────────────────────────"
+            # Warning only, don't block PR
+          else
+            echo "  STATUS: ✅ COMPLIANT"
+            echo "─────────────────────────────────────────"
+          fi
+
+  # ── JOB 4: Brand Signature Check ─────────────────────────
+  brand-check:
+    name: 🎨 Claudesy Brand Signature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Claudesy signature on all docs
+        run: |
+          echo "Checking Claudesy brand signature..."
+
+          # Check all .md files in docs/ have signature
+          UNSIGNED=()
+          while IFS= read -r mdfile; do
+            if ! grep -q "Claudesy" "$mdfile" 2>/dev/null; then
+              UNSIGNED+=("$mdfile")
+            fi
+          done < <(find ./docs -name "*.md" 2>/dev/null || true)
+
+          # Check root docs
+          ROOT_DOCS=("README.md" "CHANGELOG.md" "SECURITY.md" "CONTRIBUTING.md" "ARCHITECTURE.md")
+          for doc in "${ROOT_DOCS[@]}"; do
+            if [ -f "$doc" ] && ! grep -q "Claudesy" "$doc" 2>/dev/null; then
+              UNSIGNED+=("$doc")
+            fi
+          done
+
+          if [ ${#UNSIGNED[@]} -gt 0 ]; then
+            echo "⚠️  Missing Claudesy brand signature:"
+            for f in "${UNSIGNED[@]}"; do
+              echo "  → $f"
+            done
+            echo ""
+            echo "Add to footer: <sub>Architected & Built by Claudesy — 2026 · Sentra Healthcare Artificial Intelligence</sub>"
+            # Warning only — Jules will fix on next pass
+          else
+            echo "✅ All docs have Claudesy brand signature"
+          fi
+
+  # ── JOB 5: Mermaid Syntax Validation ─────────────────────
+  mermaid-check:
+    name: 📊 Mermaid Diagram Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli --silent 2>/dev/null || true
+
+      - name: Extract and validate Mermaid blocks
+        run: |
+          echo "Validating Mermaid diagrams in docs..."
+
+          # Extract mermaid blocks and validate
+          FAILED=0
+          while IFS= read -r mdfile; do
+            # Extract mermaid blocks
+            python3 - <<'PYEOF' "$mdfile"
+          import sys, re, subprocess, tempfile, os
+
+          with open(sys.argv[1], 'r', encoding='utf-8', errors='ignore') as f:
+              content = f.read()
+
+          blocks = re.findall(r'```mermaid\n(.*?)```', content, re.DOTALL)
+
+          if not blocks:
+              print(f"  ℹ️  No Mermaid blocks in {sys.argv[1]}")
+              sys.exit(0)
+
+          print(f"  Found {len(blocks)} Mermaid block(s) in {sys.argv[1]}")
+
+          for i, block in enumerate(blocks):
+              keywords = ['graph', 'sequenceDiagram', 'flowchart', 'stateDiagram',
+                         'erDiagram', 'gantt', 'classDiagram']
+              has_keyword = any(block.strip().startswith(k) for k in keywords)
+              if not has_keyword:
+                  print(f"  ⚠️  Block {i+1}: Missing diagram type declaration")
+              else:
+                  print(f"  ✅ Block {i+1}: Valid diagram type")
+          PYEOF
+          done < <(find . -name "*.md" -not -path './.git/*' 2>/dev/null)
+
+          echo "✅ Mermaid check complete"
+
+  # ── SUMMARY JOB ───────────────────────────────────────────
+  pipeline-summary:
+    name: 📊 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [ai-file-guard, repo-efficiency, doc-completeness, brand-check, mermaid-check]
+    if: always()
+    steps:
+      - name: Print pipeline result
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ⚡ SYNAPSE — Pipeline Result"
+          echo "  Architected & Built by Claudesy — 2026"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  AI File Guard:   ${{ needs.ai-file-guard.result }}"
+          echo "  Repo Efficiency: ${{ needs.repo-efficiency.result }}"
+          echo "  DCS Check:       ${{ needs.doc-completeness.result }}"
+          echo "  Brand Check:     ${{ needs.brand-check.result }}"
+          echo "  Mermaid Check:   ${{ needs.mermaid-check.result }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Jules — if any checks failed, fix and re-push to this PR branch."

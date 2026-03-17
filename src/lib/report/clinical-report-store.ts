@@ -339,8 +339,8 @@ export async function saveClinicalReport(
         id: report.id,
         nomor: report.nomor,
         doctorName: report.penutup.dokter || null,
-        patientMrn: report.pasien.noRM || null,
-        patientName: report.pasien.nama || null,
+        patientMrn: null,
+        patientName: null,
         diagnosisKerja: report.asesmen.diagnosisKerja || null,
         sourceAppointmentId: report.sourceRefs?.appointmentId || null,
         sourceConsultId: report.sourceRefs?.consultId || null,
@@ -367,8 +367,8 @@ export async function saveClinicalReport(
         reportId: report.id,
         nomor: report.nomor,
         doctorName: report.penutup.dokter,
-        patientMrn: report.pasien.noRM,
-        patientName: report.pasien.nama,
+        patientMrn: null,
+        patientName: null,
         diagnosisKerja: report.asesmen.diagnosisKerja,
         diagnosisBanding: report.asesmen.diagnosisBanding,
         prognosis: report.asesmen.prognosis,
@@ -378,8 +378,8 @@ export async function saveClinicalReport(
         diagnosisSource: report.auditTrail.diagnosisSource ?? null,
       }),
     });
-  } catch {
-    // Pertahankan fallback file-based agar alur audit lama tetap hidup bila DB belum siap.
+  } catch (err) {
+    console.error("[ClinicalReport] Failed to save to Prisma:", err);
   } finally {
     await ensureReportsDir();
     await writeFile(
@@ -398,8 +398,8 @@ export async function deleteClinicalReport(id: string): Promise<boolean> {
   try {
     await prisma.clinicalReport.delete({ where: { id } });
     deleted = true;
-  } catch {
-    // DB might not be available
+  } catch (err) {
+    console.error(`[ClinicalReport] Failed to delete from Prisma (id: ${id}):`, err);
   }
   // Also remove file-based copy
   const filePath = join(REPORTS_DIR, `${id}.json`);
@@ -431,7 +431,8 @@ export async function markClinicalReportPdfGenerated(
         pdfGeneratedAt: generatedAt,
       },
     });
-  } catch {
+  } catch (err) {
+    console.error(`[ClinicalReport] Failed to update PDF status (id: ${id}):`, err);
     const fileReport = await readReportByIdFromFile(id);
     if (!fileReport) return;
     const updatedReport: ClinicalReport = {

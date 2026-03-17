@@ -89,9 +89,6 @@ export interface ClinicalReport {
   penutup: ClinicalReportClosing;
 }
 
-export type ClinicalReportDraftInput = Partial<
-  Omit<ClinicalReport, "id" | "nomor" | "createdAt">
->;
 
 function escapeHtml(value: string): string {
   return value
@@ -117,7 +114,11 @@ function fieldBlock(label: string, value: string): string {
 
 export function formatClinicalReportDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("id-ID", {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) {
+      return iso;
+    }
+    return date.toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -365,3 +366,101 @@ export function renderClinicalReportHtml(report: ClinicalReport): string {
     </html>
   `;
 }
+
+// ──────────────────────────────────────────────────────────────
+// ZOD VALIDATION SCHEMAS (Sentra Standard)
+// ──────────────────────────────────────────────────────────────
+
+import { z } from "zod";
+
+export const ClinicalReportPatientSchema = z.object({
+  noRM: z.string().min(1, "No RM wajib diisi"),
+  nama: z.string().min(2, "Nama pasien minimal 2 karakter"),
+  umur: z.string().optional(),
+  jenisKelamin: z.enum(["L", "P"]),
+  alamat: z.string().optional(),
+});
+
+export const ClinicalReportAnamnesaSchema = z.object({
+  keluhanUtama: z.string().min(5, "Keluhan utama harus dijelaskan"),
+  rps: z.string().optional(),
+  rpd: z.string().optional(),
+  rpk: z.string().optional(),
+  alergi: z.string().optional(),
+});
+
+export const ClinicalReportPhysicalExamSchema = z.object({
+  tdSistolik: z.string().optional(),
+  tdDiastolik: z.string().optional(),
+  nadi: z.string().optional(),
+  suhu: z.string().optional(),
+  napas: z.string().optional(),
+  spo2: z.string().optional(),
+  bb: z.string().optional(),
+  tb: z.string().optional(),
+  keadaanUmum: z.string().optional(),
+  kesadaran: z.string().optional(),
+  pemeriksaanLain: z.string().optional(),
+});
+
+export const ClinicalReportAssessmentSchema = z.object({
+  diagnosisKerja: z.string().min(3, "Diagnosis kerja wajib diisi"),
+  icd10: z.string().optional(),
+  diagnosisBanding: z.string().optional(),
+  prognosis: z.string().optional(),
+});
+
+export const ClinicalReportPlanSchema = z.object({
+  terapi: z.string().optional(),
+  tindakan: z.string().optional(),
+  edukasi: z.string().optional(),
+  tindakLanjut: z.string().optional(),
+});
+
+export const ClinicalReportClosingSchema = z.object({
+  dokter: z.string().min(3, "Nama dokter wajib diisi"),
+  perawat: z.string().optional(),
+  tanggalPemeriksaan: z.string(),
+  jamPemeriksaan: z.string().optional(),
+});
+
+export const ClinicalReportSchema = z.object({
+  id: z.string().optional(),
+  nomor: z.number().optional(),
+  createdAt: z.string().optional(),
+  pdfAvailable: z.boolean().optional(),
+  pdfGeneratedAt: z.string().nullable().optional(),
+  sourceRefs: z.object({
+    appointmentId: z.string().optional(),
+    consultId: z.string().optional(),
+    origin: z.string().optional(),
+    actorUserId: z.string().optional(),
+    actorName: z.string().optional(),
+  }).optional(),
+  auditTrail: z.record(z.string(), z.unknown()).optional(),
+  pasien: ClinicalReportPatientSchema,
+  anamnesa: ClinicalReportAnamnesaSchema,
+  pemeriksaanFisik: ClinicalReportPhysicalExamSchema,
+  asesmen: ClinicalReportAssessmentSchema,
+  tataLaksana: ClinicalReportPlanSchema,
+  penutup: ClinicalReportClosingSchema,
+});
+
+export const ClinicalReportDraftInputSchema = z.object({
+  pasien: ClinicalReportPatientSchema,
+  anamnesa: ClinicalReportAnamnesaSchema,
+  pemeriksaanFisik: ClinicalReportPhysicalExamSchema,
+  asesmen: ClinicalReportAssessmentSchema,
+  tataLaksana: ClinicalReportPlanSchema,
+  penutup: ClinicalReportClosingSchema,
+  sourceRefs: z.object({
+    appointmentId: z.string().optional(),
+    consultId: z.string().optional(),
+    origin: z.string().optional(),
+    actorUserId: z.string().optional(),
+    actorName: z.string().optional(),
+  }).optional(),
+  auditTrail: z.record(z.string(), z.unknown()).optional(),
+}).partial();
+
+export type ClinicalReportDraftInput = z.infer<typeof ClinicalReportDraftInputSchema>;
