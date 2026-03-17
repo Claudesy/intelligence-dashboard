@@ -8648,88 +8648,27 @@ export default function EMRPage() {
                   )}
                   {/* ── Bridge to ePuskesmas ── */}
                   {isFinalizeTab && (
-                    <div
-                      style={{
-                        marginTop: 16,
-                        padding: "16px 20px",
-                        background: "var(--bg-surface, #2a2926)",
-                        border:
-                          "1px solid var(--border-subtle, rgba(255,255,255,0.08))",
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 13,
-                            color: "var(--text-muted)",
-                            letterSpacing: "0.04em",
-                            textTransform: "uppercase",
-                          }}
-                        >
+                    <div className="finalize-assist-card" style={{ marginTop: 14 }}>
+                      <div className="finalize-assist-card-head">
+                        <div className="finalize-assist-card-title">
                           ePuskesmas Bridge
-                        </span>
+                        </div>
                         {bridgeStatus !== "idle" &&
                           bridgeStatus !== "failed" && (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 8px",
-                                borderRadius: 4,
-                                background:
-                                  bridgeStatus === "completed"
-                                    ? "rgba(76,175,80,0.15)"
-                                    : "rgba(230,126,34,0.15)",
-                                color:
-                                  bridgeStatus === "completed"
-                                    ? "#4CAF50"
-                                    : "#E67E22",
-                              }}
-                            >
+                            <div className="finalize-assist-card-count">
                               {getBridgeStatusLabel(bridgeStatus)}
-                            </span>
+                            </div>
                           )}
                       </div>
                       {bridgeError && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "#e74c3c",
-                            marginBottom: 8,
-                          }}
-                        >
+                        <div className="finalize-assist-bullet" style={{ color: "var(--c-critical, #f06a6a)", marginBottom: 8 }}>
                           {bridgeError}
                         </div>
                       )}
                       <button
                         onClick={sendToEpuskesmas}
                         disabled={isBridgeActionLocked(bridgeStatus)}
-                        style={{
-                          width: "100%",
-                          padding: "10px 16px",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#fff",
-                          background:
-                            bridgeStatus === "completed"
-                              ? "#4CAF50"
-                              : isBridgeActionLocked(bridgeStatus)
-                                ? "var(--text-muted)"
-                                : "#E67E22",
-                          border: "none",
-                          borderRadius: 6,
-                          cursor: isBridgeActionLocked(bridgeStatus)
-                            ? "not-allowed"
-                            : "pointer",
-                          transition: "background 0.2s",
-                        }}
+                        className={`finalize-bridge-action${bridgeStatus === "completed" ? " is-done" : ""}`}
                       >
                         {bridgeStatus === "completed"
                           ? "Terkirim ke ePuskesmas"
@@ -8738,13 +8677,7 @@ export default function EMRPage() {
                             : getBridgeStatusLabel(bridgeStatus)}
                       </button>
                       {bridgeEntryId && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-muted)",
-                            marginTop: 6,
-                          }}
-                        >
+                        <div className="finalize-assist-card-subtitle" style={{ marginTop: 6 }}>
                           ID: {bridgeEntryId}
                         </div>
                       )}
@@ -8752,56 +8685,22 @@ export default function EMRPage() {
                   )}
                   {/* ── Generate Laporan Klinis ── */}
                   {isFinalizeTab && (
-                    <div
-                      style={{
-                        marginTop: 12,
-                        padding: "16px 20px",
-                        background: "var(--bg-surface, #2a2926)",
-                        border:
-                          "1px solid var(--border-subtle, rgba(255,255,255,0.08))",
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "var(--text-muted)",
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Laporan Klinis
+                    <div className="finalize-assist-card" style={{ marginTop: 10 }}>
+                      <div className="finalize-assist-card-head" style={{ marginBottom: 10 }}>
+                        <div className="finalize-assist-card-title">
+                          Laporan Klinis
+                        </div>
                       </div>
                       <button
                         onClick={generateClinicalReport}
                         disabled={generatingReport}
-                        style={{
-                          width: "100%",
-                          padding: "10px 16px",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#fff",
-                          background: generatingReport
-                            ? "var(--text-muted)"
-                            : "var(--c-asesmen, #E67E22)",
-                          border: "none",
-                          borderRadius: 6,
-                          cursor: generatingReport ? "not-allowed" : "pointer",
-                          transition: "background 0.2s",
-                        }}
+                        className="finalize-bridge-action"
                       >
                         {generatingReport
                           ? "Generating..."
                           : "Generate Laporan Klinis"}
                       </button>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text-muted)",
-                          marginTop: 6,
-                        }}
-                      >
+                      <div className="finalize-assist-card-subtitle" style={{ marginTop: 6 }}>
                         Data EMR akan di-generate otomatis ke format laporan +
                         PDF, lalu disimpan sebagai jejak audit trial.
                       </div>

@@ -28,8 +28,12 @@ import { listAllCrewProfiles } from "./src/lib/server/crew-access-profile";
 import { trackUserLoginToday } from "./src/lib/server/online-today-tracker";
 import { setTeleSocketIO } from "./src/lib/telemedicine/socket-bridge";
 
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const dev = process.env.NODE_ENV !== "production";
-const app = next({ dev, turbopack: false } as Parameters<typeof next>[0]);
+const app = next({ dev, turbopack: false, dir: __dirname } as Parameters<typeof next>[0]);
 const handle = app.getRequestHandler();
 
 const MAX_MESSAGE_TEXT_LENGTH = 5000;
@@ -64,12 +68,12 @@ app.prepare().then(async () => {
         "https://www.puskesmasbalowerti.com",
         "https://crew.puskesmasbalowerti.com",
         "https://primary-healthcare-production.up.railway.app",
+        /^chrome-extension:\/\//,
         ...(process.env.NODE_ENV !== "production"
           ? [
               "http://localhost:3000",
               "http://localhost:3001",
               /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
-              /^chrome-extension:\/\//,
             ]
           : []),
       ],

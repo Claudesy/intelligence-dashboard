@@ -2154,6 +2154,37 @@ a {
   color: var(--text-muted);
 }
 
+.finalize-bridge-action {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(230, 126, 34, 0.18);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-asesmen, #e67e22);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.finalize-bridge-action:hover {
+  border-color: rgba(230, 126, 34, 0.32);
+  background: rgba(230, 126, 34, 0.06);
+}
+.finalize-bridge-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.finalize-bridge-action:disabled:hover {
+  background: transparent;
+  border-color: rgba(230, 126, 34, 0.18);
+}
+.finalize-bridge-action.is-done {
+  color: rgba(145, 185, 216, 0.82);
+  border-color: rgba(145, 185, 216, 0.16);
+}
+
 .finalize-assist-bullet {
   font-size: 13px;
   color: var(--text-main);
