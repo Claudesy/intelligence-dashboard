@@ -255,18 +255,26 @@ export default function AcarsPage() {
     }
   }
 
-  // Staff map: no fake locations — server does not provide GPS. Show center only until real data exists.
-  const staffLocations: Array<{
-    id: string;
-    name: string;
-    role: string;
-    institution: string;
-    isOnline: boolean;
-    gender: "male" | "female";
-    avatarUrl: string;
-    location: { lat: number; lng: number; label: string };
-    color: string;
-  }> = [];
+  // Map online users to staff locations — use Puskesmas coordinates with small offsets
+  const staffLocations = onlineUsers.map((user, idx) => {
+    const angle = (idx / Math.max(onlineUsers.length, 1)) * 2 * Math.PI;
+    const radius = 0.00015 + idx * 0.00005;
+    return {
+      id: user.userId,
+      name: user.name,
+      role: user.role,
+      institution: user.institution || "Puskesmas Balowerti",
+      isOnline: true,
+      gender: "male" as const,
+      avatarUrl: getAvatarUrl(user.profession, user.role),
+      location: {
+        lat: DEFAULT_CENTER[0] + Math.sin(angle) * radius,
+        lng: DEFAULT_CENTER[1] + Math.cos(angle) * radius,
+        label: user.institution || "Puskesmas Balowerti",
+      },
+      color: getUserColor(user.role),
+    };
+  });
 
   const myColor = currentUser ? getUserColor(currentUser.role) : "#E67E22";
   const myAvatar = currentUser
@@ -412,8 +420,7 @@ export default function AcarsPage() {
               letterSpacing: "0.08em",
             }}
           >
-            Lokasi GPS crew belum tersedia. Directory di bawah menunjukkan
-            daftar crew online.
+            Tidak ada crew online saat ini.
           </div>
         )}
       </div>
