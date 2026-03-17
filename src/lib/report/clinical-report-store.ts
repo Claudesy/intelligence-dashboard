@@ -393,6 +393,30 @@ export async function saveClinicalReport(
   return report;
 }
 
+export async function deleteClinicalReport(id: string): Promise<boolean> {
+  let deleted = false;
+  try {
+    await prisma.clinicalReport.delete({ where: { id } });
+    deleted = true;
+  } catch {
+    // DB might not be available
+  }
+  // Also remove file-based copy
+  const filePath = join(REPORTS_DIR, `${id}.json`);
+  if (existsSync(filePath)) {
+    const { unlink } = await import("fs/promises");
+    await unlink(filePath);
+    deleted = true;
+  }
+  // Remove PDF if exists
+  const pdfPath = join(REPORTS_PDF_DIR, `${id}.pdf`);
+  if (existsSync(pdfPath)) {
+    const { unlink } = await import("fs/promises");
+    await unlink(pdfPath);
+  }
+  return deleted;
+}
+
 export async function markClinicalReportPdfGenerated(
   id: string,
   pdfStoragePath: string,

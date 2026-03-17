@@ -258,21 +258,24 @@ interface EmrPhaseFooterButtonProps {
   label: string;
   tone: "blue" | "critical";
   onClick: () => void;
+  disabled?: boolean;
 }
 
 function EmrPhaseFooterButton({
   label,
   tone,
   onClick,
+  disabled,
 }: EmrPhaseFooterButtonProps) {
   return (
     <button
       type="button"
-      className={`emr-phase-footer-btn emr-phase-footer-btn-${tone}`}
+      className={`emr-neu-nav-btn emr-neu-nav-btn-${tone}`}
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
     >
-      <span className="emr-phase-footer-btn-label">{label}</span>
+      <span className="emr-neu-nav-btn-label">{label}</span>
     </button>
   );
 }
@@ -1837,8 +1840,8 @@ export default function EMRPage() {
             }
           : undefined,
         prognosa: "Baik",
-        dokterNama: currentUser?.displayName || "",
-        perawatNama: "",
+        dokterNama: "dr. Ferdi Iskandar",
+        perawatNama: "Joseph Arianto",
       };
       const payload = mapDashboardToTransferPayload(encounterData);
       const res = await fetch("/api/emr/bridge", {
@@ -2032,8 +2035,8 @@ export default function EMRPage() {
             ].join("\n") || "-",
         },
         penutup: {
-          dokter: currentUser?.displayName || "",
-          perawat: "",
+          dokter: "dr. Ferdi Iskandar",
+          perawat: "Joseph Arianto",
           tanggalPemeriksaan: generatedAt.toISOString().slice(0, 10),
           jamPemeriksaan: generatedAt.toLocaleTimeString("id-ID", {
             hour: "2-digit",
@@ -8635,75 +8638,45 @@ export default function EMRPage() {
                       </div>
                     </div>
                   )}
-                  {isAssessmentTab ? (
+                  {isAssessmentTab && (
                     <EmrPhaseFooterButton
                       label="Finalize & Sign-Off"
                       tone="critical"
                       onClick={() => moveToWorkflowTab("finalize")}
                     />
-                  ) : (
-                    <div className="emr-phase-footer-status">
-                      FASE FINALISASI AKTIF
-                    </div>
                   )}
-                  {/* ── Bridge to ePuskesmas ── */}
+                  {/* ── Bridge + Laporan — Neumorphic action buttons ── */}
                   {isFinalizeTab && (
-                    <div className="finalize-assist-card" style={{ marginTop: 14 }}>
-                      <div className="finalize-assist-card-head">
-                        <div className="finalize-assist-card-title">
-                          ePuskesmas Bridge
-                        </div>
-                        {bridgeStatus !== "idle" &&
-                          bridgeStatus !== "failed" && (
-                            <div className="finalize-assist-card-count">
-                              {getBridgeStatusLabel(bridgeStatus)}
-                            </div>
-                          )}
-                      </div>
-                      {bridgeError && (
-                        <div className="finalize-assist-bullet" style={{ color: "var(--c-critical, #f06a6a)", marginBottom: 8 }}>
-                          {bridgeError}
-                        </div>
-                      )}
+                    <div className="finalize-neu-actions">
                       <button
                         onClick={sendToEpuskesmas}
                         disabled={isBridgeActionLocked(bridgeStatus)}
-                        className={`finalize-bridge-action${bridgeStatus === "completed" ? " is-done" : ""}`}
+                        className={`finalize-neu-btn${bridgeStatus === "completed" ? " is-done" : ""}`}
                       >
-                        {bridgeStatus === "completed"
-                          ? "Terkirim ke ePuskesmas"
-                          : bridgeStatus === "processing"
-                            ? "Sedang mengisi ePuskesmas..."
-                            : getBridgeStatusLabel(bridgeStatus)}
+                        <span className="finalize-neu-btn-label">
+                          {bridgeStatus === "completed"
+                            ? "Terkirim"
+                            : bridgeStatus === "processing"
+                              ? "Mengisi..."
+                              : "ePuskesmas Bridge"}
+                        </span>
                       </button>
-                      {bridgeEntryId && (
-                        <div className="finalize-assist-card-subtitle" style={{ marginTop: 6 }}>
-                          ID: {bridgeEntryId}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {/* ── Generate Laporan Klinis ── */}
-                  {isFinalizeTab && (
-                    <div className="finalize-assist-card" style={{ marginTop: 10 }}>
-                      <div className="finalize-assist-card-head" style={{ marginBottom: 10 }}>
-                        <div className="finalize-assist-card-title">
-                          Laporan Klinis
-                        </div>
-                      </div>
                       <button
                         onClick={generateClinicalReport}
                         disabled={generatingReport}
-                        className="finalize-bridge-action"
+                        className="finalize-neu-btn"
                       >
-                        {generatingReport
-                          ? "Generating..."
-                          : "Generate Laporan Klinis"}
+                        <span className="finalize-neu-btn-label">
+                          {generatingReport
+                            ? "Generating..."
+                            : "Laporan Klinis"}
+                        </span>
                       </button>
-                      <div className="finalize-assist-card-subtitle" style={{ marginTop: 6 }}>
-                        Data EMR akan di-generate otomatis ke format laporan +
-                        PDF, lalu disimpan sebagai jejak audit trial.
-                      </div>
+                    </div>
+                  )}
+                  {bridgeError && isFinalizeTab && (
+                    <div className="finalize-assist-bullet" style={{ color: "var(--c-critical, #f06a6a)", fontSize: 11, marginTop: 6 }}>
+                      {bridgeError}
                     </div>
                   )}
                 </div>

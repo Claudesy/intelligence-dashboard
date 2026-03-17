@@ -1550,129 +1550,87 @@ a {
   color: var(--text-muted);
 }
 
-.emr-phase-footer-btn {
-  --phase-btn-color: rgba(230, 126, 34, 0.92);
-  --phase-btn-contrast: #002147; /* Oxford blue */
+/* ── Neumorphic Navigation Buttons (Send/Lanjut/Proceed/Finalize) ── */
+.emr-neu-nav-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  overflow: hidden;
-  min-width: 248px;
-  min-height: 52px;
-  padding: 0.8em 1.75em;
-  border: 0.3px solid var(--phase-btn-color);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--phase-btn-color);
-  font-size: 14px;
-  font-weight: 400;
-  font-family: "Roboto", "Segoe UI", sans-serif;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  min-width: 200px;
+  min-height: 48px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2a2a2a, #1e1e1e);
+  box-shadow:
+    4px 4px 10px rgba(0, 0, 0, 0.45),
+    -2px -2px 6px rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  z-index: 1;
-  transition:
-    color 0.5s ease,
-    border-color 0.5s ease,
-    transform 0.28s ease,
-    filter 0.28s ease,
-    box-shadow 0.32s ease;
+  transition: all 0.15s ease;
 }
-
-.emr-phase-footer-btn::before,
-.emr-phase-footer-btn::after {
-  content: "";
-  display: block;
-  height: 100%;
-  width: 100%;
-  transform: skew(90deg) translate(-50%, -50%);
-  position: absolute;
-  inset: 50%;
-  left: 25%;
-  z-index: -1;
-  transition: transform 0.5s ease-out;
-  background-color: var(--phase-btn-color);
+.emr-neu-nav-btn:hover {
+  box-shadow:
+    2px 2px 6px rgba(0, 0, 0, 0.5),
+    -1px -1px 4px rgba(255, 255, 255, 0.06);
 }
-
-.emr-phase-footer-btn::before {
-  top: -50%;
-  left: -25%;
-  transform: skew(90deg) rotate(180deg) translate(-50%, -50%);
+.emr-neu-nav-btn:active {
+  box-shadow:
+    inset 2px 2px 6px rgba(0, 0, 0, 0.4),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.03);
+  transform: scale(0.98);
 }
-
-.emr-phase-footer-btn-label {
+.emr-neu-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.emr-neu-nav-btn:disabled:hover {
+  box-shadow:
+    4px 4px 10px rgba(0, 0, 0, 0.45),
+    -2px -2px 6px rgba(255, 255, 255, 0.04);
+}
+.emr-neu-nav-btn-label {
   position: relative;
   z-index: 1;
   display: inline-block;
   white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+.emr-neu-nav-btn:hover .emr-neu-nav-btn-label {
+  color: var(--text-main);
 }
 
-.emr-phase-footer-btn:hover {
-  color: var(--phase-btn-contrast);
+/* Blue variant (Send to Doctor, Lanjut Lokal, Proceed to Assessment) */
+.emr-neu-nav-btn-blue {
+  background: linear-gradient(145deg, #242428, #1a1a1e);
+}
+.emr-neu-nav-btn-blue .emr-neu-nav-btn-label {
+  color: rgba(207, 214, 222, 0.7);
+}
+.emr-neu-nav-btn-blue:hover .emr-neu-nav-btn-label {
+  color: rgba(207, 214, 222, 0.95);
 }
 
-.emr-phase-footer-btn:hover::before,
-.emr-phase-footer-btn:focus-visible::before {
-  transform: skew(45deg) rotate(180deg) translate(-50%, -50%);
+/* Critical variant (Finalize & Sign-Off) */
+.emr-neu-nav-btn-critical {
+  background: linear-gradient(145deg, #2e2424, #221a1a);
 }
-
-.emr-phase-footer-btn:hover::after,
-.emr-phase-footer-btn:focus-visible::after {
-  transform: skew(45deg) translate(-50%, -50%);
+.emr-neu-nav-btn-critical .emr-neu-nav-btn-label {
+  color: rgba(222, 130, 104, 0.7);
 }
-
-.emr-phase-footer-btn:active {
-  filter: brightness(0.9);
-  transform: scale(0.98);
+.emr-neu-nav-btn-critical:hover .emr-neu-nav-btn-label {
+  color: rgba(222, 130, 104, 0.95);
 }
-
-.emr-phase-footer-btn:focus-visible {
-  outline: none;
+.emr-neu-nav-btn-critical:active {
   box-shadow:
-    0 0 0 1px rgba(18, 28, 34, 0.72),
-    0 0 0 3px rgba(245, 239, 229, 0.22);
-}
-
-.emr-phase-footer-btn-blue {
-  --phase-btn-color: #cfd6de;
-  --phase-btn-contrast: #f6f1e8;
-  letter-spacing: 0.06em;
-  border-color: rgba(255, 255, 255, 0.04);
-  background: linear-gradient(145deg, #17171a, #101012);
-  box-shadow:
-    14px 14px 28px rgba(0, 0, 0, 0.38),
-    -12px -12px 24px rgba(255, 255, 255, 0.024),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.035),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.38);
-}
-
-.emr-phase-footer-btn-blue:hover,
-.emr-phase-footer-btn-blue:focus-visible {
-  box-shadow:
-    18px 18px 32px rgba(0, 0, 0, 0.42),
-    -14px -14px 24px rgba(255, 255, 255, 0.03),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.05),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.4);
-}
-
-[data-theme="light"] .emr-phase-footer-btn-blue {
-  --phase-btn-color: #6d849b;
-  --phase-btn-contrast: rgb(248, 251, 253);
-}
-
-.emr-phase-footer-btn-critical {
-  --phase-btn-color: #de8268;
-  --phase-btn-contrast: #002147; /* Oxford blue */
-  box-shadow: inset 0 0 0 1px rgba(222, 130, 104, 0.08);
-}
-
-.emr-phase-footer-btn-critical:hover,
-.emr-phase-footer-btn-critical:focus-visible {
-  box-shadow:
-    0 12px 26px rgba(95, 37, 24, 0.2),
-    inset 0 0 0 1px rgba(222, 130, 104, 0.14);
+    inset 2px 2px 6px rgba(95, 37, 24, 0.3),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.02);
 }
 
 .emr-phase-footer-finalize {
@@ -2154,35 +2112,63 @@ a {
   color: var(--text-muted);
 }
 
-.finalize-bridge-action {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid rgba(230, 126, 34, 0.18);
-  background: transparent;
+.finalize-neu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.finalize-neu-btn {
+  position: relative;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2a2a2a, #1e1e1e);
+  box-shadow:
+    4px 4px 10px rgba(0, 0, 0, 0.45),
+    -2px -2px 6px rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.finalize-neu-btn:hover {
+  box-shadow:
+    2px 2px 6px rgba(0, 0, 0, 0.5),
+    -1px -1px 4px rgba(255, 255, 255, 0.06);
+}
+.finalize-neu-btn:active {
+  box-shadow:
+    inset 2px 2px 6px rgba(0, 0, 0, 0.4),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.03);
+}
+.finalize-neu-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.finalize-neu-btn:disabled:hover {
+  box-shadow:
+    4px 4px 10px rgba(0, 0, 0, 0.45),
+    -2px -2px 6px rgba(255, 255, 255, 0.04);
+}
+.finalize-neu-btn.is-done {
+  box-shadow:
+    inset 2px 2px 6px rgba(0, 0, 0, 0.3),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.03);
+}
+.finalize-neu-btn.is-done .finalize-neu-btn-label {
+  color: rgba(145, 185, 216, 0.7);
+}
+
+.finalize-neu-btn-label {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--c-asesmen, #e67e22);
-  cursor: pointer;
-  transition: all 0.15s ease;
+  color: var(--text-muted);
 }
-.finalize-bridge-action:hover {
-  border-color: rgba(230, 126, 34, 0.32);
-  background: rgba(230, 126, 34, 0.06);
-}
-.finalize-bridge-action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.finalize-bridge-action:disabled:hover {
-  background: transparent;
-  border-color: rgba(230, 126, 34, 0.18);
-}
-.finalize-bridge-action.is-done {
-  color: rgba(145, 185, 216, 0.82);
-  border-color: rgba(145, 185, 216, 0.16);
+.finalize-neu-btn:hover .finalize-neu-btn-label {
+  color: var(--text-main);
 }
 
 .finalize-assist-bullet {
@@ -5027,7 +5013,7 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .emr-phase-footer-btn {
+  .emr-neu-nav-btn {
     width: 100%;
     min-width: 0;
   }
@@ -5593,7 +5579,7 @@ a {
   .best-question-card,
   .clinical-reveal-panel,
   .clinical-useful-tip,
-  .emr-phase-footer-btn {
+  .emr-neu-nav-btn {
     animation: none !important;
     transition: none !important;
     transform: none !important;

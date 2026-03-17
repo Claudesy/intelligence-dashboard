@@ -132,6 +132,8 @@ export default function ClinicalReportPage() {
     const pad4 = String(nextNumber).padStart(4, "0");
     f.pasien.noRM = `PKM-BLW-${pad4}`;
     f.pasien.nama = `Pasien ${pad3}`;
+    f.penutup.dokter = "dr. Ferdi Iskandar";
+    f.penutup.perawat = "Joseph Arianto";
     f.penutup.tanggalPemeriksaan = todayStr();
     f.penutup.jamPemeriksaan = nowTime();
     setForm(f);
@@ -168,15 +170,26 @@ export default function ClinicalReportPage() {
   };
 
   const handlePrint = () => {
-    if (!selected) {
-      window.print();
-      return;
+    window.print();
+  };
+
+  const handleDelete = async (reportId: string) => {
+    if (!confirm("Hapus laporan ini? Tindakan tidak dapat dibatalkan.")) return;
+    try {
+      const res = await fetch(`/api/report/clinical?id=${reportId}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json()) as { ok: boolean };
+      if (data.ok) {
+        if (selected?.id === reportId) {
+          setSelected(null);
+          setMode("list");
+        }
+        await loadReports();
+      }
+    } catch {
+      /* ignore */
     }
-    window.open(
-      `/api/report/clinical/${selected.id}/pdf`,
-      "_blank",
-      "noopener,noreferrer",
-    );
   };
 
   /* ─── Form updaters ─── */
@@ -315,7 +328,7 @@ export default function ClinicalReportPage() {
               }}
               onClick={handlePrint}
             >
-              EXPORT PDF
+              CETAK / PDF
             </button>
           )}
         </div>
@@ -376,7 +389,7 @@ export default function ClinicalReportPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "60px 160px 180px 1fr 140px 120px",
+                  gridTemplateColumns: "60px 160px 180px 1fr 140px 120px 60px",
                   gap: 12,
                   padding: "0 0 8px",
                   borderBottom: "1px solid var(--line-base)",
@@ -389,6 +402,7 @@ export default function ClinicalReportPage() {
                   "Diagnosis",
                   "Dokter",
                   "Tanggal",
+                  "",
                 ].map((h) => (
                   <span key={h} className="v-label">
                     {h}
@@ -403,7 +417,7 @@ export default function ClinicalReportPage() {
                   onClick={() => viewReport(r)}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "60px 160px 180px 1fr 140px 120px",
+                    gridTemplateColumns: "60px 160px 180px 1fr 140px 120px 60px",
                     gap: 12,
                     padding: "12px 0",
                     borderBottom: "1px dashed var(--line-base)",
@@ -453,6 +467,22 @@ export default function ClinicalReportPage() {
                   <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
                     {r.penutup.tanggalPemeriksaan || r.createdAt.slice(0, 10)}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDelete(r.id);
+                    }}
+                    style={{
+                      ...btnStyle,
+                      padding: "4px 8px",
+                      fontSize: 10,
+                      color: "var(--text-muted)",
+                      borderColor: "rgba(255,255,255,0.06)",
+                    }}
+                    title="Hapus laporan"
+                  >
+                    HAPUS
+                  </button>
                 </div>
               ))}
             </>
@@ -980,10 +1010,20 @@ export default function ClinicalReportPage() {
               }}
               onClick={handlePrint}
             >
-              EXPORT PDF
+              CETAK / PDF
             </button>
             <button style={btnStyle} onClick={startNew}>
               BUAT BARU
+            </button>
+            <button
+              style={{
+                ...btnStyle,
+                color: "rgba(239,68,68,0.7)",
+                borderColor: "rgba(239,68,68,0.2)",
+              }}
+              onClick={() => void handleDelete(selected.id)}
+            >
+              HAPUS
             </button>
           </div>
 
