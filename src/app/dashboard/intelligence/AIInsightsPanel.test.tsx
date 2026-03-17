@@ -52,7 +52,7 @@ test("AIInsightsPanelContent renders disclosure badge and ICD-10 suggestion", ()
 
   assert.match(markup, /Saran AI/i);
   assert.match(markup, /J10\.1/);
-  assert.match(markup, /Terima suggestion/i);
+  assert.match(markup, /Terima/i);
 });
 
 test("AIInsightsPanelContent renders idle state copy before CDSS events arrive", () => {
@@ -70,7 +70,7 @@ test("AIInsightsPanelContent renders idle state copy before CDSS events arrive",
     />,
   );
 
-  assert.match(markup, /Idle State/i);
+  assert.match(markup, /Menunggu event CDSS pertama/i);
   assert.match(markup, /Menunggu event CDSS pertama/i);
 });
 

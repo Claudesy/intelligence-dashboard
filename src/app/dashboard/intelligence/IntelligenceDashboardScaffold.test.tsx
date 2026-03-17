@@ -41,11 +41,11 @@ test("renders only clinical surfaces for clinical roles", () => {
     />,
   );
 
-  assert.match(html, /Dashboard Intelligence/);
+  assert.match(html, /Intelligence Monitor/);
   assert.match(html, /Patient Queue/);
-  assert.match(html, /Insights Workspace/);
+  assert.match(html, /AI Insights/);
   assert.doesNotMatch(html, /<h2[^>]*>Operational Summary<\/h2>/);
-  assert.match(html, /bg-\[var\(--bg-card\)\]/);
+  assert.match(html, /bg-card/);
   assert.match(html, /Live status slot/);
   assert.match(html, /Clinical Safety Alert/);
   assert.match(

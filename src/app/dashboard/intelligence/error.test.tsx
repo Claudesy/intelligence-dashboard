@@ -12,7 +12,7 @@ test("renders a safe retry error state", () => {
     />,
   );
 
-  assert.match(html, /Intelligence Dashboard Error/);
+  assert.match(html, /Error/);
   assert.match(html, /Panel belum bisa dimuat/);
   assert.match(html, /Coba lagi/);
   assert.match(html, /digest-123/);

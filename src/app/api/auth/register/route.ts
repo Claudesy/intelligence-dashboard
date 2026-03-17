@@ -53,6 +53,7 @@ export async function POST(request: Request) {
         error: isValidationError
           ? (error as Error).message
           : "Pendaftaran gagal diproses.",
+        debug: (error as Error).message,
       },
       { status: 400 },
     );

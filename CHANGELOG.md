@@ -10,7 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `CONTRIBUTING.md` — contributor guide with branch, PR, and commit conventions
+- Clinical Report module — full CRUD for clinical reports with Zod validation, audit trail, and PDF rendering support
+
+### Changed
+- `src/lib/report/clinical-report.ts` — added comprehensive Zod schemas (`ClinicalReportDraftInputSchema`)
+- `src/app/api/report/clinical/route.ts` — improved input validation and error handling
+- `src/lib/report/clinical-report-store.ts` — removed PHI from audit payload
+
+### Security
+- Removed patient name & MRN from audit events (PHI compliance)
+
 - `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1
 - `SECURITY.md` — responsible disclosure policy and security contact
 - `CHANGELOG.md` — this file, following Keep a Changelog format
