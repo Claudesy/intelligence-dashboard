@@ -1,76 +1,79 @@
-import dynamic from "next/dynamic";
+import dynamic from 'next/dynamic'
 
-import type { IntelligenceDashboardAccess } from "@/lib/intelligence/server";
+import type { IntelligenceDashboardAccess } from '@/lib/intelligence/server'
 
-import ClinicalSafetyAlertBanner from "./ClinicalSafetyAlertBanner";
-import { IntelligenceSocketProvider } from "./IntelligenceSocketProvider";
+import ClinicalSafetyAlertBanner from './ClinicalSafetyAlertBanner'
+import { IntelligenceSocketProvider } from './IntelligenceSocketProvider'
 
 // NFR-001: lazy-load heavy panels for code splitting.
 // ClinicalSafetyAlertBanner is eagerly loaded — it is critical path for patient safety.
 
 function PanelContentSkeleton(): React.JSX.Element {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {[1, 2, 3].map((i) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {[1, 2, 3].map(i => (
         <div
           key={i}
           style={{
             height: 64,
             borderRadius: 4,
-            border: "1px solid var(--line-base)",
-            background: "var(--bg-card)",
-            animation: "pulse 2s ease-in-out infinite",
+            border: '1px solid var(--line-base)',
+            background: 'var(--bg-card)',
+            animation: 'pulse 2s ease-in-out infinite',
           }}
         />
       ))}
     </div>
-  );
+  )
 }
 
-const PatientQueuePanel = dynamic(() => import("./PatientQueuePanel"), {
+const PatientQueuePanel = dynamic(() => import('./PatientQueuePanel'), {
   loading: () => <PanelContentSkeleton />,
-});
+})
 
-const AIInsightsPanel = dynamic(() => import("./AIInsightsPanel"), {
+const AIInsightsPanel = dynamic(() => import('./AIInsightsPanel'), {
   loading: () => <PanelContentSkeleton />,
-});
+})
 
-const OperationalSummaryPanel = dynamic(
-  () => import("./OperationalSummaryPanel"),
-  { loading: () => <PanelContentSkeleton /> },
-);
+const OperationalSummaryPanel = dynamic(() => import('./OperationalSummaryPanel'), {
+  loading: () => <PanelContentSkeleton />,
+})
+
+const TrajectoryMonitorPanel = dynamic(() => import('./TrajectoryMonitorPanel'), {
+  loading: () => <PanelContentSkeleton />,
+})
 
 function IntelligencePanel({
   title,
   subtitle,
   children,
 }: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
+  title: string
+  subtitle: string
+  children: React.ReactNode
 }): React.JSX.Element {
   return (
     <section
       style={{
-        border: "1px solid var(--line-base)",
+        border: '1px solid var(--line-base)',
         borderRadius: 6,
-        background: "var(--bg-card)",
-        overflow: "hidden",
+        background: 'var(--bg-card)',
+        overflow: 'hidden',
       }}
     >
       <div
         style={{
-          borderBottom: "1px solid var(--line-base)",
-          padding: "20px 24px",
+          borderBottom: '1px solid var(--line-base)',
+          padding: '20px 24px',
         }}
       >
         <div
           style={{
             fontSize: 10,
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
             opacity: 0.5,
             marginBottom: 8,
           }}
@@ -81,47 +84,41 @@ function IntelligencePanel({
           style={{
             fontSize: 17,
             fontWeight: 500,
-            color: "var(--text-main)",
-            letterSpacing: "0.01em",
+            color: 'var(--text-main)',
+            letterSpacing: '0.01em',
           }}
         >
           {title}
         </h2>
       </div>
-      <div style={{ padding: "20px 24px" }}>{children}</div>
+      <div style={{ padding: '20px 24px' }}>{children}</div>
     </section>
-  );
+  )
 }
 
 type IntelligenceDashboardScaffoldProps = {
-  access: IntelligenceDashboardAccess;
-  statusContent: React.ReactNode;
-};
+  access: IntelligenceDashboardAccess
+  statusContent: React.ReactNode
+}
 
-function AccessNotice({
-  title,
-  message,
-}: {
-  title: string;
-  message: string;
-}): React.JSX.Element {
+function AccessNotice({ title, message }: { title: string; message: string }): React.JSX.Element {
   return (
     <div
       style={{
         borderRadius: 6,
-        border: "1px dashed var(--line-base)",
-        padding: "16px 20px",
+        border: '1px dashed var(--line-base)',
+        padding: '16px 20px',
         fontSize: 13,
-        color: "var(--text-muted)",
+        color: 'var(--text-muted)',
       }}
     >
       <div
         style={{
           fontSize: 10,
-          fontFamily: "var(--font-mono)",
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "var(--c-asesmen)",
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--c-asesmen)',
           marginBottom: 8,
         }}
       >
@@ -129,7 +126,7 @@ function AccessNotice({
       </div>
       <p style={{ lineHeight: 1.6 }}>{message}</p>
     </div>
-  );
+  )
 }
 
 export default function IntelligenceDashboardScaffold({
@@ -138,39 +135,37 @@ export default function IntelligenceDashboardScaffold({
 }: IntelligenceDashboardScaffoldProps): React.JSX.Element {
   if (!access.hasAnyAccess) {
     return (
-      <div style={{ width: "100%", maxWidth: 1200, padding: "16px 0 64px" }}>
+      <div style={{ width: '100%', maxWidth: 1200, padding: '16px 0 64px' }}>
         <div className="page-header">
           <div className="page-title">Intelligence Monitor</div>
           <div className="page-subtitle">Akses dashboard dibatasi</div>
         </div>
         <div
           style={{
-            border: "1px dashed var(--line-base)",
+            border: '1px dashed var(--line-base)',
             borderRadius: 6,
-            padding: "32px 24px",
-            textAlign: "center",
-            color: "var(--text-muted)",
+            padding: '32px 24px',
+            textAlign: 'center',
+            color: 'var(--text-muted)',
             fontSize: 14,
           }}
         >
           Role saat ini belum memiliki izin untuk membuka panel intelligence.
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div style={{ width: "100%", maxWidth: 1400, padding: "0 0 64px" }}>
-      <IntelligenceSocketProvider
-        enableCdssSuggestions={access.canViewInsights}
-      >
+    <div style={{ width: '100%', maxWidth: 1400, padding: '0 0 64px' }}>
+      <IntelligenceSocketProvider enableCdssSuggestions={access.canViewInsights}>
         {/* ── Header ── */}
-        <div className="page-header" style={{ maxWidth: 1400, width: "100%" }}>
+        <div className="page-header" style={{ maxWidth: 1400, width: '100%' }}>
           <div>
             <div className="page-title">Intelligence Monitor</div>
             <div className="page-subtitle">
-              Situational awareness untuk shift klinik — real-time patient
-              queue, AI insights, dan operational summary.
+              Situational awareness untuk shift klinik — real-time patient queue, AI insights, dan
+              operational summary.
             </div>
           </div>
         </div>
@@ -206,17 +201,14 @@ export default function IntelligenceDashboardScaffold({
         {/* ── Main Grid: Queue + Insights/Ops ── */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr",
+            display: 'grid',
+            gridTemplateColumns: '1fr',
             gap: 24,
           }}
         >
           {/* Row 1: Patient Queue (full width) */}
           {access.canViewEncounters && (
-            <IntelligencePanel
-              title="Patient Queue"
-              subtitle="Antrian Encounter"
-            >
+            <IntelligencePanel title="Patient Queue" subtitle="Antrian Encounter">
               <PatientQueuePanel />
             </IntelligencePanel>
           )}
@@ -224,34 +216,36 @@ export default function IntelligenceDashboardScaffold({
           {/* Row 2: Insights + Operational side by side */}
           <div
             style={{
-              display: "grid",
+              display: 'grid',
               gridTemplateColumns:
-                access.canViewInsights && access.canViewMetrics
-                  ? "1.4fr 1fr"
-                  : "1fr",
+                access.canViewInsights && access.canViewMetrics ? '1.4fr 1fr' : '1fr',
               gap: 24,
             }}
           >
             {access.canViewInsights && (
-              <IntelligencePanel
-                title="AI Insights"
-                subtitle="CDSS Engine Output"
-              >
+              <IntelligencePanel title="AI Insights" subtitle="CDSS Engine Output">
                 <AIInsightsPanel />
               </IntelligencePanel>
             )}
 
             {access.canViewMetrics && (
-              <IntelligencePanel
-                title="Operational Summary"
-                subtitle="Metrik Shift"
-              >
+              <IntelligencePanel title="Operational Summary" subtitle="Metrik Shift">
                 <OperationalSummaryPanel />
               </IntelligencePanel>
             )}
           </div>
+
+          {/* Row 3: Clinical Trajectory Monitor */}
+          {access.canViewInsights && (
+            <IntelligencePanel
+              title="Clinical Trajectory"
+              subtitle="Clinical Momentum Engine · CME Phase 1–3"
+            >
+              <TrajectoryMonitorPanel />
+            </IntelligencePanel>
+          )}
         </div>
       </IntelligenceSocketProvider>
     </div>
-  );
+  )
 }
