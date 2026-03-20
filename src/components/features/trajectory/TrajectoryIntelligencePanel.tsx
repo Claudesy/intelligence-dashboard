@@ -15,11 +15,14 @@
 
 import { useTrajectoryAnalysis } from '@/hooks/useTrajectoryAnalysis'
 import { MomentumScoreCard } from './MomentumScoreCard'
+import { VitalVelocityList } from './VitalVelocityList'
 import { ConvergencePatternAlert } from './ConvergencePatternAlert'
+import { ConvergenceHeatmap } from './ConvergenceHeatmap'
 import { TimeToCriticalTimeline } from './TimeToCriticalTimeline'
 import { BaselineDeviationGauge } from './BaselineDeviationGauge'
 import { AcuteAttackRiskGrid } from './AcuteAttackRiskGrid'
 import { MortalityRiskIndicator } from './MortalityRiskIndicator'
+import { ClinicalUrgencyMatrix } from './ClinicalUrgencyMatrix'
 
 interface TrajectoryIntelligencePanelProps {
   /** 64-char hex SHA-256 patient identifier hash */
@@ -137,11 +140,23 @@ export function TrajectoryIntelligencePanel({
       {/* Mortality proxy — top-level risk indicator */}
       <MortalityRiskIndicator mortalityProxy={data.mortality_proxy} />
 
+      {/* Clinical urgency matrix — momentum level × mortality tier */}
+      <ClinicalUrgencyMatrix
+        momentumLevel={data.momentum.level}
+        mortalityTier={data.mortality_proxy.mortality_proxy_tier}
+      />
+
       {/* Momentum score */}
       <MomentumScoreCard momentum={data.momentum} />
 
+      {/* Velocity sparklines per vital */}
+      <VitalVelocityList params={data.momentum.params} />
+
       {/* Convergence alert — only renders when pattern detected */}
       <ConvergencePatternAlert convergence={data.momentum.convergence} />
+
+      {/* Convergence heatmap — param × status grid */}
+      <ConvergenceHeatmap convergence={data.momentum.convergence} />
 
       {/* Time to critical */}
       <TimeToCriticalTimeline timeToCritical={data.time_to_critical_estimate} />

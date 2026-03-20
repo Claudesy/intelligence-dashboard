@@ -8,8 +8,10 @@
 
 'use client'
 
+import { useState } from 'react'
 import type { AcuteAttackRisk24h } from '@/types/abyss/trajectory'
 import { ACUTE_RISK_LABELS } from '@/types/abyss/trajectory'
+import { AcuteAttackRiskRadar } from './AcuteAttackRiskRadar'
 
 interface AcuteAttackRiskGridProps {
   risks: AcuteAttackRisk24h
@@ -39,6 +41,8 @@ const RISK_ENTRIES: { key: keyof AcuteAttackRisk24h; labelKey: string }[] = [
 ]
 
 export function AcuteAttackRiskGrid({ risks, className }: AcuteAttackRiskGridProps) {
+  const [showRadar, setShowRadar] = useState(false)
+
   return (
     <div
       className={className}
@@ -51,16 +55,46 @@ export function AcuteAttackRiskGrid({ risks, className }: AcuteAttackRiskGridPro
     >
       <div
         style={{
-          fontSize: 10,
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           marginBottom: 12,
         }}
       >
-        Risiko Serangan Akut 24J
+        <div
+          style={{
+            fontSize: 10,
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+          }}
+        >
+          Risiko Serangan Akut 24J
+        </div>
+        <button
+          onClick={() => setShowRadar((v) => !v)}
+          aria-label={showRadar ? 'Tampilkan grid' : 'Tampilkan radar'}
+          style={{
+            fontSize: 9,
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+            background: 'none',
+            border: '1px solid var(--line-base)',
+            borderRadius: 4,
+            padding: '2px 8px',
+            cursor: 'pointer',
+          }}
+        >
+          {showRadar ? 'Grid' : 'Radar'}
+        </button>
       </div>
+
+      {showRadar ? (
+        <AcuteAttackRiskRadar risks={risks} />
+      ) : (
 
       <div
         style={{
@@ -132,6 +166,7 @@ export function AcuteAttackRiskGrid({ risks, className }: AcuteAttackRiskGridPro
           )
         })}
       </div>
+      )}
     </div>
   )
 }
