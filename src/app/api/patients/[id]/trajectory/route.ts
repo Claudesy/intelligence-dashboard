@@ -27,6 +27,8 @@ import type { VisitRecord } from '@/lib/clinical/trajectory-analyzer'
 import { getPatientVitalHistory } from '@/lib/vitals/vital-record-service'
 import type { VitalHistoryEntry } from '@/lib/vitals/vital-record-service'
 import { PatientIdentifierSchema, TrajectoryQuerySchema } from '@/types/abyss/trajectory'
+import type { VitalSnapshot, MomentumSnapshot } from '@/types/abyss/trajectory'
+import { computeMomentum } from '@/lib/clinical/momentum-engine'
 import type { AVPULevel } from '@/lib/vitals/unified-vitals'
 
 export const runtime = 'nodejs'
@@ -119,10 +121,40 @@ export async function GET(
     )
   }
 
-  // 6. Return
+  // 6. Build visit_history — PHI-safe vital snapshots per visit
+  const visit_history: VitalSnapshot[] = entries.map((e) => ({
+    visitDate: e.recordedAt instanceof Date ? e.recordedAt.toISOString() : String(e.recordedAt),
+    sbp: e.vitals.sbp ?? null,
+    dbp: e.vitals.dbp ?? null,
+    hr: e.vitals.hr ?? null,
+    rr: e.vitals.rr ?? null,
+    temp: e.vitals.temp ?? null,
+    glucose: typeof e.vitals.glucose === 'number'
+      ? e.vitals.glucose
+      : (e.vitals.glucose?.value ?? null),
+    spo2: e.vitals.spo2 ?? null,
+  }))
+
+  // 7. Build momentum_history — retroactive momentum score per visit subset
+  const momentum_history: MomentumSnapshot[] = visitRecords.length >= 3
+    ? visitRecords.map((_, i) => {
+        if (i < 1) return null
+        const subset = visitRecords.slice(0, i + 1)
+        const m = computeMomentum(subset)
+        return {
+          visitDate: visitRecords[i].timestamp,
+          score: m.score,
+          level: m.level,
+        } satisfies MomentumSnapshot
+      }).filter((s): s is MomentumSnapshot => s !== null)
+    : []
+
+  // 8. Return
   return NextResponse.json({
     success: true,
     data: analysis,
+    visit_history,
+    momentum_history,
     meta: {
       patientIdentifier: patientIdentifier.slice(0, 8) + '…', // truncated for logs
       visitCount: entries.length,

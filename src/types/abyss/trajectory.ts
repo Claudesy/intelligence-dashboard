@@ -144,6 +144,27 @@ export const MORTALITY_TIER_CONFIG = {
   very_high: { label: 'Risiko Sangat Tinggi', color: '#dc2626', bg: 'rgba(220,38,38,0.12)' },
 } as const
 
+// ── Visit history types (T005 / T007) ─────────────────────────────────────────
+
+/** PHI-safe snapshot of vital values for one visit */
+export interface VitalSnapshot {
+  visitDate: string
+  sbp?: number | null
+  dbp?: number | null
+  hr?: number | null
+  rr?: number | null
+  temp?: number | null
+  glucose?: number | null
+  spo2?: number | null
+}
+
+/** Momentum score at a specific historical visit */
+export interface MomentumSnapshot {
+  visitDate: string
+  score: number
+  level: import('@/lib/clinical/momentum-engine').MomentumLevel
+}
+
 // ── ETA display helpers ───────────────────────────────────────────────────────
 
 export function formatETAHours(hours: number | null): string {

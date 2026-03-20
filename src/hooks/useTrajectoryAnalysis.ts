@@ -15,10 +15,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { TrajectoryAnalysis } from '@/types/abyss/trajectory'
+import type { TrajectoryAnalysis, VitalSnapshot, MomentumSnapshot } from '@/types/abyss/trajectory'
 
 type UseTrajectoryAnalysisResult = {
   data: TrajectoryAnalysis | undefined
+  visitHistory: VitalSnapshot[]
+  momentumHistory: MomentumSnapshot[]
   isLoading: boolean
   error: Error | null
 }
@@ -30,6 +32,8 @@ export function useTrajectoryAnalysis(
   visitCount = 5
 ): UseTrajectoryAnalysisResult {
   const [data, setData] = useState<TrajectoryAnalysis | undefined>(undefined)
+  const [visitHistory, setVisitHistory] = useState<VitalSnapshot[]>([])
+  const [momentumHistory, setMomentumHistory] = useState<MomentumSnapshot[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
@@ -63,6 +67,8 @@ export function useTrajectoryAnalysis(
         const json = (await res.json()) as {
           success: boolean
           data: TrajectoryAnalysis
+          visit_history?: VitalSnapshot[]
+          momentum_history?: MomentumSnapshot[]
           error?: string
         }
 
@@ -71,6 +77,8 @@ export function useTrajectoryAnalysis(
         }
 
         setData(json.data)
+        setVisitHistory(json.visit_history ?? [])
+        setMomentumHistory(json.momentum_history ?? [])
       } catch (err) {
         if (controller.signal.aborted) return
         setError(err instanceof Error ? err : new Error(String(err)))
@@ -86,5 +94,5 @@ export function useTrajectoryAnalysis(
     return () => controller.abort()
   }, [patientIdentifier, visitCount])
 
-  return { data, isLoading, error }
+  return { data, visitHistory, momentumHistory, isLoading, error }
 }

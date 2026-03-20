@@ -23,6 +23,8 @@ import { BaselineDeviationGauge } from './BaselineDeviationGauge'
 import { AcuteAttackRiskGrid } from './AcuteAttackRiskGrid'
 import { MortalityRiskIndicator } from './MortalityRiskIndicator'
 import { ClinicalUrgencyMatrix } from './ClinicalUrgencyMatrix'
+import { VitalTrendChart } from './VitalTrendChart'
+import { MomentumHistoryChart } from './MomentumHistoryChart'
 
 interface TrajectoryIntelligencePanelProps {
   /** 64-char hex SHA-256 patient identifier hash */
@@ -109,7 +111,7 @@ export function TrajectoryIntelligencePanel({
   visitCount = 5,
   className,
 }: TrajectoryIntelligencePanelProps) {
-  const { data, isLoading, error } = useTrajectoryAnalysis(patientIdentifier, visitCount)
+  const { data, visitHistory, momentumHistory, isLoading, error } = useTrajectoryAnalysis(patientIdentifier, visitCount)
 
   if (!patientIdentifier) return <PanelEmpty />
   if (isLoading) return <PanelSkeleton />
@@ -166,6 +168,16 @@ export function TrajectoryIntelligencePanel({
 
       {/* Acute attack risk grid */}
       <AcuteAttackRiskGrid risks={data.acute_attack_risk_24h} />
+
+      {/* Multi-visit vital trend chart */}
+      {visitHistory.length >= 2 && (
+        <VitalTrendChart snapshots={visitHistory} baseline={data.momentum.baseline} />
+      )}
+
+      {/* Momentum history area chart */}
+      {momentumHistory.length >= 2 && (
+        <MomentumHistoryChart history={momentumHistory} />
+      )}
 
       {/* Clinical safe output — recommended action */}
       {data.clinical_safe_output.recommended_action && (
