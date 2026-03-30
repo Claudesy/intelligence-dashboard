@@ -293,8 +293,6 @@ const DIAGNOSIS_SCHEMA: Schema = {
   properties: {
     suggestions: {
       type: SchemaType.ARRAY,
-      minItems: 2,
-      maxItems: 5,
       items: {
         type: SchemaType.OBJECT,
         properties: {
@@ -607,7 +605,7 @@ export async function runDiagnosisEngine(
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
+        model: "gemini-2.0-flash-lite",
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: DIAGNOSIS_SCHEMA,
@@ -618,7 +616,7 @@ export async function runDiagnosisEngine(
       const result = await model.generateContent(prompt);
       const raw = result.response.text();
       parsed = JSON.parse(raw) as LLMResponse;
-      modelUsed = "gemini-2.5-flash-lite (fallback)";
+      modelUsed = "gemini-2.0-flash-lite (fallback)";
     } catch (gemErr) {
       const gemMsg = gemErr instanceof Error ? gemErr.message : "Gemini error";
       return buildFallbackResult(
@@ -764,6 +762,6 @@ export function getCDSSEngineStatus(): {
   return {
     ready: stats.total > 0 && hasKey,
     kb_disease_count: stats.total,
-    model: "IDE-V2 (deepseek-reasoner → gemini-2.5-flash-lite fallback)",
+    model: "IDE-V2 (deepseek-reasoner → gemini-2.0-flash-lite fallback)",
   };
 }
