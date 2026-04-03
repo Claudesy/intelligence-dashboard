@@ -1,49 +1,47 @@
 // Masterplan and masterpiece by Claudesy.
-import { NextResponse } from "next/server";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { isCrewAuthorizedRequest } from "@/lib/server/crew-access-auth";
 
-export const runtime = "nodejs";
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { NextResponse } from 'next/server'
+import { isCrewAuthorizedRequest } from '@/lib/server/crew-access-auth'
+
+export const runtime = 'nodejs'
 
 // ─── Load knowledge base (cached per process) ────────────────────────────────
 
-let _systemPrompt: string | null = null;
+let _systemPrompt: string | null = null
 
 interface PenyakitEntry {
-  nama: string;
-  icd10: string;
-  definisi: string;
+  nama: string
+  icd10: string
+  definisi: string
 }
 
 function loadDiseases(): PenyakitEntry[] {
   try {
-    const filePath = join(process.cwd(), "public", "data", "penyakit.json");
-    const raw = readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as PenyakitEntry[];
+    const filePath = join(process.cwd(), 'public', 'data', 'penyakit.json')
+    const raw = readFileSync(filePath, 'utf-8')
+    return JSON.parse(raw) as PenyakitEntry[]
   } catch {
-    return [];
+    return []
   }
 }
 
 async function buildSystemPrompt(): Promise<string> {
-  if (_systemPrompt) return _systemPrompt;
+  if (_systemPrompt) return _systemPrompt
 
-  const diseases = loadDiseases();
+  const diseases = loadDiseases()
   const diseaseContext = diseases
     .slice(0, 144)
-    .map(
-      (d) =>
-        `- ${d.nama} (ICD: ${d.icd10}): ${d.definisi.substring(0, 150)}...`,
-    )
-    .join("\n");
+    .map(d => `- ${d.nama} (ICD: ${d.icd10}): ${d.definisi.substring(0, 150)}...`)
+    .join('\n')
 
   // Load common ICD-10 from diseases list (subset for context window)
   const icdContext = diseases
     .slice(0, 200)
-    .map((d) => `${d.icd10}: ${d.nama}`)
-    .join("\n");
+    .map(d => `${d.icd10}: ${d.nama}`)
+    .join('\n')
 
   _systemPrompt = `Kamu adalah ABBY (Advanced Biomedical Bridging Intelligence) — asisten klinis AI untuk dr. Ferdi Iskandar di Puskesmas Balowerti, Kota Kediri, Indonesia.
 
@@ -73,69 +71,63 @@ Kamu dibangun di atas engine AETHER (Advanced Engineering Transformer for Hyper-
 ${diseaseContext}
 
 ## Referensi ICD-10 BPJS e-Klaim (subset umum)
-${icdContext}`;
+${icdContext}`
 
-  return _systemPrompt;
+  return _systemPrompt
 }
 
 // ─── Chat history per session (in-memory, simple) ────────────────────────────
 
 interface ChatMessage {
-  role: "user" | "model";
-  parts: Array<{ text: string }>;
+  role: 'user' | 'model'
+  parts: Array<{ text: string }>
 }
 
-const sessions = new Map<string, ChatMessage[]>();
+const sessions = new Map<string, ChatMessage[]>()
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   if (!isCrewAuthorizedRequest(request)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { ok: false, error: "GEMINI_API_KEY belum dikonfigurasi di .env.local" },
-      { status: 500 },
-    );
+      { ok: false, error: 'GEMINI_API_KEY belum dikonfigurasi di .env.local' },
+      { status: 500 }
+    )
   }
 
   const body = (await request.json().catch(() => ({}))) as {
-    message?: string;
-    sessionId?: string;
-    reset?: boolean;
-  };
+    message?: string
+    sessionId?: string
+    reset?: boolean
+  }
 
-  const { message, sessionId = "default", reset = false } = body;
+  const { message, sessionId = 'default', reset = false } = body
 
   if (reset) {
-    sessions.delete(sessionId);
-    return NextResponse.json({ ok: true, reset: true });
+    sessions.delete(sessionId)
+    return NextResponse.json({ ok: true, reset: true })
   }
 
   if (!message?.trim()) {
-    return NextResponse.json(
-      { ok: false, error: "Pesan kosong" },
-      { status: 400 },
-    );
+    return NextResponse.json({ ok: false, error: 'Pesan kosong' }, { status: 400 })
   }
 
   // Init atau ambil history session
-  if (!sessions.has(sessionId)) sessions.set(sessionId, []);
-  const history = sessions.get(sessionId)!;
+  if (!sessions.has(sessionId)) sessions.set(sessionId, [])
+  const history = sessions.get(sessionId)!
 
   try {
-    const systemInstruction = await buildSystemPrompt();
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const systemInstruction = await buildSystemPrompt()
+    const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: 'gemini-2.0-flash',
       systemInstruction,
-    });
+    })
 
     const chat = model.startChat({
       history,
@@ -143,24 +135,21 @@ export async function POST(request: Request) {
         maxOutputTokens: 1024,
         temperature: 0.3, // rendah untuk konsistensi klinis
       },
-    });
+    })
 
-    const result = await chat.sendMessage(message);
-    const responseText = result.response.text();
+    const result = await chat.sendMessage(message)
+    const responseText = result.response.text()
 
     // Simpan ke history
-    history.push({ role: "user", parts: [{ text: message }] });
-    history.push({ role: "model", parts: [{ text: responseText }] });
+    history.push({ role: 'user', parts: [{ text: message }] })
+    history.push({ role: 'model', parts: [{ text: responseText }] })
 
     // Batasi history 20 turn terakhir agar tidak overflow
-    if (history.length > 40) history.splice(0, history.length - 40);
+    if (history.length > 40) history.splice(0, history.length - 40)
 
-    return NextResponse.json({ ok: true, response: responseText });
+    return NextResponse.json({ ok: true, response: responseText })
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { ok: false, error: `Gemini error: ${msg}` },
-      { status: 500 },
-    );
+    const msg = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ ok: false, error: `Gemini error: ${msg}` }, { status: 500 })
   }
 }

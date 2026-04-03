@@ -7,18 +7,18 @@
  * broadcastNotamDeactivated() dipanggil setelah NOTAM dinonaktifkan.
  */
 
-import type { Server as SocketIOServer } from "socket.io";
-import type { NOTAMRecord } from "@/lib/server/notam";
+import type { Server as SocketIOServer } from 'socket.io'
+import type { NOTAMRecord } from '@/lib/server/notam'
 
-let _io: SocketIOServer | null = null;
+let _io: SocketIOServer | null = null
 
 export function setNotamSocketIO(io: SocketIOServer): void {
-  _io = io;
+  _io = io
 }
 
 export function broadcastNotam(notam: NOTAMRecord): void {
-  if (!_io) return;
-  _io.to("crew").emit("notam:new", {
+  if (!_io) return
+  _io.to('crew').emit('notam:new', {
     id: notam.id,
     title: notam.title,
     body: notam.body,
@@ -27,10 +27,10 @@ export function broadcastNotam(notam: NOTAMRecord): void {
     createdAt: notam.createdAt,
     expiresAt: notam.expiresAt,
     active: notam.active,
-  });
+  })
 }
 
 export function broadcastNotamDeactivated(id: string): void {
-  if (!_io) return;
-  _io.to("crew").emit("notam:deactivated", { id });
+  if (!_io) return
+  _io.to('crew').emit('notam:deactivated', { id })
 }

@@ -1,6 +1,5 @@
 // Blueprinted & built by Claudesy.
-import type { ComponentType } from "react";
-import Link from "next/link";
+
 import {
   Activity,
   Baby,
@@ -12,13 +11,12 @@ import {
   Smile,
   UserRound,
   Wind,
-} from "lucide-react";
-import {
-  MEDICAL_CALCULATORS,
-  type CalculatorCategory,
-} from "@/lib/calculators/medical-calculators";
+} from 'lucide-react'
+import Link from 'next/link'
+import type { ComponentType } from 'react'
+import { type CalculatorCategory, MEDICAL_CALCULATORS } from '@/lib/calculators/medical-calculators'
 
-const PAGE_WIDTH = 1200;
+const PAGE_WIDTH = 1200
 
 const CATEGORY_ICON: Record<
   CalculatorCategory,
@@ -28,40 +26,36 @@ const CATEGORY_ICON: Record<
   Kardiovaskular: Heart,
   Ginjal: Droplets,
   Obstetri: Baby,
-  "Critical Care": Activity,
+  'Critical Care': Activity,
   Neurologi: Brain,
   Pulmonologi: Wind,
   Metabolik: Scale,
-  "Skrining Mental": Smile,
-};
+  'Skrining Mental': Smile,
+}
 
 const CATEGORY_ORDER: CalculatorCategory[] = [
-  "Umum",
-  "Kardiovaskular",
-  "Ginjal",
-  "Pulmonologi",
-  "Metabolik",
-  "Skrining Mental",
-  "Critical Care",
-  "Neurologi",
-  "Obstetri",
-];
+  'Umum',
+  'Kardiovaskular',
+  'Ginjal',
+  'Pulmonologi',
+  'Metabolik',
+  'Skrining Mental',
+  'Critical Care',
+  'Neurologi',
+  'Obstetri',
+]
 
 export default function CalculatorPage() {
   return (
-    <div style={{ width: "100%", padding: "0 32px 72px" }}>
-      <div
-        className="page-header"
-        style={{ maxWidth: PAGE_WIDTH, margin: "0 auto" }}
-      >
+    <div style={{ width: '100%', padding: '0 32px 72px' }}>
+      <div className="page-header" style={{ maxWidth: PAGE_WIDTH, margin: '0 auto' }}>
         <div className="page-header-block">
           <div className="page-title-row">
             <Calculator size={20} color="var(--c-asesmen)" />
             <h1 className="page-title">Calculator Medis</h1>
           </div>
           <p className="page-subtitle">
-            Adaptasi kalkulator klinis dari Medlink untuk kebutuhan cepat di
-            dashboard Puskesmas.
+            Adaptasi kalkulator klinis dari Medlink untuk kebutuhan cepat di dashboard Puskesmas.
           </p>
         </div>
         <div className="page-header-divider" />
@@ -71,18 +65,16 @@ export default function CalculatorPage() {
         <div className="calculator-catalog-intro">
           <span className="calculator-catalog-kicker">Batch pertama aktif</span>
           <p>
-            Kalkulator berikut sudah diadaptasi ke bahasa visual dashboard saat
-            ini. Source asli tetap disalin ke folder
+            Kalkulator berikut sudah diadaptasi ke bahasa visual dashboard saat ini. Source asli
+            tetap disalin ke folder
             <strong> dashboard/calculator </strong> sebagai basis referensi.
           </p>
         </div>
 
-        {CATEGORY_ORDER.map((category) => {
-          const items = MEDICAL_CALCULATORS.filter(
-            (item) => item.category === category,
-          );
-          if (!items.length) return null;
-          const Icon = CATEGORY_ICON[category];
+        {CATEGORY_ORDER.map(category => {
+          const items = MEDICAL_CALCULATORS.filter(item => item.category === category)
+          if (!items.length) return null
+          const Icon = CATEGORY_ICON[category]
           return (
             <section key={category} className="calculator-category-block">
               <div className="calculator-category-header">
@@ -94,16 +86,14 @@ export default function CalculatorPage() {
               </div>
 
               <div className="calculator-card-grid">
-                {items.map((calculator) => (
+                {items.map(calculator => (
                   <Link
                     key={calculator.slug}
                     href={`/calculator/${calculator.slug}`}
                     className="calculator-catalog-card"
                   >
                     <div className="calculator-catalog-card-header">
-                      <span className="calculator-catalog-chip">
-                        {calculator.category}
-                      </span>
+                      <span className="calculator-catalog-chip">{calculator.category}</span>
                     </div>
                     <h3>{calculator.title}</h3>
                     <p>{calculator.summary}</p>
@@ -115,9 +105,9 @@ export default function CalculatorPage() {
                 ))}
               </div>
             </section>
-          );
+          )
         })}
       </div>
     </div>
-  );
+  )
 }

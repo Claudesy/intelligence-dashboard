@@ -1,48 +1,48 @@
 // Designed and constructed by Claudesy.
-"use client";
+'use client'
 
-import Link from "next/link";
+import Link from 'next/link'
 
 const FOOTER_LINK_GROUPS = [
   {
-    title: "Jelajah",
+    title: 'Jelajah',
     links: [
-      { href: "/emr", label: "Clinical Mind Algorithm" },
-      { href: "/hub", label: "Sentra HUB" },
-      { href: "/voice", label: "Consult Audrey" },
-      { href: "/acars", label: "Sentra Network" },
+      { href: '/emr', label: 'Clinical Mind Algorithm' },
+      { href: '/hub', label: 'Sentra HUB' },
+      { href: '/voice', label: 'Consult Audrey' },
+      { href: '/acars', label: 'Sentra Network' },
     ],
   },
   {
-    title: "Clinical Tools",
+    title: 'Clinical Tools',
     links: [
-      { href: "/icdx", label: "Smart ICD-10" },
-      { href: "/calculator", label: "SenCall" },
-      { href: "/critical-mind", label: "Critical Mind" },
-      { href: "/report", label: "Report" },
+      { href: '/icdx', label: 'Smart ICD-10' },
+      { href: '/calculator', label: 'SenCall' },
+      { href: '/critical-mind', label: 'Critical Mind' },
+      { href: '/report', label: 'Report' },
     ],
   },
   {
-    title: "Komunikasi",
+    title: 'Komunikasi',
     links: [
-      { href: "/chat", label: "Team Chat" },
-      { href: "/telemedicine", label: "Telemedicine" },
-      { href: "/dashboard/intelligence", label: "Intelligence Monitor" },
+      { href: '/chat', label: 'Team Chat' },
+      { href: '/telemedicine', label: 'Telemedicine' },
+      { href: '/dashboard/intelligence', label: 'Intelligence Monitor' },
     ],
   },
   {
-    title: "Legal & Governance",
+    title: 'Legal & Governance',
     links: [
-      { href: "/legal#disclaimer", label: "Disclaimer AI" },
-      { href: "/legal#privacy", label: "Privasi Data" },
-      { href: "/legal#terms", label: "Ketentuan Penggunaan" },
-      { href: "/legal#security", label: "Keamanan Informasi" },
+      { href: '/legal#disclaimer', label: 'Disclaimer AI' },
+      { href: '/legal#privacy', label: 'Privasi Data' },
+      { href: '/legal#terms', label: 'Ketentuan Penggunaan' },
+      { href: '/legal#security', label: 'Keamanan Informasi' },
     ],
   },
-];
+]
 
 export default function AppFooter() {
-  const year = new Date().getFullYear();
+  const year = new Date().getFullYear()
 
   return (
     <footer className="app-footer" aria-label="Footer aplikasi">
@@ -56,30 +56,24 @@ export default function AppFooter() {
 
         <div className="app-footer-summary">
           <p>
-            Sentra Intelligence Dashboard saat ini masih dalam tahap
-            pengembangan intensif. Dengan demikian, fitur, data, dan
-            fungsionalitas yang tersedia mungkin belum sepenuhnya akurat dan
-            stabil.
+            Sentra Intelligence Dashboard saat ini masih dalam tahap pengembangan intensif. Dengan
+            demikian, fitur, data, dan fungsionalitas yang tersedia mungkin belum sepenuhnya akurat
+            dan stabil.
           </p>
           <p>
-            Seluruh hak kekayaan intelektual, properti, dan konten yang terkait
-            dengan sistem ini adalah milik Sentra Healthcare Artificial
-            Intelligent.
+            Seluruh hak kekayaan intelektual, properti, dan konten yang terkait dengan sistem ini
+            adalah milik Sentra Healthcare Artificial Intelligent.
           </p>
         </div>
       </div>
 
       <div className="app-footer-grid">
-        {FOOTER_LINK_GROUPS.map((group) => (
+        {FOOTER_LINK_GROUPS.map(group => (
           <section key={group.title} className="app-footer-section">
             <div className="app-footer-section-title">{group.title}</div>
             <div className="app-footer-links">
-              {group.links.map((link) => (
-                <Link
-                  key={link.href + link.label}
-                  href={link.href}
-                  className="app-footer-link"
-                >
+              {group.links.map(link => (
+                <Link key={link.href + link.label} href={link.href} className="app-footer-link">
                   {link.label}
                 </Link>
               ))}
@@ -102,5 +96,5 @@ export default function AppFooter() {
         <div>Designed for disciplined, daily clinical operations.</div>
       </div>
     </footer>
-  );
+  )
 }

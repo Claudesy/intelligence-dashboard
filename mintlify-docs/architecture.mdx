@@ -1,0 +1,136 @@
+---
+title: "Architecture"
+description: "System architecture and technical design of AADI"
+---
+
+# Architecture
+
+AADI uses a **custom server architecture** combining Next.js App Router with Socket.IO for real-time features.
+
+## Arsitektur Sistem: Inovasi Teknologi Tinggi
+
+### Arsitektur Monolitik Terkontainerisasi
+
+Platform ini menggunakan pendekatan **single-container, single-tenant** untuk menjamin kesederhanaan deployment, pemeliharaan, dan isolasi data yang kuat. Integrasi erat antara frontend (Next.js) dan backend (Node.js) melalui Prisma ORM memastikan performa yang optimal.
+
+```mermaid
+graph TD
+    subgraph UserInterface["User Interface Layer"]
+        UI1[Next.js Frontend]
+        UI2[Responsive Design]
+        UI3[Dark/Light Mode]
+        UI4[Accessibility Features]
+    end
+
+    subgraph Application["Application Layer"]
+        AP1[Node.js Backend]
+        AP2[Express]
+        AP3[API Requests]
+        AP4[Business Logic]
+        AP5[Socket.IO]
+    end
+
+    subgraph Data["Data Layer"]
+        DT1[PostgreSQL Database]
+        DT2[Prisma ORM]
+        DT3[Type Safety]
+        DT4[Efficient Queries]
+    end
+
+    subgraph AI["AI Layer"]
+        AI1[Audrey API]
+        AI2[Google Gemini Live]
+        AI3[Clinical Decision Support]
+        AI4[Voice Assistance]
+    end
+
+    subgraph Automation["Automation Layer"]
+        AT1[Playwright]
+        AT2[RPA Tasks]
+        AT3[Legacy System Integration]
+    end
+
+    subgraph Telemedicine["Telemedicine Layer"]
+        TM1[LiveKit]
+        TM2[WebRTC]
+        TM3[Secure Video Consultations]
+    end
+
+    subgraph Security["Security Layer"]
+        SC1[HMAC-SHA256]
+        SC2[RBAC]
+        SC3[End-to-End Encryption]
+    end
+
+    subgraph Integration["Integration Layer"]
+        IN1[SATUSEHAT API]
+        IN2[BPJS API]
+        IN3[ePuskesmas API]
+    end
+
+    subgraph Monitoring["Monitoring and Logging"]
+        MN1[Prometheus]
+        MN2[Grafana]
+        MN3[Structured Logging]
+    end
+
+    subgraph Deployment["Deployment and CI/CD"]
+        DP1[Railway]
+        DP2[GitHub Actions]
+        DP3[Docker]
+    end
+
+    %% Connections
+    UserInterface --> Application
+    Application --> Data
+    Application --> AI
+    Application --> Automation
+    Application --> Telemedicine
+    Application --> Security
+    Application --> Integration
+    Application --> Monitoring
+    Deployment --> Application
+```
+
+### Justifikasi Pemilihan Teknologi
+
+| Komponen | Teknologi | Alasan Pemilihan | Manfaat Utama |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | Next.js 14 | SSR, TypeScript, dan optimasi performa | Pengalaman pengguna yang sangat cepat |
+| **Backend** | Node.js + Express | Kontrol penuh atas Socket.IO dan RPA | Integrasi yang mulus dan performa tinggi |
+| **Database** | PostgreSQL + Prisma | Typing kuat dan migrasi otomatis | Keamanan data dan kemudahan pemeliharaan |
+| **RPA Engine** | Playwright 1.58.2 | Integrasi dengan UI legacy tanpa API publik | Otomatisasi proses administratif manual |
+| **AI Layer** | Google Gemini Live | NLP dan asisten suara real-time | Dukungan diagnostik akurasi tinggi |
+| **Telemedicine** | WebRTC + LiveKit | Kualitas HD dan latensi rendah | Konsultasi jarak jauh yang aman |
+| **Autentikasi** | HMAC-SHA256 | Autentikasi stateless yang ringan | Keamanan tinggi tanpa kompleksitas sesi |
+| **Deployment** | Railway | Infrastruktur cloud otomatis (Nixpacks) | Kemudahan deployment dan skalabilitas |
+| **Monitoring** | Prometheus + Grafana | Pemantauan sistem real-time | Deteksi dini masalah operasional |
+
+---
+
+## Struktur Proyek (Project Structure)
+
+```
+primary-healthcare/
+├── server.ts                          # Custom HTTP + Socket.IO + Gemini Live
+├── src/
+│   ├── app/                           # Next.js App Router pages
+│   │   ├── api/                       # API route handlers
+│   │   ├── dashboard/intelligence/    # Intelligence Dashboard UI
+│   │   ├── emr/                       # EMR transfer UI
+│   │   ├── telemedicine/              # Video consultation UI
+│   │   └── voice/                     # Audrey voice UI
+│   ├── lib/
+│   │   ├── cdss/                      # Core Clinical Engine (AADI)
+│   │   ├── clinical/                  # Clinical utilities
+│   │   ├── emr/                       # EMR Playwright engine
+│   │   └── audrey-persona.ts          # Voice AI persona
+│   ├── components/                    # UI components
+│   └── hooks/                         # Custom React hooks
+├── prisma/                            # Schema + seed
+└── scripts/                           # Test scripts
+```
+
+---
+
+<sub>Dikembangkan oleh Sentra Healthcare Artificial Intelligence.</sub>

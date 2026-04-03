@@ -2,33 +2,27 @@
 // POST /api/consult — receive clinical consult from Assist, route to target doctor
 // Called by Assist (Chrome Extension) after perawat selects a doctor
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from 'next/server'
 
 import {
   appendClinicalCaseAuditEvent,
   CLINICAL_CASE_AUDIT_EVENTS,
-} from "@/lib/audit/clinical-case-audit";
-import { prisma } from "@/lib/prisma";
-import {
-  getCrewSessionFromRequest,
-  isCrewAuthorizedRequest,
-} from "@/lib/server/crew-access-auth";
-import { emitAssistConsult } from "@/lib/telemedicine/socket-bridge";
+} from '@/lib/audit/clinical-case-audit'
+import { prisma } from '@/lib/prisma'
+import { getCrewSessionFromRequest, isCrewAuthorizedRequest } from '@/lib/server/crew-access-auth'
+import { emitAssistConsult } from '@/lib/telemedicine/socket-bridge'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   if (!isCrewAuthorizedRequest(req)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const session = getCrewSessionFromRequest(req);
+  const session = getCrewSessionFromRequest(req)
 
   try {
-    const body = await req.json();
+    const body = await req.json()
     const {
       patient,
       ttv,
@@ -38,21 +32,20 @@ export async function POST(req: NextRequest) {
       penyakit_kronis,
       target_doctor_id,
       sent_at,
-    } = body;
+    } = body
 
     if (!patient?.name || !keluhan_utama || !target_doctor_id) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "Field wajib tidak lengkap: patient.name, keluhan_utama, target_doctor_id",
+          error: 'Field wajib tidak lengkap: patient.name, keluhan_utama, target_doctor_id',
         },
-        { status: 400 },
-      );
+        { status: 400 }
+      )
     }
 
-    const consultId = `consult-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const receivedAt = new Date().toISOString();
+    const consultId = `consult-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const receivedAt = new Date().toISOString()
 
     emitAssistConsult({
       consultId,
@@ -64,17 +57,17 @@ export async function POST(req: NextRequest) {
       risk_factors: Array.isArray(risk_factors) ? risk_factors : [],
       anthropometrics: anthropometrics || {},
       penyakit_kronis: Array.isArray(penyakit_kronis) ? penyakit_kronis : [],
-    });
+    })
 
     // Persist consult data to database for audit trail
     try {
       await prisma.consultLog.create({
         data: {
           consultId,
-          status: "received",
+          status: 'received',
           patientName: patient.name,
           patientRm: patient.rm ?? null,
-          patientAge: typeof patient.age === "number" ? patient.age : null,
+          patientAge: typeof patient.age === 'number' ? patient.age : null,
           patientGender: patient.gender ?? null,
           keluhanUtama: String(keluhan_utama),
           ttv: ttv || {},
@@ -86,9 +79,9 @@ export async function POST(req: NextRequest) {
           targetDoctorId: String(target_doctor_id),
           sentAt: sent_at ? new Date(sent_at) : new Date(),
         },
-      });
+      })
     } catch (dbErr) {
-      console.error("[Consult] ConsultLog write failed:", dbErr);
+      console.error('[Consult] ConsultLog write failed:', dbErr)
     }
 
     // Write audit event for traceability
@@ -97,7 +90,7 @@ export async function POST(req: NextRequest) {
       actorUserId: session?.username ?? null,
       actorName: session?.displayName ?? null,
       consultId,
-      sourceOrigin: "ghost-protocols",
+      sourceOrigin: 'ghost-protocols',
       payload: {
         patientName: patient.name,
         patientRm: patient.rm ?? null,
@@ -109,14 +102,11 @@ export async function POST(req: NextRequest) {
         sentAt: sent_at,
         receivedAt,
       },
-    });
+    })
 
-    return NextResponse.json({ ok: true, consultId });
+    return NextResponse.json({ ok: true, consultId })
   } catch (err) {
-    console.error("[Consult] POST error:", err);
-    return NextResponse.json(
-      { ok: false, error: "Server error" },
-      { status: 500 },
-    );
+    console.error('[Consult] POST error:', err)
+    return NextResponse.json({ ok: false, error: 'Server error' }, { status: 500 })
   }
 }

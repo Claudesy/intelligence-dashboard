@@ -1,20 +1,16 @@
 // Architected and built by the one and only Claudesy.
-import { NextResponse } from "next/server";
-
+import { NextResponse } from 'next/server'
 import {
-  getCrewSessionFromRequest,
-  isCrewAuthorizedRequest,
-} from "@/lib/server/crew-access-auth";
-import {
-  createBridgeEntry,
-  listBridgeEntries,
-  getBridgeStats,
   type BridgeEntryStatus,
-} from "@/lib/emr/bridge-queue";
-import { emitEMRProgress } from "@/lib/emr/socket-bridge";
-import type { RMETransferPayload } from "@/lib/emr/types";
+  createBridgeEntry,
+  getBridgeStats,
+  listBridgeEntries,
+} from '@/lib/emr/bridge-queue'
+import { emitEMRProgress } from '@/lib/emr/socket-bridge'
+import type { RMETransferPayload } from '@/lib/emr/types'
+import { getCrewSessionFromRequest, isCrewAuthorizedRequest } from '@/lib/server/crew-access-auth'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
 /**
  * POST /api/emr/bridge — Create a new transfer request
@@ -25,50 +21,47 @@ export const runtime = "nodejs";
  * Ghost Protocols extension uses GET/PATCH with token auth to poll & process.
  */
 export async function POST(request: Request) {
-  const session = getCrewSessionFromRequest(request);
+  const session = getCrewSessionFromRequest(request)
   if (!session) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
     const body = (await request.json()) as {
-      pelayananId?: string;
-      patientName?: string;
-      payload?: RMETransferPayload;
-    };
+      pelayananId?: string
+      patientName?: string
+      payload?: RMETransferPayload
+    }
 
     if (!body.pelayananId || !body.payload) {
       return NextResponse.json(
-        { ok: false, error: "pelayananId dan payload wajib diisi." },
-        { status: 400 },
-      );
+        { ok: false, error: 'pelayananId dan payload wajib diisi.' },
+        { status: 400 }
+      )
     }
 
     if (!body.payload.anamnesa) {
       return NextResponse.json(
-        { ok: false, error: "payload.anamnesa wajib diisi." },
-        { status: 400 },
-      );
+        { ok: false, error: 'payload.anamnesa wajib diisi.' },
+        { status: 400 }
+      )
     }
 
     const entry = createBridgeEntry(
       session.username,
       body.pelayananId,
       body.payload,
-      body.patientName,
-    );
+      body.patientName
+    )
 
     // Notify connected clients via Socket.IO
     emitEMRProgress({
       transferId: entry.id,
-      step: "init",
-      status: "running",
+      step: 'init',
+      status: 'running',
       message: `Transfer baru: ${body.patientName || body.pelayananId}`,
       timestamp: entry.createdAt,
-    });
+    })
 
     return NextResponse.json({
       ok: true,
@@ -78,12 +71,12 @@ export async function POST(request: Request) {
         createdAt: entry.createdAt,
         pelayananId: entry.pelayananId,
       },
-    });
+    })
   } catch {
     return NextResponse.json(
-      { ok: false, error: "Gagal membuat transfer request." },
-      { status: 500 },
-    );
+      { ok: false, error: 'Gagal membuat transfer request.' },
+      { status: 500 }
+    )
   }
 }
 
@@ -95,31 +88,27 @@ export async function POST(request: Request) {
  *   stats=true (include queue stats)
  */
 export async function GET(request: Request) {
-  const correlationId =
-    request.headers.get("x-correlation-id") || "no-correlation";
-  console.log(`[Bridge] GET /api/emr/bridge — correlationId: ${correlationId}`);
+  const correlationId = request.headers.get('x-correlation-id') || 'no-correlation'
+  console.log(`[Bridge] GET /api/emr/bridge — correlationId: ${correlationId}`)
 
   if (!isCrewAuthorizedRequest(request)) {
     console.warn(
-      `[Bridge] GET /api/emr/bridge — 401 Unauthorized — correlationId: ${correlationId}`,
-    );
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+      `[Bridge] GET /api/emr/bridge — 401 Unauthorized — correlationId: ${correlationId}`
+    )
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const statusParam = searchParams.get("status") || "pending";
-    const limit = Math.min(Number(searchParams.get("limit")) || 10, 50);
-    const includeStats = searchParams.get("stats") === "true";
+    const { searchParams } = new URL(request.url)
+    const statusParam = searchParams.get('status') || 'pending'
+    const limit = Math.min(Number(searchParams.get('limit')) || 10, 50)
+    const includeStats = searchParams.get('stats') === 'true'
 
-    const statuses = statusParam.split(",") as BridgeEntryStatus[];
-    const entries = listBridgeEntries({ status: statuses, limit });
+    const statuses = statusParam.split(',') as BridgeEntryStatus[]
+    const entries = listBridgeEntries({ status: statuses, limit })
 
     // Strip full payload from list view — Assist claims first, then fetches detail
-    const items = entries.map((e) => ({
+    const items = entries.map(e => ({
       id: e.id,
       status: e.status,
       createdAt: e.createdAt,
@@ -129,22 +118,19 @@ export async function GET(request: Request) {
       hasAnamnesa: !!e.payload.anamnesa,
       hasDiagnosa: !!e.payload.diagnosa,
       hasResep: !!e.payload.resep,
-    }));
+    }))
 
     const response: Record<string, unknown> = {
       ok: true,
       items,
       count: items.length,
-    };
+    }
     if (includeStats) {
-      response.stats = getBridgeStats();
+      response.stats = getBridgeStats()
     }
 
-    return NextResponse.json(response);
+    return NextResponse.json(response)
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Gagal memuat antrian bridge." },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: 'Gagal memuat antrian bridge.' }, { status: 500 })
   }
 }

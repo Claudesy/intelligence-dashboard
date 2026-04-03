@@ -1,16 +1,14 @@
 // Architected and built by the one and only Claudesy.
-import "server-only";
+import 'server-only'
 
-import { Resend } from "resend";
+import { Resend } from 'resend'
 
-const FROM =
-  process.env.EMAIL_FROM ||
-  "Puskesmas Dashboard <noreply@puskesmasbalowerti.com>";
+const FROM = process.env.EMAIL_FROM || 'Puskesmas Dashboard <noreply@puskesmasbalowerti.com>'
 
 function getResend(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) return null;
-  return new Resend(apiKey);
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) return null
+  return new Resend(apiKey)
 }
 
 /* ── Approval Email ── */
@@ -18,16 +16,16 @@ function getResend(): Resend | null {
 export async function sendApprovalEmail(
   to: string,
   fullName: string,
-  username: string,
+  username: string
 ): Promise<void> {
-  const resend = getResend();
-  if (!resend) return;
+  const resend = getResend()
+  if (!resend) return
 
   try {
     await resend.emails.send({
       from: FROM,
       to,
-      subject: "Akun Anda Telah Disetujui — Sentra Intelligence Dashboard",
+      subject: 'Akun Anda Telah Disetujui — Sentra Intelligence Dashboard',
       html: `
         <div style="font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 520px; margin: 0 auto; color: #333;">
           <div style="padding: 24px 0; border-bottom: 2px solid #E67E22;">
@@ -45,7 +43,7 @@ export async function sendApprovalEmail(
           </div>
         </div>
       `,
-    });
+    })
   } catch {
     // Email send failure — silent, non-blocking
   }
@@ -57,32 +55,24 @@ export async function sendNotamEmail(
   recipients: string[],
   title: string,
   body: string,
-  priority: string,
+  priority: string
 ): Promise<void> {
-  const resend = getResend();
-  if (!resend) return;
+  const resend = getResend()
+  if (!resend) return
 
-  const validRecipients = recipients.filter((e) => e.includes("@"));
-  if (validRecipients.length === 0) return;
+  const validRecipients = recipients.filter(e => e.includes('@'))
+  if (validRecipients.length === 0) return
 
   const priorityColor =
-    priority === "urgent"
-      ? "#dc3545"
-      : priority === "warning"
-        ? "#E67E22"
-        : "#888";
+    priority === 'urgent' ? '#dc3545' : priority === 'warning' ? '#E67E22' : '#888'
   const priorityLabel =
-    priority === "urgent"
-      ? "URGENT"
-      : priority === "warning"
-        ? "WARNING"
-        : "INFO";
+    priority === 'urgent' ? 'URGENT' : priority === 'warning' ? 'WARNING' : 'INFO'
 
   try {
     // Batch send — Resend supports up to 50 recipients per batch
-    const batches: string[][] = [];
+    const batches: string[][] = []
     for (let i = 0; i < validRecipients.length; i += 49) {
-      batches.push(validRecipients.slice(i, i + 49));
+      batches.push(validRecipients.slice(i, i + 49))
     }
 
     for (const batch of batches) {
@@ -107,7 +97,7 @@ export async function sendNotamEmail(
             </div>
           </div>
         `,
-      });
+      })
     }
   } catch {
     // NOTAM email send failure — silent, non-blocking
@@ -116,8 +106,8 @@ export async function sendNotamEmail(
 
 function escapeHtml(text: string): string {
   return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }

@@ -1,69 +1,65 @@
 // The vision and craft of Claudesy.
-import { listAllCrewProfiles } from "@/lib/server/crew-access-profile";
+import { listAllCrewProfiles } from '@/lib/server/crew-access-profile'
 
-export const CHIEF_USERNAMES = ["ferdi", "ferdi-balowerti"];
+export const CHIEF_USERNAMES = ['ferdi', 'ferdi-balowerti']
 
 export interface AudreySessionUser {
-  username: string;
-  displayName: string;
-  profession: string;
+  username: string
+  displayName: string
+  profession: string
 }
 
 function normalizePersonName(name: string): string {
-  return name
-    .replace(/^(drg?\.|dokter|pak|bu|bpk\.?|ibu|sdr\.?|suster|ners)\s*/i, "")
-    .trim();
+  return name.replace(/^(drg?\.|dokter|pak|bu|bpk\.?|ibu|sdr\.?|suster|ners)\s*/i, '').trim()
 }
 
 export function getAudreyUserReference(user: AudreySessionUser): {
-  fullName: string;
-  normalizedName: string;
+  fullName: string
+  normalizedName: string
 } {
-  const profile = listAllCrewProfiles().get(user.username);
-  const fullName = (profile?.fullName || user.displayName).trim() || "Rekan";
+  const profile = listAllCrewProfiles().get(user.username)
+  const fullName = (profile?.fullName || user.displayName).trim() || 'Rekan'
 
   return {
     fullName,
     normalizedName:
-      normalizePersonName(fullName) ||
-      normalizePersonName(user.displayName) ||
-      "Rekan",
-  };
+      normalizePersonName(fullName) || normalizePersonName(user.displayName) || 'Rekan',
+  }
 }
 
 export function getAudreyPreferredAddress(user: AudreySessionUser): string {
-  const profile = listAllCrewProfiles().get(user.username);
-  const { normalizedName } = getAudreyUserReference(user);
-  const gender = profile?.gender || "";
+  const profile = listAllCrewProfiles().get(user.username)
+  const { normalizedName } = getAudreyUserReference(user)
+  const gender = profile?.gender || ''
 
   switch (user.profession) {
-    case "Dokter":
-    case "Dokter Gigi":
-      return `Dokter ${normalizedName}`;
-    case "Bidan":
-      return `Bu Bidan ${normalizedName}`;
-    case "Perawat":
-      if (gender === "Perempuan") return `Bu Nurse ${normalizedName}`;
-      if (gender === "Laki-laki") return `Pak Perawat ${normalizedName}`;
-      return `Perawat ${normalizedName}`;
+    case 'Dokter':
+    case 'Dokter Gigi':
+      return `Dokter ${normalizedName}`
+    case 'Bidan':
+      return `Bu Bidan ${normalizedName}`
+    case 'Perawat':
+      if (gender === 'Perempuan') return `Bu Nurse ${normalizedName}`
+      if (gender === 'Laki-laki') return `Pak Perawat ${normalizedName}`
+      return `Perawat ${normalizedName}`
     default:
-      return normalizedName;
+      return normalizedName
   }
 }
 
 export function buildAudreyGreetingReply(user: AudreySessionUser): string {
-  const preferredAddress = getAudreyPreferredAddress(user);
-  const isChief = CHIEF_USERNAMES.includes(user.username.toLowerCase());
+  const preferredAddress = getAudreyPreferredAddress(user)
+  const isChief = CHIEF_USERNAMES.includes(user.username.toLowerCase())
 
   if (isChief) {
-    return "Halo Chief. Saya siap bantu, mau kita bahas klinis, farmakologi, atau operasional hari ini?";
+    return 'Halo Chief. Saya siap bantu, mau kita bahas klinis, farmakologi, atau operasional hari ini?'
   }
 
-  return `Halo, ${preferredAddress}. Saya siap bantu. Ada yang ingin dibahas sekarang?`;
+  return `Halo, ${preferredAddress}. Saya siap bantu. Ada yang ingin dibahas sekarang?`
 }
 
 export function buildAudreyUserContext(user: AudreySessionUser): string {
-  const isChief = CHIEF_USERNAMES.includes(user.username.toLowerCase());
+  const isChief = CHIEF_USERNAMES.includes(user.username.toLowerCase())
 
   if (isChief) {
     return `
@@ -73,11 +69,11 @@ Yang sedang chat sekarang adalah **dr. Ferdi Iskandar** — Chief, orang yang me
 Kamu kenal beliau dengan baik. Tidak perlu formalitas berlebihan — bicara seperti asisten yang sudah lama bekerja bersama.
 Panggil beliau "Chief" secara natural, bukan setiap kalimat. Langsung ke inti, efisien, dan kalau perlu boleh sedikit santai.
 Tidak perlu jelaskan Sentra atau dirimu sendiri — beliau yang merancangmu.
-`.trim();
+`.trim()
   }
 
-  const { fullName } = getAudreyUserReference(user);
-  const preferredAddress = getAudreyPreferredAddress(user);
+  const { fullName } = getAudreyUserReference(user)
+  const preferredAddress = getAudreyPreferredAddress(user)
 
   return `
 ## SIAPA YANG SEDANG BERBICARA DENGANMU
@@ -88,13 +84,13 @@ Selalu gunakan **nama lengkap**, jangan disingkat menjadi nama depan saja.
 Bukan Chief, tapi tetap anggota tim yang kamu layani dengan sepenuh hati.
 Bicara hangat dan profesional — seperti rekan kerja yang helpful, bukan sistem yang kaku.
 Kalau ada pertanyaan besar yang butuh keputusan klinis atau manajerial penting, boleh sarankan diskusikan dengan dr. Ferdi.
-`.trim();
+`.trim()
 }
 
 export function buildAudreyCoreSystemPrompt(args: {
-  user: AudreySessionUser;
-  knowledgeContext?: string;
-  extraInstructions?: string;
+  user: AudreySessionUser
+  knowledgeContext?: string
+  extraInstructions?: string
 }): string {
   const sections = [
     `
@@ -168,7 +164,7 @@ Jawab berbasis bukti tapi sampaikan dengan cara yang mudah dicerna — bukan cer
 Kalau tidak tahu atau tidak yakin, bilang jujur. Tidak ada yang salah dari "saya tidak yakin, lebih baik cek guideline terbaru."
 Saat menyebut identitas diri, selalu gunakan nama **Audrey**, bukan ABBY.
 `.trim(),
-  ];
+  ]
 
   if (args.knowledgeContext?.trim()) {
     sections.push(
@@ -179,15 +175,15 @@ Gunakan knowledge internal berikut sebagai grounding utama jika relevan terhadap
 Jika ada konflik antara percakapan dan knowledge internal, prioritaskan keselamatan pasien, fakta eksplisit, lalu knowledge internal.
 
 ${args.knowledgeContext.trim()}
-`.trim(),
-    );
+`.trim()
+    )
   }
 
   if (args.extraInstructions?.trim()) {
-    sections.push(args.extraInstructions.trim());
+    sections.push(args.extraInstructions.trim())
   }
 
-  sections.push(buildAudreyUserContext(args.user));
+  sections.push(buildAudreyUserContext(args.user))
 
-  return sections.join("\n\n");
+  return sections.join('\n\n')
 }

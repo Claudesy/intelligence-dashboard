@@ -1,13 +1,12 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import type { DashboardOperationalMetrics } from '@abyss/types'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { DashboardOperationalMetrics } from "@abyss/types";
-
-import { OperationalSummaryPanelContent } from "./OperationalSummaryPanel";
+import { OperationalSummaryPanelContent } from './OperationalSummaryPanel'
 
 const metrics: DashboardOperationalMetrics = {
-  shiftLabel: "Shift Operasional",
+  shiftLabel: 'Shift Operasional',
   totalEncounters: 8,
   encountersByStatus: {
     waiting: 1,
@@ -21,18 +20,16 @@ const metrics: DashboardOperationalMetrics = {
   averageConfidenceScore: 0.81,
   overrideCount: 2,
   overrideRate: 0.25,
-  generatedAt: "2026-03-13T10:00:00.000Z",
-};
+  generatedAt: '2026-03-13T10:00:00.000Z',
+}
 
-test("OperationalSummaryPanelContent renders API-backed metrics cards", () => {
-  const markup = renderToStaticMarkup(
-    <OperationalSummaryPanelContent metrics={metrics} />,
-  );
+test('OperationalSummaryPanelContent renders API-backed metrics cards', () => {
+  const markup = renderToStaticMarkup(<OperationalSummaryPanelContent metrics={metrics} />)
 
-  assert.match(markup, /Encounter Aktif/);
-  assert.match(markup, />8</);
-  assert.match(markup, /50%/);
-  assert.match(markup, /63%/);
-  assert.match(markup, /0\.81/);
-  assert.match(markup, /Override rate 25%/);
-});
+  assert.match(markup, /Encounter Aktif/)
+  assert.match(markup, />8</)
+  assert.match(markup, /50%/)
+  assert.match(markup, /63%/)
+  assert.match(markup, /0\.81/)
+  assert.match(markup, /Override rate 25%/)
+})

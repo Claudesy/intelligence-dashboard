@@ -1,0 +1,48 @@
+---
+title: "Risiko & Mitigasi"
+description: "Strategi pengelolaan risiko teknis dan klinis dalam implementasi Puskesmas Intelligence Dashboard."
+---
+
+# Risiko & Mitigasi
+
+Implementasi sistem kesehatan digital di lingkungan Puskesmas menghadapi berbagai tantangan unik. AADI menerapkan strategi mitigasi proaktif untuk menjamin kontinuitas layanan.
+
+## Matriks Risiko & Mitigasi
+
+| Risiko | Dampak Potensial | Strategi Mitigasi | Contoh Aplikasi |
+| :--- | :--- | :--- | :--- |
+| **Perubahan UI Legacy** | RPA Playwright gagal | Pemantauan rutin + Fallback manual | Dashboard tetap operasional saat ePuskesmas update |
+| **Ketergantungan API** | Downtime layanan sekunder | Retry mechanism + Caching cerdas | Audrey tetap berfungsi dengan model lokal |
+| **Skalabilitas** | Penurunan kinerja sistem | Rencana migrasi ke Microservices | Arsitektur monolitik yang terkontainerisasi |
+| **Keamanan Data** | Kebocoran data (PHI) | Enkripsi end-to-end + Audit Log | HMAC-SHA256 untuk setiap akses kru |
+
+## Visualisasi Alur Mitigasi
+
+```mermaid
+graph TD
+    A[Risiko] --> B[Dampak Potensial]
+    B --> C[Strategi Mitigasi]
+    C --> D[Hasil: Kontinuitas Layanan]
+    A -->|1| B1[Perubahan UI ePuskesmas]
+    B1 --> C1[RPA Playwright Gagal]
+    C1 --> D1[Pemantauan Rutin + Fallback]
+    A -->|2| B2[Ketergantungan API Eksternal]
+    B2 --> C2[Layanan Hilang/Downtime]
+    C2 --> D2[Retry Mechanism + Caching]
+    A -->|3| B3[Lonjakan Beban Data]
+    B3 --> C3[Performa Melambat]
+    C3 --> D3[Migrasi Horizontal Scaling]
+    A -->|4| B4[Ancaman Keamanan]
+    B4 --> C4[Akses Tidak Sah]
+    C4 --> D4[Enkripsi + RBAC + Audit Log]
+```
+
+## Keamanan Data (PHI)
+
+AADI memperlakukan data kesehatan pasien (Protected Health Information) sebagai aset paling sensitif:
+- **Deteksi PHI Leak**: Model AI kami dilatih untuk mendeteksi dan mencegah pengiriman data identitas pasien ke API eksternal yang tidak aman.
+- **Audit Logs**: Setiap akses data pasien dicatat secara permanen dengan stempel waktu dan identitas kru yang melakukan akses.
+
+---
+
+<sub>Strategi mitigasi ini dikembangkan untuk menjamin ketersediaan layanan kesehatan primer 24/7 di Indonesia.</sub>

@@ -1,4 +1,4 @@
-import { AI_DISCLOSURE_LABEL } from "@/lib/intelligence/disclosure";
+import { AI_DISCLOSURE_LABEL } from '@/lib/intelligence/disclosure'
 
 export function AIDisclosureBadge(): React.JSX.Element {
   return (
@@ -6,5 +6,5 @@ export function AIDisclosureBadge(): React.JSX.Element {
       <span>{AI_DISCLOSURE_LABEL}</span>
       <span className="text-[var(--text-main)]">Perlu verifikasi klinisi</span>
     </span>
-  );
+  )
 }

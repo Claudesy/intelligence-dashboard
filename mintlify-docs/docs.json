@@ -1,0 +1,100 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "aspen",
+  "name": "Sentra Healthcare Artificial Intelligence",
+  "description": "Dokumentasi Resmi Platform Augmented Artificial Intelligence Diagnosis Integrated (AADI) - Sentra Healthcare Artificial Intelligence",
+  "colors": {
+    "primary": "#C9A87C"
+  },
+  "fonts": {
+    "body": {
+      "family": "Geist"
+    }
+  },
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "favicon": "/logo.png",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Memulai",
+        "pages": [
+          "index",
+          "quickstart",
+          "architecture"
+        ]
+      },
+      {
+        "group": "Fitur Inti",
+        "pages": [
+          "features/cdss",
+          "features/emr-autofill",
+          "features/audrey-voice",
+          "features/telemedicine",
+          "features/intelligence-dashboard",
+          "features/clinical-trajectory",
+          "features/reporting"
+        ]
+      },
+      {
+        "group": "Klinis",
+        "pages": [
+          "clinical/clinical-logic",
+          "clinical/data-model",
+          "clinical/fine-tuning",
+          "clinical/ai-governance",
+          "clinical/privacy"
+        ]
+      },
+      {
+        "group": "Transparansi Klinis",
+        "pages": [
+          "clinical-transparency"
+        ]
+      },
+      {
+        "group": "Operasional",
+        "pages": [
+          "operations/deployment",
+          "operations/setup",
+          "operations/roi-analysis",
+          "operations/risk-mitigation",
+          "operations/troubleshooting",
+          "operations/testing"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/overview",
+          "api-reference/authentication"
+        ]
+      },
+      {
+        "group": "Endpoint API",
+        "openapi": "openapi.json"
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/sentra-healthcare"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://puskesmasbalowerti.com"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/sentra-healthcare",
+      "linkedin": "https://linkedin.com/company/sentra-healthcare"
+    }
+  }
+}

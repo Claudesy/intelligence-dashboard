@@ -1,0 +1,61 @@
+---
+title: "CDSS Iskandar Engine"
+description: "AI-powered Clinical Decision Support System with hybrid retrieval"
+---
+
+# CDSS — Iskandar Diagnosis Engine V2
+
+The core clinical intelligence of AADI. A hybrid AI engine combining rule-based red flag detection with LLM-powered differential diagnosis.
+
+## How It Works
+
+<Steps>
+  <Step title="Input Collection">
+    Receives patient data: chief complaint, vital signs, chronic diseases, and allergies.
+  </Step>
+  <Step title="Vital Signs Red Flag Check">
+    Hardcoded critical thresholds — **no LLM needed**:
+    - SpO₂ \< 90%
+    - Systolic BP ≥ 180 or \< 90 mmHg
+    - Heart Rate \> 140 or \< 45 bpm
+    - Temperature ≥ 40°C
+    - Respiratory Rate \> 30 or \< 8/min
+  </Step>
+  <Step title="Candidate Retrieval (Hybrid)">
+    - **Keyword pre-filter** → searches `penyakit.json` (159 diseases from KKI)
+    - **Semantic embedding** → vector similarity search (if available)
+    - Merged + deduplicated → max 18 candidates
+  </Step>
+  <Step title="LLM Reasoning">
+    Structured JSON output via:
+    - **Primary**: DeepSeek Reasoner
+    - **Fallback**: Gemini 2.5 Flash-Lite
+  </Step>
+  <Step title="Validation + Hybrid Decisioning">
+    `validateLLMSuggestions` → `applyHybridDecisioning` for final ranking.
+  </Step>
+</Steps>
+
+## Output Structure
+
+The engine returns a `CDSSEngineResult`:
+
+| Field | Description |
+|-------|------------|
+| `suggestions[]` | Ranked differential diagnoses with ICD-10 codes and confidence (0–1) |
+| `red_flags[]` | Severity levels: `emergency`, `urgent`, `warning` |
+| `alerts[]` | Types: `red_flag`, `vital_sign`, `low_confidence`, `guideline` |
+| `validation_summary` | Validation result overview |
+| `next_best_questions[]` | Suggested follow-up questions for the clinician |
+
+## Knowledge Base
+
+**159 diseases** from the Kompendium Klinisi Indonesia (KKI), stored in `penyakit.json`. Each entry includes symptoms, differentials, ICD-10 codes, and treatment guidelines.
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/cdss/engine.ts` | Main engine logic |
+| `src/lib/cdss/penyakit.json` | Disease knowledge base |
+| `src/app/api/cdss/` | API endpoints (diagnose, autocomplete, symptoms, red-flag-ack) |

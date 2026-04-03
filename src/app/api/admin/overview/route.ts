@@ -1,99 +1,81 @@
 // Claudesy's vision, brought to life.
-import { NextResponse } from "next/server";
-import {
-  getCrewSessionFromRequest,
-  listCrewAccessUsers,
-} from "@/lib/server/crew-access-auth";
-import { listAllCrewProfiles } from "@/lib/server/crew-access-profile";
-import { listPendingRegistrations } from "@/lib/server/crew-access-registration";
-import { readRunHistory } from "@/lib/lb1/history";
-import { readEMRHistory } from "@/lib/emr/history";
-import { getOnlineTodayCount } from "@/lib/server/online-today-tracker";
-import {
-  getTodayUsageData,
-  getRecentLogins,
-  getTopUsers,
-} from "@/lib/server/usage-tracker";
+import { NextResponse } from 'next/server'
+import { readEMRHistory } from '@/lib/emr/history'
+import { readRunHistory } from '@/lib/lb1/history'
+import { getCrewSessionFromRequest, listCrewAccessUsers } from '@/lib/server/crew-access-auth'
+import { listAllCrewProfiles } from '@/lib/server/crew-access-profile'
+import { listPendingRegistrations } from '@/lib/server/crew-access-registration'
+import { getOnlineTodayCount } from '@/lib/server/online-today-tracker'
+import { getRecentLogins, getTodayUsageData, getTopUsers } from '@/lib/server/usage-tracker'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
-const ALLOWED_ROLES = new Set([
-  "CEO",
-  "ADMINISTRATOR",
-  "CHIEF_EXECUTIVE_OFFICER",
-]);
+const ALLOWED_ROLES = new Set(['CEO', 'ADMINISTRATOR', 'CHIEF_EXECUTIVE_OFFICER'])
 
 export async function GET(request: Request) {
-  const session = getCrewSessionFromRequest(request);
+  const session = getCrewSessionFromRequest(request)
   if (!session || !ALLOWED_ROLES.has(session.role)) {
     return NextResponse.json(
-      { ok: false, error: "Akses ditolak. Hanya CEO dan Administrator." },
-      { status: 403 },
-    );
+      { ok: false, error: 'Akses ditolak. Hanya CEO dan Administrator.' },
+      { status: 403 }
+    )
   }
 
   try {
-    const users = listCrewAccessUsers();
-    const profiles = listAllCrewProfiles();
-    const pendingRegistrations = listPendingRegistrations();
+    const users = listCrewAccessUsers()
+    const profiles = listAllCrewProfiles()
+    const pendingRegistrations = listPendingRegistrations()
 
-    const crew = users.map((u) => ({
+    const crew = users.map(u => ({
       username: u.username,
       displayName: u.displayName,
       profession: u.profession,
       role: u.role,
       avatarUrl: profiles.get(u.username)?.avatarUrl || null,
-    }));
+    }))
 
-    let lb1History: Awaited<ReturnType<typeof readRunHistory>> = [];
+    let lb1History: Awaited<ReturnType<typeof readRunHistory>> = []
     try {
-      lb1History = await readRunHistory(50);
+      lb1History = await readRunHistory(50)
     } catch {
       /* no history yet */
     }
 
-    let emrHistory: Awaited<ReturnType<typeof readEMRHistory>> = [];
+    let emrHistory: Awaited<ReturnType<typeof readEMRHistory>> = []
     try {
-      emrHistory = await readEMRHistory(50);
+      emrHistory = await readEMRHistory(50)
     } catch {
       /* no history yet */
     }
 
-    const lb1Success = lb1History.filter((r) => r.status === "success");
-    const lb1Failed = lb1History.filter((r) => r.status === "failed");
+    const lb1Success = lb1History.filter(r => r.status === 'success')
+    const lb1Failed = lb1History.filter(r => r.status === 'failed')
     const lb1TotalVisits = lb1Success.reduce(
       (sum, r) => sum + (r.rawatJalan || 0) + (r.rawatInap || 0),
-      0,
-    );
+      0
+    )
 
-    const emrSuccess = emrHistory.filter((r) => r.state === "success").length;
-    const emrPartial = emrHistory.filter((r) => r.state === "partial").length;
-    const emrFailed = emrHistory.filter(
-      (r) => r.state === "failed" || r.state === "cancelled",
-    ).length;
+    const emrSuccess = emrHistory.filter(r => r.state === 'success').length
+    const emrPartial = emrHistory.filter(r => r.state === 'partial').length
+    const emrFailed = emrHistory.filter(r => r.state === 'failed' || r.state === 'cancelled').length
     const emrAvgLatency =
       emrHistory.length > 0
         ? Math.round(
-            emrHistory.reduce((sum, r) => sum + (r.totalLatencyMs || 0), 0) /
-              emrHistory.length,
+            emrHistory.reduce((sum, r) => sum + (r.totalLatencyMs || 0), 0) / emrHistory.length
           )
-        : 0;
+        : 0
 
     /* Module health derivation */
-    const lastLb1 = lb1History[0] || null;
-    const lastEmr = emrHistory[0] || null;
-    const lb1Status = !lastLb1
-      ? "unknown"
-      : lastLb1.status === "success"
-        ? "ok"
-        : "error";
+    const lastLb1 = lb1History[0] || null
+    const lastEmr = emrHistory[0] || null
+    const lb1Status = !lastLb1 ? 'unknown' : lastLb1.status === 'success' ? 'ok' : 'error'
     const emrStatus = !lastEmr
-      ? "unknown"
-      : lastEmr.state === "success"
-        ? "ok"
-        : lastEmr.state === "partial"
-          ? "warning"
-          : "error";
+      ? 'unknown'
+      : lastEmr.state === 'success'
+        ? 'ok'
+        : lastEmr.state === 'partial'
+          ? 'warning'
+          : 'error'
 
     return NextResponse.json({
       ok: true,
@@ -125,17 +107,17 @@ export async function GET(request: Request) {
         },
       },
       serverMetrics: (() => {
-        const mem = process.memoryUsage();
+        const mem = process.memoryUsage()
         return {
           memoryRssMb: Math.round(mem.rss / 1048576),
           heapUsedMb: Math.round(mem.heapUsed / 1048576),
           heapTotalMb: Math.round(mem.heapTotal / 1048576),
           externalMb: Math.round(mem.external / 1048576),
           uptimeSeconds: Math.floor(process.uptime()),
-        };
+        }
       })(),
       serverTime: new Date().toISOString(),
-      lb1Recent: lb1History.slice(0, 20).map((r) => ({
+      lb1Recent: lb1History.slice(0, 20).map(r => ({
         id: r.id,
         timestamp: r.timestamp,
         status: r.status,
@@ -146,7 +128,7 @@ export async function GET(request: Request) {
         validRows: r.validRows,
         invalidRows: r.invalidRows,
       })),
-      emrRecent: emrHistory.slice(0, 20).map((r) => ({
+      emrRecent: emrHistory.slice(0, 20).map(r => ({
         id: r.id,
         timestamp: r.timestamp,
         state: r.state,
@@ -154,7 +136,7 @@ export async function GET(request: Request) {
         error: r.error || null,
       })),
       crew,
-      pendingRegistrations: pendingRegistrations.map((r) => ({
+      pendingRegistrations: pendingRegistrations.map(r => ({
         id: r.id,
         username: r.username,
         displayName: r.displayName,
@@ -165,31 +147,28 @@ export async function GET(request: Request) {
       })),
       usageToday: (() => {
         try {
-          return getTodayUsageData();
+          return getTodayUsageData()
         } catch {
-          return { hours: [], dashboardCounts: [], emrClinicalCounts: [] };
+          return { hours: [], dashboardCounts: [], emrClinicalCounts: [] }
         }
       })(),
       recentLogins: (() => {
         try {
-          return getRecentLogins();
+          return getRecentLogins()
         } catch {
-          return [];
+          return []
         }
       })(),
       topUsers: (() => {
         try {
-          return getTopUsers(10);
+          return getTopUsers(10)
         } catch {
-          return [];
+          return []
         }
       })(),
-    });
+    })
   } catch (error) {
-    console.error("[Admin] Overview error:", error);
-    return NextResponse.json(
-      { ok: false, error: "Gagal memuat data overview." },
-      { status: 500 },
-    );
+    console.error('[Admin] Overview error:', error)
+    return NextResponse.json({ ok: false, error: 'Gagal memuat data overview.' }, { status: 500 })
   }
 }

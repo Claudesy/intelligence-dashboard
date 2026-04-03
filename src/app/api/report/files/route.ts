@@ -1,42 +1,37 @@
 // Architected and built by Claudesy.
-import { NextResponse } from "next/server";
-import fs from "node:fs";
-import path from "node:path";
-import { isCrewAuthorizedRequest } from "@/lib/server/crew-access-auth";
 
-export const runtime = "nodejs";
+import fs from 'node:fs'
+import path from 'node:path'
+import { NextResponse } from 'next/server'
+import { isCrewAuthorizedRequest } from '@/lib/server/crew-access-auth'
+
+export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   if (!isCrewAuthorizedRequest(request)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
-  const outputDir = path.join(process.cwd(), "runtime", "lb1-output");
+  const outputDir = path.join(process.cwd(), 'runtime', 'lb1-output')
 
   if (!fs.existsSync(outputDir)) {
-    return NextResponse.json({ ok: true, files: [], outputDir });
+    return NextResponse.json({ ok: true, files: [], outputDir })
   }
 
-  const entries = fs.readdirSync(outputDir);
+  const entries = fs.readdirSync(outputDir)
   const files = entries
-    .filter(
-      (f) =>
-        (f.startsWith("LB1_") || f.startsWith("REGIS_")) && f.endsWith(".xlsx"),
-    )
-    .map((f) => {
-      const fullPath = path.join(outputDir, f);
-      const stat = fs.statSync(fullPath);
+    .filter(f => (f.startsWith('LB1_') || f.startsWith('REGIS_')) && f.endsWith('.xlsx'))
+    .map(f => {
+      const fullPath = path.join(outputDir, f)
+      const stat = fs.statSync(fullPath)
       return {
         name: f,
         path: fullPath,
         sizeKb: Math.round(stat.size / 1024),
         generatedAt: stat.mtime.toISOString(),
-      };
+      }
     })
-    .sort((a, b) => b.name.localeCompare(a.name));
+    .sort((a, b) => b.name.localeCompare(a.name))
 
-  return NextResponse.json({ ok: true, files, outputDir });
+  return NextResponse.json({ ok: true, files, outputDir })
 }

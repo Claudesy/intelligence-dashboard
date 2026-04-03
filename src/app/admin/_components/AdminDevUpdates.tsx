@@ -1,178 +1,176 @@
 // The vision and craft of Claudesy.
-"use client";
+'use client'
 
-import type { DevUpdateCategory, DevUpdateRecord } from "@/lib/dev-updates";
-import { useCallback, useEffect, useState } from "react";
-import styles from "./AdminDevUpdates.module.css";
+import { useCallback, useEffect, useState } from 'react'
+import type { DevUpdateCategory, DevUpdateRecord } from '@/lib/dev-updates'
+import styles from './AdminDevUpdates.module.css'
 
 function categoryLabel(category: DevUpdateCategory): string {
   switch (category) {
-    case "release":
-      return "RELEASE";
-    case "maintenance":
-      return "MAINTENANCE";
+    case 'release':
+      return 'RELEASE'
+    case 'maintenance':
+      return 'MAINTENANCE'
     default:
-      return "IMPROVEMENT";
+      return 'IMPROVEMENT'
   }
 }
 
 function categoryBadgeClassName(category: DevUpdateCategory): string {
   switch (category) {
-    case "release":
-      return `${styles.badge} ${styles.badgeRelease}`;
-    case "maintenance":
-      return `${styles.badge} ${styles.badgeMaintenance}`;
+    case 'release':
+      return `${styles.badge} ${styles.badgeRelease}`
+    case 'maintenance':
+      return `${styles.badge} ${styles.badgeMaintenance}`
     default:
-      return `${styles.badge} ${styles.badgeDefault}`;
+      return `${styles.badge} ${styles.badgeDefault}`
   }
 }
 
 function formatDateTime(iso: string): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const d = new Date(iso)
+    return d.toLocaleString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   } catch {
-    return iso;
+    return iso
   }
 }
 
 function isExpired(expiresAt: string | null): boolean {
-  if (!expiresAt) return false;
-  return new Date(expiresAt) <= new Date();
+  if (!expiresAt) return false
+  return new Date(expiresAt) <= new Date()
 }
 
 export default function AdminDevUpdates() {
-  const [updates, setUpdates] = useState<DevUpdateRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [category, setCategory] = useState<DevUpdateCategory>("improvement");
-  const [expiresAt, setExpiresAt] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [updates, setUpdates] = useState<DevUpdateRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [category, setCategory] = useState<DevUpdateCategory>('improvement')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   const fetchUpdates = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/dev-updates", { cache: "no-store" });
+      const res = await fetch('/api/admin/dev-updates', { cache: 'no-store' })
       if (!res.ok) {
-        setError("Gagal memuat data update dev.");
-        return;
+        setError('Gagal memuat data update dev.')
+        return
       }
       const data = (await res.json()) as {
-        ok: boolean;
-        updates: DevUpdateRecord[];
-      };
+        ok: boolean
+        updates: DevUpdateRecord[]
+      }
       if (data.ok) {
-        setUpdates(data.updates);
+        setUpdates(data.updates)
       }
     } catch {
-      setError("Gagal memuat data update dev.");
+      setError('Gagal memuat data update dev.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    void fetchUpdates();
-  }, [fetchUpdates]);
+    void fetchUpdates()
+  }, [fetchUpdates])
 
   async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-    setSubmitting(true);
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setSubmitting(true)
 
     try {
-      const res = await fetch("/api/admin/dev-updates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/admin/dev-updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
           body: body.trim(),
           category,
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         }),
-      });
+      })
 
       const data = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        message?: string;
-      };
+        ok: boolean
+        error?: string
+        message?: string
+      }
       if (!data.ok) {
-        setError(data.error || "Gagal membuat update dev.");
-        return;
+        setError(data.error || 'Gagal membuat update dev.')
+        return
       }
 
-      setSuccess(data.message || "Update dev berhasil dibuat.");
-      setTitle("");
-      setBody("");
-      setCategory("improvement");
-      setExpiresAt("");
-      void fetchUpdates();
+      setSuccess(data.message || 'Update dev berhasil dibuat.')
+      setTitle('')
+      setBody('')
+      setCategory('improvement')
+      setExpiresAt('')
+      void fetchUpdates()
     } catch {
-      setError("Gagal membuat update dev.");
+      setError('Gagal membuat update dev.')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
   }
 
   async function handleDeactivate(id: string) {
-    setError("");
-    setSuccess("");
-    setDeactivatingId(id);
+    setError('')
+    setSuccess('')
+    setDeactivatingId(id)
 
     try {
       const res = await fetch(`/api/admin/dev-updates/${id}`, {
-        method: "DELETE",
-      });
+        method: 'DELETE',
+      })
       const data = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        message?: string;
-      };
+        ok: boolean
+        error?: string
+        message?: string
+      }
       if (!data.ok) {
-        setError(data.error || "Gagal menonaktifkan update dev.");
-        return;
+        setError(data.error || 'Gagal menonaktifkan update dev.')
+        return
       }
 
-      setSuccess(data.message || "Update dev dinonaktifkan.");
-      void fetchUpdates();
+      setSuccess(data.message || 'Update dev dinonaktifkan.')
+      void fetchUpdates()
     } catch {
-      setError("Gagal menonaktifkan update dev.");
+      setError('Gagal menonaktifkan update dev.')
     } finally {
-      setDeactivatingId(null);
+      setDeactivatingId(null)
     }
   }
 
   const orderedUpdates = [...updates].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
   const activeUpdates = orderedUpdates.filter(
-    (update) => update.active && !isExpired(update.expiresAt),
-  );
+    update => update.active && !isExpired(update.expiresAt)
+  )
   const inactiveUpdates = orderedUpdates.filter(
-    (update) => !update.active || isExpired(update.expiresAt),
-  );
+    update => !update.active || isExpired(update.expiresAt)
+  )
 
   if (loading) {
     return (
-      <div className={`${styles.statusMessage} ${styles.loadingMessage}`}>
-        Memuat update dev...
-      </div>
-    );
+      <div className={`${styles.statusMessage} ${styles.loadingMessage}`}>Memuat update dev...</div>
+    )
   }
 
-  const errorClassName = `${styles.feedback} ${styles.feedbackError}`;
-  const successClassName = `${styles.feedback} ${styles.feedbackSuccess}`;
+  const errorClassName = `${styles.feedback} ${styles.feedbackError}`
+  const successClassName = `${styles.feedback} ${styles.feedbackSuccess}`
 
   return (
     <div className={styles.root}>
@@ -188,7 +186,7 @@ export default function AdminDevUpdates() {
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               placeholder="Contoh: Patch SOAP editor sudah live"
               required
               maxLength={200}
@@ -200,7 +198,7 @@ export default function AdminDevUpdates() {
             <label className={styles.label}>Rincian</label>
             <textarea
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={e => setBody(e.target.value)}
               placeholder="Tulis ringkasan perubahan, scope, atau catatan operasional..."
               required
               maxLength={2000}
@@ -214,9 +212,7 @@ export default function AdminDevUpdates() {
               <label className={styles.label}>Kategori</label>
               <select
                 value={category}
-                onChange={(e) =>
-                  setCategory(e.target.value as DevUpdateCategory)
-                }
+                onChange={e => setCategory(e.target.value as DevUpdateCategory)}
                 title="Kategori update dev"
                 aria-label="Kategori update dev"
                 className={styles.input}
@@ -231,7 +227,7 @@ export default function AdminDevUpdates() {
               <input
                 type="datetime-local"
                 value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
+                onChange={e => setExpiresAt(e.target.value)}
                 title="Kedaluwarsa update dev"
                 aria-label="Kedaluwarsa update dev"
                 className={styles.input}
@@ -244,23 +240,19 @@ export default function AdminDevUpdates() {
             disabled={submitting || !title.trim() || !body.trim()}
             className={styles.primaryButton}
           >
-            {submitting ? "Mengirim..." : "Terbitkan Update"}
+            {submitting ? 'Mengirim...' : 'Terbitkan Update'}
           </button>
         </form>
       </div>
 
       <div>
-        <p className={styles.sectionKick}>
-          UPDATE AKTIF ({activeUpdates.length})
-        </p>
+        <p className={styles.sectionKick}>UPDATE AKTIF ({activeUpdates.length})</p>
 
         {activeUpdates.length === 0 ? (
-          <div className={styles.emptyState}>
-            Belum ada update dev aktif saat ini.
-          </div>
+          <div className={styles.emptyState}>Belum ada update dev aktif saat ini.</div>
         ) : (
           <div className={styles.cardList}>
-            {activeUpdates.map((update) => (
+            {activeUpdates.map(update => (
               <div key={update.id} className={styles.panel}>
                 <div className={styles.cardHeader}>
                   <div className={styles.cardBody}>
@@ -275,9 +267,7 @@ export default function AdminDevUpdates() {
                       <span>Oleh: {update.createdByName}</span>
                       <span>{formatDateTime(update.createdAt)}</span>
                       {update.expiresAt && (
-                        <span>
-                          Kedaluwarsa: {formatDateTime(update.expiresAt)}
-                        </span>
+                        <span>Kedaluwarsa: {formatDateTime(update.expiresAt)}</span>
                       )}
                     </div>
                   </div>
@@ -287,9 +277,7 @@ export default function AdminDevUpdates() {
                     disabled={deactivatingId === update.id}
                     className={styles.dangerButton}
                   >
-                    {deactivatingId === update.id
-                      ? "MEMPROSES..."
-                      : "NONAKTIFKAN"}
+                    {deactivatingId === update.id ? 'MEMPROSES...' : 'NONAKTIFKAN'}
                   </button>
                 </div>
               </div>
@@ -304,27 +292,22 @@ export default function AdminDevUpdates() {
             RIWAYAT ({inactiveUpdates.length})
           </p>
           <div className={styles.historyList}>
-            {inactiveUpdates.map((update) => (
-              <div
-                key={update.id}
-                className={`${styles.panel} ${styles.historyPanel}`}
-              >
+            {inactiveUpdates.map(update => (
+              <div key={update.id} className={`${styles.panel} ${styles.historyPanel}`}>
                 <div className={styles.historyTitleRow}>
                   <span className={categoryBadgeClassName(update.category)}>
                     {categoryLabel(update.category)}
                   </span>
                   <span className={styles.historyTitle}>{update.title}</span>
                   <span className={styles.historyBadge}>
-                    {!update.active ? "NONAKTIF" : "KEDALUWARSA"}
+                    {!update.active ? 'NONAKTIF' : 'KEDALUWARSA'}
                   </span>
                 </div>
                 <p className={styles.historyText}>{update.body}</p>
                 <div className={styles.historyMetaRow}>
                   <span>Oleh: {update.createdByName}</span>
                   <span>{formatDateTime(update.createdAt)}</span>
-                  {update.expiresAt && (
-                    <span>Kedaluwarsa: {formatDateTime(update.expiresAt)}</span>
-                  )}
+                  {update.expiresAt && <span>Kedaluwarsa: {formatDateTime(update.expiresAt)}</span>}
                 </div>
               </div>
             ))}
@@ -332,5 +315,5 @@ export default function AdminDevUpdates() {
         </div>
       )}
     </div>
-  );
+  )
 }

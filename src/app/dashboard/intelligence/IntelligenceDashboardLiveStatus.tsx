@@ -1,59 +1,53 @@
-"use client";
+'use client'
 
-import { getIntelligenceEventStatusLabel } from "@/lib/intelligence/socket-payload";
+import { getIntelligenceEventStatusLabel } from '@/lib/intelligence/socket-payload'
 
-import { useSharedIntelligenceSocket } from "./IntelligenceSocketProvider";
+import { useSharedIntelligenceSocket } from './IntelligenceSocketProvider'
 
-function resolveConnectionLabel(
-  isConnected: boolean,
-  isReconnecting: boolean,
-): string {
-  if (isReconnecting) return "Memperbarui...";
-  if (isConnected) return "Live";
-  return "Offline";
+function resolveConnectionLabel(isConnected: boolean, isReconnecting: boolean): string {
+  if (isReconnecting) return 'Memperbarui...'
+  if (isConnected) return 'Live'
+  return 'Offline'
 }
 
 export default function IntelligenceDashboardLiveStatus(): React.JSX.Element {
-  const socket = useSharedIntelligenceSocket();
+  const socket = useSharedIntelligenceSocket()
 
-  const latestEvent = socket.lastEncounterUpdate ?? socket.lastCriticalAlert;
-  const connLabel = resolveConnectionLabel(
-    socket.isConnected,
-    socket.isReconnecting,
-  );
-  const isLive = socket.isConnected;
+  const latestEvent = socket.lastEncounterUpdate ?? socket.lastCriticalAlert
+  const connLabel = resolveConnectionLabel(socket.isConnected, socket.isReconnecting)
+  const isLive = socket.isConnected
 
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "auto auto 1fr",
+        display: 'grid',
+        gridTemplateColumns: 'auto auto 1fr',
         gap: 16,
-        alignItems: "center",
-        border: "1px solid var(--line-base)",
+        alignItems: 'center',
+        border: '1px solid var(--line-base)',
         borderRadius: 6,
-        padding: "16px 20px",
-        background: "var(--bg-card)",
+        padding: '16px 20px',
+        background: 'var(--bg-card)',
       }}
     >
       {/* Status dot + label */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div
           style={{
             width: 8,
             height: 8,
-            borderRadius: "50%",
-            background: isLive ? "#4ade80" : "var(--text-muted)",
-            boxShadow: isLive ? "0 0 8px #4ade80" : "none",
+            borderRadius: '50%',
+            background: isLive ? '#4ade80' : 'var(--text-muted)',
+            boxShadow: isLive ? '0 0 8px #4ade80' : 'none',
           }}
         />
         <div
           style={{
             fontSize: 13,
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.1em",
-            color: isLive ? "#4ade80" : "var(--text-muted)",
-            textTransform: "uppercase",
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.1em',
+            color: isLive ? '#4ade80' : 'var(--text-muted)',
+            textTransform: 'uppercase',
           }}
         >
           {connLabel}
@@ -64,32 +58,32 @@ export default function IntelligenceDashboardLiveStatus(): React.JSX.Element {
       <div
         style={{
           fontSize: 12,
-          fontFamily: "var(--font-mono)",
-          color: "var(--text-muted)",
-          letterSpacing: "0.05em",
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--text-muted)',
+          letterSpacing: '0.05em',
           opacity: 0.6,
-          borderLeft: "1px solid var(--line-base)",
+          borderLeft: '1px solid var(--line-base)',
           paddingLeft: 16,
         }}
       >
-        {isLive ? "/intelligence namespace" : "Disconnected"}
+        {isLive ? '/intelligence namespace' : 'Disconnected'}
       </div>
 
       {/* Latest event */}
       <div
         style={{
           fontSize: 12,
-          color: "var(--text-muted)",
-          textAlign: "right",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          color: 'var(--text-muted)',
+          textAlign: 'right',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
         {latestEvent
           ? `${latestEvent.encounterId} · ${getIntelligenceEventStatusLabel(latestEvent.status)}`
-          : "To be filled — belum ada event live"}
+          : 'To be filled — belum ada event live'}
       </div>
     </div>
-  );
+  )
 }

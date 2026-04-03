@@ -2,38 +2,32 @@
 // GET /api/doctors/online — returns list of doctors currently online
 // Called by Assist (Chrome Extension) to populate "Send to Doctor" selector
 
-import { NextResponse } from "next/server";
-import { isCrewAuthorizedRequest } from "@/lib/server/crew-access-auth";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { isCrewAuthorizedRequest } from '@/lib/server/crew-access-auth'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   if (!isCrewAuthorizedRequest(request)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
     const online = await prisma.doctorStatus.findMany({
       where: { isOnline: true },
       select: { doctorName: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-    });
+      orderBy: { updatedAt: 'desc' },
+    })
 
-    const doctors = online.map((d) => ({
+    const doctors = online.map(d => ({
       id: d.doctorName,
       name: d.doctorName,
-      role: "dokter",
-    }));
+      role: 'dokter',
+    }))
 
-    return NextResponse.json({ ok: true, doctors });
+    return NextResponse.json({ ok: true, doctors })
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: 'Server error' }, { status: 500 })
   }
 }

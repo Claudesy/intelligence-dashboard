@@ -1,0 +1,90 @@
+---
+title: "Quick Start"
+description: "Get AADI running locally in under 5 minutes"
+---
+
+# Quick Start
+
+Get the AADI platform up and running on your local machine.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Node.js 20.9+">
+    Ensure Node.js v20.9.0 or later is installed.
+    ```bash
+    node -v
+    ```
+  </Step>
+  <Step title="PostgreSQL">
+    A running PostgreSQL instance (local or cloud).
+  </Step>
+  <Step title="API Keys">
+    You'll need API keys for:
+    - **DeepSeek** — Primary AI engine
+    - **Google Gemini** — Secondary AI + Voice
+    - **Sentry** — Error monitoring (optional)
+  </Step>
+</Steps>
+
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/sentra-healthcare/abyss-monorepo.git
+    cd abyss-monorepo/app/primary-healthcare/dashboard
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Configure environment">
+    Copy the example environment file and fill in your values:
+    ```bash
+    cp .env.example .env.local
+    ```
+    See [Setup Guide](/operations/setup) for detailed environment variable documentation.
+  </Step>
+  <Step title="Set up the database">
+    ```bash
+    npx prisma migrate dev
+    npm run seed
+    ```
+  </Step>
+  <Step title="Start the dev server">
+    ```bash
+    npm run dev
+    ```
+    The app runs at `http://localhost:3000` with the custom server handling both HTTP and WebSocket connections.
+  </Step>
+</Steps>
+
+<Warning>
+  AADI uses a **custom server** (`server.ts`) instead of the default `next dev`. 
+  Always use `npm run dev` to start the application — not `next dev` directly.
+</Warning>
+
+## Verify Installation
+
+After starting, verify these endpoints:
+
+| Endpoint | Expected |
+|----------|----------|
+| `http://localhost:3000` | AADI main interface |
+| `http://localhost:3000/api/auth/session` | Auth session check |
+| Socket.IO `/` namespace | WebSocket connected |
+| Socket.IO `/intelligence` namespace | Intelligence events |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Understand the system design
+  </Card>
+  <Card title="CDSS Engine" icon="brain" href="/features/cdss">
+    Learn about the diagnosis engine
+  </Card>
+</CardGroup>

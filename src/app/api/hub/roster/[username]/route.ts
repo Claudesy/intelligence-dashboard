@@ -1,42 +1,30 @@
 // Architected and built by Claudesy.
-import { NextResponse } from "next/server";
-import {
-  isCrewAuthorizedRequest,
-  listCrewAccessUsers,
-} from "@/lib/server/crew-access-auth";
-import { listAllCrewProfiles } from "@/lib/server/crew-access-profile";
+import { NextResponse } from 'next/server'
+import { isCrewAuthorizedRequest, listCrewAccessUsers } from '@/lib/server/crew-access-auth'
+import { listAllCrewProfiles } from '@/lib/server/crew-access-profile'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
 function maskValue(value: string): string {
-  return value ? "***" : "";
+  return value ? '***' : ''
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ username: string }> },
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ username: string }> }) {
   if (!isCrewAuthorizedRequest(request)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const { username } = await params;
-    const users = listCrewAccessUsers();
-    const profiles = listAllCrewProfiles();
-    const user = users.find((item) => item.username === username);
+    const { username } = await params
+    const users = listCrewAccessUsers()
+    const profiles = listAllCrewProfiles()
+    const user = users.find(item => item.username === username)
 
     if (!user) {
-      return NextResponse.json(
-        { ok: false, error: "User tidak ditemukan." },
-        { status: 404 },
-      );
+      return NextResponse.json({ ok: false, error: 'User tidak ditemukan.' }, { status: 404 })
     }
 
-    const profile = profiles.get(user.username);
+    const profile = profiles.get(user.username)
 
     return NextResponse.json({
       ok: true,
@@ -72,12 +60,9 @@ export async function GET(
             }
           : null,
       },
-    });
+    })
   } catch (error) {
-    console.error("[Hub] Roster detail error:", error);
-    return NextResponse.json(
-      { ok: false, error: "Gagal memuat profile crew." },
-      { status: 500 },
-    );
+    console.error('[Hub] Roster detail error:', error)
+    return NextResponse.json({ ok: false, error: 'Gagal memuat profile crew.' }, { status: 500 })
   }
 }

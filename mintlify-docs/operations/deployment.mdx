@@ -1,0 +1,37 @@
+---
+title: "Deployment"
+description: "Deploy AADI to production on Railway"
+---
+
+# Deployment
+
+AADI deploys to **Railway** using Nixpacks with Node 22.
+
+## Railway Configuration
+
+The deployment is configured via `railway.toml`:
+
+```toml
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "NODE_ENV=production tsx --conditions react-server server.ts"
+```
+
+## Environment Variables
+
+Ensure all required environment variables are set in Railway dashboard. See [Setup Guide](/operations/setup) for the full list.
+
+## CORS Origins (Production)
+
+```
+https://puskesmasbalowerti.com
+https://www.puskesmasbalowerti.com
+https://crew.puskesmasbalowerti.com
+https://primary-healthcare-production.up.railway.app
+```
+
+<Note>
+  For the full deployment guide, see the internal [DEPLOYMENT.md](https://github.com/sentra-healthcare/abyss-monorepo/blob/main/app/primary-healthcare/dashboard/docs/DEPLOYMENT.md).
+</Note>

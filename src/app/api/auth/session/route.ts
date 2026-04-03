@@ -1,16 +1,13 @@
 // Blueprinted & built by Claudesy.
-import { NextResponse } from "next/server";
-import { getCrewSessionFromRequest } from "@/lib/server/crew-access-auth";
+import { NextResponse } from 'next/server'
+import { getCrewSessionFromRequest } from '@/lib/server/crew-access-auth'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
-  const session = getCrewSessionFromRequest(request);
+  const session = getCrewSessionFromRequest(request)
   if (!session) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   return NextResponse.json({
@@ -24,5 +21,5 @@ export async function GET(request: Request) {
       role: session.role,
     },
     expiresAt: session.expiresAt,
-  });
+  })
 }

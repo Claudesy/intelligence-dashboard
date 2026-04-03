@@ -1,0 +1,44 @@
+---
+title: "Setup Guide"
+description: "Environment configuration and initial setup"
+---
+
+# Setup Guide
+
+Complete environment setup for AADI development and production.
+
+<Note>
+  For the full setup reference, see the internal [SETUP.md](https://github.com/sentra-healthcare/abyss-monorepo/blob/main/app/primary-healthcare/dashboard/docs/SETUP.md).
+</Note>
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and configure:
+
+```bash
+cp .env.example .env.local
+```
+
+### Required Variables
+
+| Variable | Description |
+|----------|------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `DEEPSEEK_API_KEY` | DeepSeek Reasoner API key |
+| `GOOGLE_AI_API_KEY` | Google Gemini API key |
+
+### Optional Variables
+
+| Variable | Description |
+|----------|------------|
+| `SENTRY_DSN` | Sentry error monitoring |
+| `LIVEKIT_*` | LiveKit telemedicine config |
+| `RESEND_API_KEY` | Email sending via Resend |
+
+## Database Setup
+
+```bash
+npx prisma migrate dev    # Run migrations
+npm run seed               # Seed initial data
+npm run db:studio           # Open Prisma Studio
+```

@@ -1,141 +1,137 @@
 // Masterplan and masterpiece by Claudesy.
-import "server-only";
+import 'server-only'
 
-import fs from "node:fs";
-import path from "node:path";
-import type { DevUpdateCategory, DevUpdateRecord } from "@/lib/dev-updates";
+import fs from 'node:fs'
+import path from 'node:path'
+import type { DevUpdateCategory, DevUpdateRecord } from '@/lib/dev-updates'
 
 interface CreateDevUpdateInput {
-  title: string;
-  body: string;
-  category: DevUpdateCategory;
-  expiresAt: string | null;
+  title: string
+  body: string
+  category: DevUpdateCategory
+  expiresAt: string | null
 }
 
 interface DevUpdateAuthor {
-  username: string;
-  displayName: string;
+  username: string
+  displayName: string
 }
 
 function getDevUpdateFilePath(): string {
-  return path.resolve(process.cwd(), "runtime", "dev-updates-board.json");
+  return path.resolve(process.cwd(), 'runtime', 'dev-updates-board.json')
 }
 
 function getDevUpdateLockFilePath(): string {
-  return `${getDevUpdateFilePath()}.lock`;
+  return `${getDevUpdateFilePath()}.lock`
 }
 
 function ensureRuntimeDirectory(filePath: string): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
 }
 
 async function withDevUpdateLock<T>(task: () => Promise<T>): Promise<T> {
-  const lockPath = getDevUpdateLockFilePath();
-  ensureRuntimeDirectory(lockPath);
-  const startedAt = Date.now();
+  const lockPath = getDevUpdateLockFilePath()
+  ensureRuntimeDirectory(lockPath)
+  const startedAt = Date.now()
 
   while (true) {
     try {
-      const handle = fs.openSync(lockPath, "wx");
+      const handle = fs.openSync(lockPath, 'wx')
 
       try {
-        return await task();
+        return await task()
       } finally {
-        fs.closeSync(handle);
-        fs.rmSync(lockPath, { force: true });
+        fs.closeSync(handle)
+        fs.rmSync(lockPath, { force: true })
       }
     } catch (error) {
       const isLockBusy =
         error instanceof Error &&
-        "code" in error &&
-        (error as NodeJS.ErrnoException).code === "EEXIST";
-      if (!isLockBusy) throw error;
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'EEXIST'
+      if (!isLockBusy) throw error
 
       try {
-        const stat = fs.statSync(lockPath);
+        const stat = fs.statSync(lockPath)
         if (Date.now() - stat.mtimeMs > 30_000) {
-          fs.rmSync(lockPath, { force: true });
-          continue;
+          fs.rmSync(lockPath, { force: true })
+          continue
         }
       } catch {
-        continue;
+        continue
       }
 
       if (Date.now() - startedAt > 2000) {
-        throw new Error(
-          "Board update dev sedang sibuk. Silakan coba lagi beberapa saat.",
-        );
+        throw new Error('Board update dev sedang sibuk. Silakan coba lagi beberapa saat.')
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50))
     }
   }
 }
 
 export function loadDevUpdates(): DevUpdateRecord[] {
-  const filePath = getDevUpdateFilePath();
-  if (!fs.existsSync(filePath)) return [];
+  const filePath = getDevUpdateFilePath()
+  if (!fs.existsSync(filePath)) return []
 
-  const raw = fs.readFileSync(filePath, "utf-8").trim();
-  if (!raw) return [];
+  const raw = fs.readFileSync(filePath, 'utf-8').trim()
+  if (!raw) return []
 
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as DevUpdateRecord[]) : [];
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? (parsed as DevUpdateRecord[]) : []
   } catch {
-    throw new Error("File board update dev rusak dan perlu diperbaiki.");
+    throw new Error('File board update dev rusak dan perlu diperbaiki.')
   }
 }
 
 function saveDevUpdates(records: DevUpdateRecord[]): void {
-  const filePath = getDevUpdateFilePath();
-  ensureRuntimeDirectory(filePath);
+  const filePath = getDevUpdateFilePath()
+  ensureRuntimeDirectory(filePath)
 
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(records, null, 2), "utf-8");
-  fs.renameSync(tempPath, filePath);
+  const tempPath = `${filePath}.tmp`
+  fs.writeFileSync(tempPath, JSON.stringify(records, null, 2), 'utf-8')
+  fs.renameSync(tempPath, filePath)
 }
 
-const VALID_CATEGORIES = new Set(["release", "improvement", "maintenance"]);
+const VALID_CATEGORIES = new Set(['release', 'improvement', 'maintenance'])
 
 function sortByLatest(records: DevUpdateRecord[]): DevUpdateRecord[] {
   return [...records].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
 }
 
 function validateCreateInput(raw: unknown): CreateDevUpdateInput {
-  if (!raw || typeof raw !== "object") {
-    throw new Error("Payload update dev tidak valid.");
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Payload update dev tidak valid.')
   }
 
-  const body = raw as Record<string, unknown>;
-  const title = String(body.title ?? "").trim();
-  const content = String(body.body ?? "").trim();
-  const category = String(body.category ?? "improvement").trim();
-  const expiresAt = body.expiresAt ? String(body.expiresAt).trim() : null;
+  const body = raw as Record<string, unknown>
+  const title = String(body.title ?? '').trim()
+  const content = String(body.body ?? '').trim()
+  const category = String(body.category ?? 'improvement').trim()
+  const expiresAt = body.expiresAt ? String(body.expiresAt).trim() : null
 
   if (!title || title.length < 3 || title.length > 200) {
-    throw new Error("Judul update dev harus 3-200 karakter.");
+    throw new Error('Judul update dev harus 3-200 karakter.')
   }
 
   if (!content || content.length < 3 || content.length > 2000) {
-    throw new Error("Isi update dev harus 3-2000 karakter.");
+    throw new Error('Isi update dev harus 3-2000 karakter.')
   }
 
   if (!VALID_CATEGORIES.has(category)) {
-    throw new Error(
-      "Kategori harus salah satu dari: release, improvement, maintenance.",
-    );
+    throw new Error('Kategori harus salah satu dari: release, improvement, maintenance.')
   }
 
   if (expiresAt) {
-    const parsed = new Date(expiresAt);
+    const parsed = new Date(expiresAt)
     if (Number.isNaN(parsed.getTime())) {
-      throw new Error("Tanggal kedaluwarsa tidak valid.");
+      throw new Error('Tanggal kedaluwarsa tidak valid.')
     }
     if (parsed <= new Date()) {
-      throw new Error("Tanggal kedaluwarsa harus di masa mendatang.");
+      throw new Error('Tanggal kedaluwarsa harus di masa mendatang.')
     }
   }
 
@@ -144,17 +140,17 @@ function validateCreateInput(raw: unknown): CreateDevUpdateInput {
     body: content,
     category: category as DevUpdateCategory,
     expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
-  };
+  }
 }
 
 export async function createDevUpdate(
   raw: unknown,
-  author: DevUpdateAuthor,
+  author: DevUpdateAuthor
 ): Promise<DevUpdateRecord> {
-  const input = validateCreateInput(raw);
+  const input = validateCreateInput(raw)
 
   return withDevUpdateLock(async () => {
-    const records = loadDevUpdates();
+    const records = loadDevUpdates()
 
     const record: DevUpdateRecord = {
       id: `devupdate_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -166,44 +162,44 @@ export async function createDevUpdate(
       createdAt: new Date().toISOString(),
       expiresAt: input.expiresAt,
       active: true,
-    };
+    }
 
-    records.push(record);
-    saveDevUpdates(records);
+    records.push(record)
+    saveDevUpdates(records)
 
-    return record;
-  });
+    return record
+  })
 }
 
 export async function deactivateDevUpdate(id: string): Promise<boolean> {
   return withDevUpdateLock(async () => {
-    const records = loadDevUpdates();
-    const index = records.findIndex((record) => record.id === id);
-    if (index < 0) return false;
+    const records = loadDevUpdates()
+    const index = records.findIndex(record => record.id === id)
+    if (index < 0) return false
 
-    records[index] = { ...records[index], active: false };
-    saveDevUpdates(records);
+    records[index] = { ...records[index], active: false }
+    saveDevUpdates(records)
 
-    return true;
-  });
+    return true
+  })
 }
 
 export function getActiveDevUpdates(): DevUpdateRecord[] {
-  const records = loadDevUpdates();
-  const now = new Date();
+  const records = loadDevUpdates()
+  const now = new Date()
 
   return sortByLatest(
-    records.filter((record) => {
-      if (!record.active) return false;
+    records.filter(record => {
+      if (!record.active) return false
       if (record.expiresAt) {
-        const expiry = new Date(record.expiresAt);
-        if (expiry <= now) return false;
+        const expiry = new Date(record.expiresAt)
+        if (expiry <= now) return false
       }
-      return true;
-    }),
-  );
+      return true
+    })
+  )
 }
 
 export function listAllDevUpdates(): DevUpdateRecord[] {
-  return sortByLatest(loadDevUpdates());
+  return sortByLatest(loadDevUpdates())
 }

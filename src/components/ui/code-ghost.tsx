@@ -1,7 +1,7 @@
 // Masterplan and masterpiece by Claudesy.
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 
 /* 5 script real — cycling: type → hold → erase → next */
 
@@ -75,102 +75,94 @@ const eligibility = await bpjs.checkEligibility({
 });
 
 return eligibility.status === "AKTIF";`,
-];
+]
 
 function colorize(line: string): React.ReactNode[] {
-  const tokens: React.ReactNode[] = [];
-  let rest = line;
-  let i = 0;
+  const tokens: React.ReactNode[] = []
+  let rest = line
+  let i = 0
 
   const rules: [RegExp, string][] = [
-    [
-      /^(const|let|async|await|new|if|return|for|of|true|false|function)(?=\W)/,
-      "#ef6f2e",
-    ],
-    [/^`[^`]*`/, "#8a8380"],
-    [/^"[^"]*"/, "#8a8380"],
-    [/^'[^']*'/, "#8a8380"],
-    [/^\/\/.*/, "#2e2c2b"],
-    [/^[0-9]+(\.[0-9]+)?/, "#ef6f2e"],
-    [/^[A-Z][a-zA-Z0-9_]+/, "#d6d3d2"],
-    [/^[a-z_][a-zA-Z0-9_]*(?=\s*[:(,])/, "#a49d9a"],
-    [/^[a-z_][a-zA-Z0-9_]*/, "#ededed"],
-    [/^[=><!+\-*/.,;{}()[\]`]+/, "#3d3a39"],
-    [/^\s+/, "transparent"],
-  ];
+    [/^(const|let|async|await|new|if|return|for|of|true|false|function)(?=\W)/, '#ef6f2e'],
+    [/^`[^`]*`/, '#8a8380'],
+    [/^"[^"]*"/, '#8a8380'],
+    [/^'[^']*'/, '#8a8380'],
+    [/^\/\/.*/, '#2e2c2b'],
+    [/^[0-9]+(\.[0-9]+)?/, '#ef6f2e'],
+    [/^[A-Z][a-zA-Z0-9_]+/, '#d6d3d2'],
+    [/^[a-z_][a-zA-Z0-9_]*(?=\s*[:(,])/, '#a49d9a'],
+    [/^[a-z_][a-zA-Z0-9_]*/, '#ededed'],
+    [/^[=><!+\-*/.,;{}()[\]`]+/, '#3d3a39'],
+    [/^\s+/, 'transparent'],
+  ]
 
   while (rest.length > 0) {
-    let matched = false;
+    let matched = false
     for (const [re, color] of rules) {
-      const m = rest.match(re);
+      const m = rest.match(re)
       if (m) {
         tokens.push(
           <span key={i++} style={{ color }}>
             {m[0]}
-          </span>,
-        );
-        rest = rest.slice(m[0].length);
-        matched = true;
-        break;
+          </span>
+        )
+        rest = rest.slice(m[0].length)
+        matched = true
+        break
       }
     }
     if (!matched) {
       tokens.push(
-        <span key={i++} style={{ color: "#3d3a39" }}>
+        <span key={i++} style={{ color: '#3d3a39' }}>
           {rest[0]}
-        </span>,
-      );
-      rest = rest.slice(1);
+        </span>
+      )
+      rest = rest.slice(1)
     }
   }
-  return tokens;
+  return tokens
 }
 
-const CHAR_DELAY = 22;
-const HOLD_MS = 2800;
-const ERASE_DELAY = 6;
-const PAUSE_MS = 600;
+const CHAR_DELAY = 22
+const HOLD_MS = 2800
+const ERASE_DELAY = 6
+const PAUSE_MS = 600
 
 export function CodeGhost() {
-  const [scriptIdx, setScriptIdx] = useState(0);
-  const [displayed, setDisplayed] = useState("");
-  const [phase, setPhase] = useState<
-    "typing" | "holding" | "erasing" | "pausing"
-  >("pausing");
+  const [scriptIdx, setScriptIdx] = useState(0)
+  const [displayed, setDisplayed] = useState('')
+  const [phase, setPhase] = useState<'typing' | 'holding' | 'erasing' | 'pausing'>('pausing')
 
-  const FULL = SCRIPTS[scriptIdx];
+  const FULL = SCRIPTS[scriptIdx]
 
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
+    let t: ReturnType<typeof setTimeout>
 
-    if (phase === "typing") {
+    if (phase === 'typing') {
       if (displayed.length < FULL.length) {
-        t = setTimeout(
-          () => setDisplayed(FULL.slice(0, displayed.length + 1)),
-          CHAR_DELAY,
-        );
+        t = setTimeout(() => setDisplayed(FULL.slice(0, displayed.length + 1)), CHAR_DELAY)
       } else {
-        t = setTimeout(() => setPhase("holding"), HOLD_MS);
+        t = setTimeout(() => setPhase('holding'), HOLD_MS)
       }
-    } else if (phase === "holding") {
-      t = setTimeout(() => setPhase("erasing"), HOLD_MS);
-    } else if (phase === "erasing") {
+    } else if (phase === 'holding') {
+      t = setTimeout(() => setPhase('erasing'), HOLD_MS)
+    } else if (phase === 'erasing') {
       if (displayed.length > 0) {
-        t = setTimeout(() => setDisplayed((d) => d.slice(0, -1)), ERASE_DELAY);
+        t = setTimeout(() => setDisplayed(d => d.slice(0, -1)), ERASE_DELAY)
       } else {
         t = setTimeout(() => {
-          setScriptIdx((i) => (i + 1) % SCRIPTS.length);
-          setPhase("pausing");
-        }, PAUSE_MS);
+          setScriptIdx(i => (i + 1) % SCRIPTS.length)
+          setPhase('pausing')
+        }, PAUSE_MS)
       }
     } else {
-      t = setTimeout(() => setPhase("typing"), PAUSE_MS);
+      t = setTimeout(() => setPhase('typing'), PAUSE_MS)
     }
 
-    return () => clearTimeout(t);
-  }, [phase, displayed, FULL]);
+    return () => clearTimeout(t)
+  }, [phase, displayed, FULL])
 
-  const lines = displayed.split("\n");
+  const lines = displayed.split('\n')
 
   return (
     <div
@@ -180,10 +172,10 @@ export function CodeGhost() {
     >
       <pre
         style={{
-          fontSize: "13px",
-          userSelect: "none",
-          textAlign: "left",
-          whiteSpace: "pre",
+          fontSize: '13px',
+          userSelect: 'none',
+          textAlign: 'left',
+          whiteSpace: 'pre',
         }}
       >
         {lines.map((line, li) => (
@@ -192,13 +184,13 @@ export function CodeGhost() {
             {li === lines.length - 1 && (
               <span
                 style={{
-                  display: "inline-block",
-                  width: "1px",
-                  height: "13px",
-                  background: "#ef6f2e",
-                  marginLeft: "1px",
-                  verticalAlign: "middle",
-                  animation: "cursorBlink 0.8s step-end infinite",
+                  display: 'inline-block',
+                  width: '1px',
+                  height: '13px',
+                  background: '#ef6f2e',
+                  marginLeft: '1px',
+                  verticalAlign: 'middle',
+                  animation: 'cursorBlink 0.8s step-end infinite',
                 }}
               />
             )}
@@ -213,5 +205,5 @@ export function CodeGhost() {
         }
       `}</style>
     </div>
-  );
+  )
 }

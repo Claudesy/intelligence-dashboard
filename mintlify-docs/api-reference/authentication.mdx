@@ -1,0 +1,31 @@
+---
+title: "Autentikasi"
+description: "Cara mengautentikasi permintaan Anda dengan API AADI (Augmented Artificial Intelligence Diagnosis Integrated)."
+---
+
+AADI menggunakan autentikasi berbasis sesi untuk dashboard dan autentikasi berbasis token API untuk relasi otomatisasi.
+
+## Autentikasi Sesi (cookieAuth)
+
+Sebagian besar endpoint klinis memerlukan cookie sesi yang valid.
+
+1.  **Login**: POST ke `/api/auth/login` dengan kredensial Anda.
+2.  **Cookie**: Cookie `session` akan ditetapkan di browser Anda.
+3.  **Otomatis**: Permintaan selanjutnya dari browser akan menyertakan cookie ini secara otomatis.
+
+## Autentikasi Otomatisasi & Relay (crewAccessToken)
+
+Endpoint relay (seperti sinkronisasi EMR) menggunakan token header statis.
+
+1.  **Header**: Sertakan `X-Crew-Access-Token` dalam header permintaan Anda.
+2.  **Nilai**: Gunakan token yang disediakan untuk fasilitas atau sistem spesifik Anda.
+
+```http
+X-Crew-Access-Token: token_anda_di_sini
+```
+
+## Praktik Keamanan Terbaik
+
+- Selalu gunakan HTTPS di lingkungan produksi.
+- Jangan bagikan token otomatisasi Anda.
+- Data klinis (PHI) diaudit secara ketat berdasarkan identitas yang terautentikasi.

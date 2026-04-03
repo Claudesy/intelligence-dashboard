@@ -3,7 +3,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Socket } from 'socket.io-client'
-import { io as socketIO } from 'socket.io-client'
 import type { EMRProgressEvent } from '@/lib/emr/types'
 import { IcdAutocomplete } from '@/components/features/icd/IcdAutocomplete'
 
@@ -47,18 +46,26 @@ export default function EMRTransferPanel() {
 
   // Socket.IO connection
   useEffect(() => {
-    const s = socketIO({ path: '/socket.io' })
+    let s: Socket | null = null
+    let active = true
 
-    s.on('emr:progress', (event: EMRProgressEvent) => {
-      setProgressItems(prev => [...prev, event])
-      if (event.step === 'done') {
-        setTransferState(event.status === 'success' ? 'done' : 'error')
-      }
+    import('socket.io-client').then(({ io }) => {
+      if (!active) return
+      s = io({ path: '/socket.io' })
+
+      s.on('emr:progress', (event: EMRProgressEvent) => {
+        setProgressItems(prev => [...prev, event])
+        if (event.step === 'done') {
+          setTransferState(event.status === 'success' ? 'done' : 'error')
+        }
+      })
+
+      setSocket(s)
     })
 
-    setSocket(s)
     return () => {
-      s.disconnect()
+      active = false
+      s?.disconnect()
     }
   }, [])
 

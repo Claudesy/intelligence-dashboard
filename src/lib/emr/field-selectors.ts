@@ -7,20 +7,20 @@
 
 export interface VisitFieldSelectorMap {
   vitals: {
-    sbp: string[];
-    dbp: string[];
-    hr: string[];
-    rr: string[];
-    temp: string[];
-    glucose: string[];
-  };
+    sbp: string[]
+    dbp: string[]
+    hr: string[]
+    rr: string[]
+    temp: string[]
+    glucose: string[]
+  }
   complaints: {
-    keluhanUtama: string[];
-  };
+    keluhanUtama: string[]
+  }
   diagnosis: {
-    icd: string[];
-    nama: string[];
-  };
+    icd: string[]
+    nama: string[]
+  }
 }
 
 export const VISIT_FIELD_SELECTORS: VisitFieldSelectorMap = {
@@ -58,7 +58,7 @@ export const VISIT_FIELD_SELECTORS: VisitFieldSelectorMap = {
       'input[id*="temp"]',
     ],
     glucose: [
-      "input#gula-darah",
+      'input#gula-darah',
       'input[name="PeriksaFisik[gula_darah]"]',
       'input[name*="[gula_darah]"]',
       'input[id*="gula"]',
@@ -75,22 +75,18 @@ export const VISIT_FIELD_SELECTORS: VisitFieldSelectorMap = {
   },
   diagnosis: {
     icd: ['input[name="icd_x"]', 'input[name*="[icd"]', 'input[id*="icd"]'],
-    nama: [
-      'input[name="diagnosa"]',
-      'input[name*="[diagnosa]"]',
-      'input[id*="diagnosa"]',
-    ],
+    nama: ['input[name="diagnosa"]', 'input[name*="[diagnosa]"]', 'input[id*="diagnosa"]'],
   },
-};
+}
 
 export const VISIT_LABEL_KEYWORDS = {
-  sbp: ["sistole", "sistolik"],
-  dbp: ["diastole", "diastolik"],
-  hr: ["detak nadi", "nadi", "heart rate"],
-  rr: ["nafas", "respirasi", "respiratory rate"],
-  temp: ["suhu", "temperatur", "temperature"],
-  glucose: ["gula darah", "glukosa", "glucose"],
-  keluhanUtama: ["keluhan utama", "keluhan"],
-  icd: ["icd", "icd-x", "icdx"],
-  diagnosa: ["diagnosa", "diagnosis"],
-} as const;
+  sbp: ['sistole', 'sistolik'],
+  dbp: ['diastole', 'diastolik'],
+  hr: ['detak nadi', 'nadi', 'heart rate'],
+  rr: ['nafas', 'respirasi', 'respiratory rate'],
+  temp: ['suhu', 'temperatur', 'temperature'],
+  glucose: ['gula darah', 'glukosa', 'glucose'],
+  keluhanUtama: ['keluhan utama', 'keluhan'],
+  icd: ['icd', 'icd-x', 'icdx'],
+  diagnosa: ['diagnosa', 'diagnosis'],
+} as const

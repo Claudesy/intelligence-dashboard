@@ -1,106 +1,105 @@
 // Structured with care by Claudesy.
 
 export interface ClinicalReportPatient {
-  noRM: string;
-  nama: string;
-  umur: string;
-  jenisKelamin: "L" | "P";
-  alamat: string;
+  noRM: string
+  nama: string
+  umur: string
+  jenisKelamin: 'L' | 'P'
+  alamat: string
 }
 
 export interface ClinicalReportAnamnesa {
-  keluhanUtama: string;
-  rps: string;
-  rpd: string;
-  rpk: string;
-  alergi: string;
+  keluhanUtama: string
+  rps: string
+  rpd: string
+  rpk: string
+  alergi: string
 }
 
 export interface ClinicalReportPhysicalExam {
-  tdSistolik: string;
-  tdDiastolik: string;
-  nadi: string;
-  suhu: string;
-  napas: string;
-  spo2: string;
-  bb: string;
-  tb: string;
-  keadaanUmum: string;
-  kesadaran: string;
-  pemeriksaanLain: string;
+  tdSistolik: string
+  tdDiastolik: string
+  nadi: string
+  suhu: string
+  napas: string
+  spo2: string
+  bb: string
+  tb: string
+  keadaanUmum: string
+  kesadaran: string
+  pemeriksaanLain: string
 }
 
 export interface ClinicalReportAssessment {
-  diagnosisKerja: string;
-  icd10: string;
-  diagnosisBanding: string;
-  prognosis: string;
+  diagnosisKerja: string
+  icd10: string
+  diagnosisBanding: string
+  prognosis: string
 }
 
 export interface ClinicalReportPlan {
-  terapi: string;
-  tindakan: string;
-  edukasi: string;
-  tindakLanjut: string;
+  terapi: string
+  tindakan: string
+  edukasi: string
+  tindakLanjut: string
 }
 
 export interface ClinicalReportClosing {
-  dokter: string;
-  perawat: string;
-  tanggalPemeriksaan: string;
-  jamPemeriksaan: string;
+  dokter: string
+  perawat: string
+  tanggalPemeriksaan: string
+  jamPemeriksaan: string
 }
 
 export interface ClinicalReportAuditTrail {
-  phase?: string;
-  trialMode?: boolean;
-  savedForAudit?: boolean;
-  generatedAt?: string;
-  diagnosisSource?: string;
-  careMode?: string;
-  referralDiagnoses?: string[];
-  manualMedicationEntries?: unknown[];
-  aiMedicationRecommendations?: unknown[];
-  selectedAIMedications?: unknown[];
-  [key: string]: unknown;
+  phase?: string
+  trialMode?: boolean
+  savedForAudit?: boolean
+  generatedAt?: string
+  diagnosisSource?: string
+  careMode?: string
+  referralDiagnoses?: string[]
+  manualMedicationEntries?: unknown[]
+  aiMedicationRecommendations?: unknown[]
+  selectedAIMedications?: unknown[]
+  [key: string]: unknown
 }
 
 export interface ClinicalReportSourceRefs {
-  appointmentId?: string;
-  consultId?: string;
-  origin?: string;
-  actorUserId?: string;
-  actorName?: string;
+  appointmentId?: string
+  consultId?: string
+  origin?: string
+  actorUserId?: string
+  actorName?: string
 }
 
 export interface ClinicalReport {
-  id: string;
-  nomor: number;
-  createdAt: string;
-  pdfAvailable?: boolean;
-  pdfGeneratedAt?: string | null;
-  sourceRefs?: ClinicalReportSourceRefs;
-  auditTrail: ClinicalReportAuditTrail;
-  pasien: ClinicalReportPatient;
-  anamnesa: ClinicalReportAnamnesa;
-  pemeriksaanFisik: ClinicalReportPhysicalExam;
-  asesmen: ClinicalReportAssessment;
-  tataLaksana: ClinicalReportPlan;
-  penutup: ClinicalReportClosing;
+  id: string
+  nomor: number
+  createdAt: string
+  pdfAvailable?: boolean
+  pdfGeneratedAt?: string | null
+  sourceRefs?: ClinicalReportSourceRefs
+  auditTrail: ClinicalReportAuditTrail
+  pasien: ClinicalReportPatient
+  anamnesa: ClinicalReportAnamnesa
+  pemeriksaanFisik: ClinicalReportPhysicalExam
+  asesmen: ClinicalReportAssessment
+  tataLaksana: ClinicalReportPlan
+  penutup: ClinicalReportClosing
 }
-
 
 function escapeHtml(value: string): string {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function multilineHtml(value: string): string {
-  return escapeHtml(value || "—").replace(/\n/g, "<br />");
+  return escapeHtml(value || '—').replace(/\n/g, '<br />')
 }
 
 function fieldBlock(label: string, value: string): string {
@@ -109,40 +108,40 @@ function fieldBlock(label: string, value: string): string {
       <div class="field-label">${escapeHtml(label)}</div>
       <div class="field-value">${multilineHtml(value)}</div>
     </div>
-  `;
+  `
 }
 
 export function formatClinicalReportDate(iso: string): string {
   try {
-    const date = new Date(iso);
+    const date = new Date(iso)
     if (isNaN(date.getTime())) {
-      return iso;
+      return iso
     }
-    return date.toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   } catch {
-    return iso;
+    return iso
   }
 }
 
 export function renderClinicalReportHtml(report: ClinicalReport): string {
   const patientRows = [
-    ["NO. RM", report.pasien.noRM],
-    ["NAMA", report.pasien.nama],
-    ["UMUR", report.pasien.umur || "—"],
-    ["JK", report.pasien.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"],
-    ["ALAMAT", report.pasien.alamat || "—"],
-  ];
+    ['NO. RM', report.pasien.noRM],
+    ['NAMA', report.pasien.nama],
+    ['UMUR', report.pasien.umur || '—'],
+    ['JK', report.pasien.jenisKelamin === 'L' ? 'Laki-laki' : 'Perempuan'],
+    ['ALAMAT', report.pasien.alamat || '—'],
+  ]
 
   const tekananDarah =
     report.pemeriksaanFisik.tdSistolik && report.pemeriksaanFisik.tdDiastolik
       ? `${report.pemeriksaanFisik.tdSistolik}/${report.pemeriksaanFisik.tdDiastolik} mmHg`
-      : "—";
+      : '—'
 
   return `
     <!DOCTYPE html>
@@ -286,108 +285,108 @@ export function renderClinicalReportHtml(report: ClinicalReport): string {
                 <div class="patient-label">${escapeHtml(label)}</div>
                 <div class="patient-value">${escapeHtml(value)}</div>
               </div>
-            `,
+            `
               )
-              .join("")}
+              .join('')}
           </div>
 
           <div class="section">
             <div class="section-title">SUBJEKTIF (S) — ANAMNESA</div>
-            ${fieldBlock("Keluhan Utama", report.anamnesa.keluhanUtama)}
-            ${fieldBlock("Riwayat Penyakit Sekarang", report.anamnesa.rps)}
+            ${fieldBlock('Keluhan Utama', report.anamnesa.keluhanUtama)}
+            ${fieldBlock('Riwayat Penyakit Sekarang', report.anamnesa.rps)}
             <div class="grid-3">
-              ${fieldBlock("RPD", report.anamnesa.rpd)}
-              ${fieldBlock("RPK", report.anamnesa.rpk)}
-              ${fieldBlock("Alergi", report.anamnesa.alergi)}
+              ${fieldBlock('RPD', report.anamnesa.rpd)}
+              ${fieldBlock('RPK', report.anamnesa.rpk)}
+              ${fieldBlock('Alergi', report.anamnesa.alergi)}
             </div>
           </div>
 
           <div class="section">
             <div class="section-title">OBJEKTIF (O) — PEMERIKSAAN FISIK</div>
             <div class="grid-4">
-              ${fieldBlock("Tekanan Darah", tekananDarah)}
-              ${fieldBlock("Nadi", report.pemeriksaanFisik.nadi ? `${report.pemeriksaanFisik.nadi} x/mnt` : "—")}
-              ${fieldBlock("Suhu", report.pemeriksaanFisik.suhu ? `${report.pemeriksaanFisik.suhu} °C` : "—")}
-              ${fieldBlock("Napas", report.pemeriksaanFisik.napas ? `${report.pemeriksaanFisik.napas} x/mnt` : "—")}
+              ${fieldBlock('Tekanan Darah', tekananDarah)}
+              ${fieldBlock('Nadi', report.pemeriksaanFisik.nadi ? `${report.pemeriksaanFisik.nadi} x/mnt` : '—')}
+              ${fieldBlock('Suhu', report.pemeriksaanFisik.suhu ? `${report.pemeriksaanFisik.suhu} °C` : '—')}
+              ${fieldBlock('Napas', report.pemeriksaanFisik.napas ? `${report.pemeriksaanFisik.napas} x/mnt` : '—')}
             </div>
             <div class="grid-4">
-              ${fieldBlock("SpO2", report.pemeriksaanFisik.spo2 ? `${report.pemeriksaanFisik.spo2}%` : "—")}
-              ${fieldBlock("Berat Badan", report.pemeriksaanFisik.bb ? `${report.pemeriksaanFisik.bb} kg` : "—")}
-              ${fieldBlock("Tinggi Badan", report.pemeriksaanFisik.tb ? `${report.pemeriksaanFisik.tb} cm` : "—")}
-              ${fieldBlock("Keadaan Umum", report.pemeriksaanFisik.keadaanUmum)}
+              ${fieldBlock('SpO2', report.pemeriksaanFisik.spo2 ? `${report.pemeriksaanFisik.spo2}%` : '—')}
+              ${fieldBlock('Berat Badan', report.pemeriksaanFisik.bb ? `${report.pemeriksaanFisik.bb} kg` : '—')}
+              ${fieldBlock('Tinggi Badan', report.pemeriksaanFisik.tb ? `${report.pemeriksaanFisik.tb} cm` : '—')}
+              ${fieldBlock('Keadaan Umum', report.pemeriksaanFisik.keadaanUmum)}
             </div>
             <div class="grid-2">
-              ${fieldBlock("Kesadaran", report.pemeriksaanFisik.kesadaran)}
-              ${fieldBlock("Pemeriksaan Fisik Lain", report.pemeriksaanFisik.pemeriksaanLain)}
+              ${fieldBlock('Kesadaran', report.pemeriksaanFisik.kesadaran)}
+              ${fieldBlock('Pemeriksaan Fisik Lain', report.pemeriksaanFisik.pemeriksaanLain)}
             </div>
           </div>
 
           <div class="section">
             <div class="section-title">ASESMEN (A)</div>
             <div class="grid-2">
-              ${fieldBlock("Diagnosis Kerja", report.asesmen.diagnosisKerja)}
-              ${fieldBlock("Kode ICD-10", report.asesmen.icd10)}
+              ${fieldBlock('Diagnosis Kerja', report.asesmen.diagnosisKerja)}
+              ${fieldBlock('Kode ICD-10', report.asesmen.icd10)}
             </div>
             <div class="grid-2">
-              ${fieldBlock("Diagnosis Banding", report.asesmen.diagnosisBanding)}
-              ${fieldBlock("Prognosis", report.asesmen.prognosis)}
+              ${fieldBlock('Diagnosis Banding', report.asesmen.diagnosisBanding)}
+              ${fieldBlock('Prognosis', report.asesmen.prognosis)}
             </div>
           </div>
 
           <div class="section">
             <div class="section-title">TATA LAKSANA (P)</div>
             <div class="grid-2">
-              ${fieldBlock("Terapi / Resep", report.tataLaksana.terapi)}
-              ${fieldBlock("Tindakan", report.tataLaksana.tindakan)}
+              ${fieldBlock('Terapi / Resep', report.tataLaksana.terapi)}
+              ${fieldBlock('Tindakan', report.tataLaksana.tindakan)}
             </div>
             <div class="grid-2">
-              ${fieldBlock("Edukasi", report.tataLaksana.edukasi)}
-              ${fieldBlock("Rencana Tindak Lanjut", report.tataLaksana.tindakLanjut)}
+              ${fieldBlock('Edukasi', report.tataLaksana.edukasi)}
+              ${fieldBlock('Rencana Tindak Lanjut', report.tataLaksana.tindakLanjut)}
             </div>
           </div>
 
           <div class="signature-grid">
             <div class="signature">
               <div class="section-label">Dokter Pemeriksa</div>
-              <div class="signature-line">${escapeHtml(report.penutup.dokter || "............................")}</div>
+              <div class="signature-line">${escapeHtml(report.penutup.dokter || '............................')}</div>
             </div>
             <div class="signature">
               <div class="section-label">Perawat</div>
-              <div class="signature-line">${escapeHtml(report.penutup.perawat || "............................")}</div>
+              <div class="signature-line">${escapeHtml(report.penutup.perawat || '............................')}</div>
             </div>
           </div>
 
           <div class="footer">
-            <span>Dicetak: ${escapeHtml(new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }))}</span>
+            <span>Dicetak: ${escapeHtml(new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }))}</span>
             <span>UPTD Puskesmas Balowerti — Sistem Rekam Medis Digital</span>
           </div>
         </div>
       </body>
     </html>
-  `;
+  `
 }
 
 // ──────────────────────────────────────────────────────────────
 // ZOD VALIDATION SCHEMAS (Sentra Standard)
 // ──────────────────────────────────────────────────────────────
 
-import { z } from "zod";
+import { z } from 'zod'
 
 export const ClinicalReportPatientSchema = z.object({
-  noRM: z.string().min(1, "No RM wajib diisi"),
-  nama: z.string().min(2, "Nama pasien minimal 2 karakter"),
+  noRM: z.string().min(1, 'No RM wajib diisi'),
+  nama: z.string().min(2, 'Nama pasien minimal 2 karakter'),
   umur: z.string().optional(),
-  jenisKelamin: z.enum(["L", "P"]),
+  jenisKelamin: z.enum(['L', 'P']),
   alamat: z.string().optional(),
-});
+})
 
 export const ClinicalReportAnamnesaSchema = z.object({
-  keluhanUtama: z.string().min(5, "Keluhan utama harus dijelaskan"),
+  keluhanUtama: z.string().min(5, 'Keluhan utama harus dijelaskan'),
   rps: z.string().optional(),
   rpd: z.string().optional(),
   rpk: z.string().optional(),
   alergi: z.string().optional(),
-});
+})
 
 export const ClinicalReportPhysicalExamSchema = z.object({
   tdSistolik: z.string().optional(),
@@ -401,28 +400,28 @@ export const ClinicalReportPhysicalExamSchema = z.object({
   keadaanUmum: z.string().optional(),
   kesadaran: z.string().optional(),
   pemeriksaanLain: z.string().optional(),
-});
+})
 
 export const ClinicalReportAssessmentSchema = z.object({
-  diagnosisKerja: z.string().min(3, "Diagnosis kerja wajib diisi"),
+  diagnosisKerja: z.string().min(3, 'Diagnosis kerja wajib diisi'),
   icd10: z.string().optional(),
   diagnosisBanding: z.string().optional(),
   prognosis: z.string().optional(),
-});
+})
 
 export const ClinicalReportPlanSchema = z.object({
   terapi: z.string().optional(),
   tindakan: z.string().optional(),
   edukasi: z.string().optional(),
   tindakLanjut: z.string().optional(),
-});
+})
 
 export const ClinicalReportClosingSchema = z.object({
-  dokter: z.string().min(3, "Nama dokter wajib diisi"),
+  dokter: z.string().min(3, 'Nama dokter wajib diisi'),
   perawat: z.string().optional(),
   tanggalPemeriksaan: z.string(),
   jamPemeriksaan: z.string().optional(),
-});
+})
 
 export const ClinicalReportSchema = z.object({
   id: z.string().optional(),
@@ -430,13 +429,15 @@ export const ClinicalReportSchema = z.object({
   createdAt: z.string().optional(),
   pdfAvailable: z.boolean().optional(),
   pdfGeneratedAt: z.string().nullable().optional(),
-  sourceRefs: z.object({
-    appointmentId: z.string().optional(),
-    consultId: z.string().optional(),
-    origin: z.string().optional(),
-    actorUserId: z.string().optional(),
-    actorName: z.string().optional(),
-  }).optional(),
+  sourceRefs: z
+    .object({
+      appointmentId: z.string().optional(),
+      consultId: z.string().optional(),
+      origin: z.string().optional(),
+      actorUserId: z.string().optional(),
+      actorName: z.string().optional(),
+    })
+    .optional(),
   auditTrail: z.record(z.string(), z.unknown()).optional(),
   pasien: ClinicalReportPatientSchema,
   anamnesa: ClinicalReportAnamnesaSchema,
@@ -444,23 +445,27 @@ export const ClinicalReportSchema = z.object({
   asesmen: ClinicalReportAssessmentSchema,
   tataLaksana: ClinicalReportPlanSchema,
   penutup: ClinicalReportClosingSchema,
-});
+})
 
-export const ClinicalReportDraftInputSchema = z.object({
-  pasien: ClinicalReportPatientSchema,
-  anamnesa: ClinicalReportAnamnesaSchema,
-  pemeriksaanFisik: ClinicalReportPhysicalExamSchema,
-  asesmen: ClinicalReportAssessmentSchema,
-  tataLaksana: ClinicalReportPlanSchema,
-  penutup: ClinicalReportClosingSchema,
-  sourceRefs: z.object({
-    appointmentId: z.string().optional(),
-    consultId: z.string().optional(),
-    origin: z.string().optional(),
-    actorUserId: z.string().optional(),
-    actorName: z.string().optional(),
-  }).optional(),
-  auditTrail: z.record(z.string(), z.unknown()).optional(),
-}).partial();
+export const ClinicalReportDraftInputSchema = z
+  .object({
+    pasien: ClinicalReportPatientSchema,
+    anamnesa: ClinicalReportAnamnesaSchema,
+    pemeriksaanFisik: ClinicalReportPhysicalExamSchema,
+    asesmen: ClinicalReportAssessmentSchema,
+    tataLaksana: ClinicalReportPlanSchema,
+    penutup: ClinicalReportClosingSchema,
+    sourceRefs: z
+      .object({
+        appointmentId: z.string().optional(),
+        consultId: z.string().optional(),
+        origin: z.string().optional(),
+        actorUserId: z.string().optional(),
+        actorName: z.string().optional(),
+      })
+      .optional(),
+    auditTrail: z.record(z.string(), z.unknown()).optional(),
+  })
+  .partial()
 
-export type ClinicalReportDraftInput = z.infer<typeof ClinicalReportDraftInputSchema>;
+export type ClinicalReportDraftInput = z.infer<typeof ClinicalReportDraftInputSchema>

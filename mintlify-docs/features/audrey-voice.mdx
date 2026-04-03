@@ -1,0 +1,42 @@
+---
+title: "Audrey Voice AI"
+description: "Voice-activated clinical assistant powered by Gemini Live"
+---
+
+# Audrey Clinical Voice Assistant
+
+**Audrey** adalah asisten klinis berbasis suara bertenaga **Artificial Intelligence** yang memungkinkan interaksi hands-free dengan sistem rekam medis.
+
+## Contoh Interaksi Klinis
+
+AADI menyediakan interface suara yang natural untuk mempercepat dokumentasi:
+
+```plaintext
+Dokter: "Audrey, tampilkan riwayat pasien ID 12345."
+Audrey: "Riwayat pasien: [Daftar pemeriksaan, alergi, obat-obatan]."
+Dokter: "Audrey, catat diagnosis: Hipertensi stage 1."
+Audrey: "Diagnosis tersimpan. Rekomendasi: lakukan pengukuran tekanan darah rutin."
+```
+
+## Teknologi Pendorong
+
+- **Web Speech API**: Pengenalan suara (Speech-to-Text) real-time yang andal.
+- **Google Gemini Live API**: Generasi respons bahasa alami yang cerdas dengan latensi sangat rendah.
+- **Model Lokal Fallback**: Menjamin ketersediaan asisten bahkan di lingkungan bising atau dengan bandwidth terbatas.
+
+## Dampak Klinis (Studi Kasus)
+- **Efisiensi Waktu**: Waktu pencatatan diagnosis berkurang hingga **50%**.
+- **Adopsi Staf**: Penggunaan asisten suara meningkat 80% dalam periode uji coba di Puskesmas Balowerti.
+
+---
+
+<sub>Asisten Suara Audrey — "Your Clinical Co-Pilot".</sub>
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `server.ts` | Voice WebSocket proxy |
+| `src/lib/audrey-persona.ts` | Persona + profession-based addressing |
+| `src/app/voice/` | Voice UI |
+| `src/app/api/voice/` | Voice API endpoints |

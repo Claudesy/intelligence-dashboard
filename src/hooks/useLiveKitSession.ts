@@ -1,44 +1,44 @@
 // Architected and built by the one and only Claudesy.
-"use client";
+'use client'
 
 // ============================================================
 // PKM Dashboard — useLiveKitSession Hook
 // ============================================================
 
-import { useState, useEffect, useCallback, useRef } from "react";
 import {
+  ConnectionQuality,
+  type LocalParticipant,
+  type RemoteParticipant,
   Room,
   RoomEvent,
-  RemoteParticipant,
-  LocalParticipant,
-  ConnectionQuality,
-} from "livekit-client";
+} from 'livekit-client'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type {
-  SessionState,
-  SessionParticipantInfo,
   LiveKitTokenResponse,
+  SessionParticipantInfo,
   SessionParticipantRole,
-} from "@/types/telemedicine.types";
+  SessionState,
+} from '@/types/telemedicine.types'
 
 interface UseLiveKitSessionParams {
-  appointmentId: string;
-  participantRole: SessionParticipantRole;
-  onSessionEnd?: () => void;
-  onParticipantJoined?: (participant: SessionParticipantInfo) => void;
-  onParticipantLeft?: (identity: string) => void;
+  appointmentId: string
+  participantRole: SessionParticipantRole
+  onSessionEnd?: () => void
+  onParticipantJoined?: (participant: SessionParticipantInfo) => void
+  onParticipantLeft?: (identity: string) => void
 }
 
 interface UseLiveKitSessionReturn {
-  room: Room | null;
-  sessionState: SessionState;
-  participants: SessionParticipantInfo[];
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-  toggleMic: () => Promise<void>;
-  toggleCamera: () => Promise<void>;
-  toggleScreenShare: () => Promise<void>;
-  error: string | null;
+  room: Room | null
+  sessionState: SessionState
+  participants: SessionParticipantInfo[]
+  connect: () => Promise<void>
+  disconnect: () => Promise<void>
+  toggleMic: () => Promise<void>
+  toggleCamera: () => Promise<void>
+  toggleScreenShare: () => Promise<void>
+  error: string | null
 }
 
 const INITIAL_STATE: SessionState = {
@@ -48,9 +48,9 @@ const INITIAL_STATE: SessionState = {
   isCameraEnabled: true,
   isScreenSharing: false,
   participantCount: 0,
-  networkQuality: "unknown",
+  networkQuality: 'unknown',
   elapsedSeconds: 0,
-};
+}
 
 export function useLiveKitSession({
   appointmentId,
@@ -72,33 +72,31 @@ export function useLiveKitSession({
         videoCaptureDefaults: {
           resolution: { width: 1280, height: 720, frameRate: 24 },
         },
-      }),
-  );
+      })
+  )
 
-  const [sessionState, setSessionState] = useState<SessionState>(INITIAL_STATE);
-  const [participants, setParticipants] = useState<SessionParticipantInfo[]>(
-    [],
-  );
-  const [error, setError] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState>(INITIAL_STATE)
+  const [participants, setParticipants] = useState<SessionParticipantInfo[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const updateState = useCallback((updates: Partial<SessionState>) => {
-    setSessionState((prev) => ({ ...prev, ...updates }));
-  }, []);
+    setSessionState(prev => ({ ...prev, ...updates }))
+  }, [])
 
   const mapParticipant = useCallback(
     (p: RemoteParticipant | LocalParticipant): SessionParticipantInfo => {
       const meta = (() => {
         try {
-          return JSON.parse(p.metadata ?? "{}");
+          return JSON.parse(p.metadata ?? '{}')
         } catch {
-          return {};
+          return {}
         }
-      })();
+      })()
       return {
         identity: p.identity,
         name: p.name ?? p.identity,
-        role: (meta.role ?? "OBSERVER") as SessionParticipantRole,
+        role: (meta.role ?? 'OBSERVER') as SessionParticipantRole,
         isSpeaking: p.isSpeaking,
         isCameraOn: p.isCameraEnabled,
         isMicOn: p.isMicrophoneEnabled,
@@ -110,60 +108,60 @@ export function useLiveKitSession({
               : p.connectionQuality === ConnectionQuality.Poor
                 ? 1
                 : 0,
-      };
+      }
     },
-    [],
-  );
+    []
+  )
 
   const refreshParticipants = useCallback(() => {
     const list: SessionParticipantInfo[] = [
       mapParticipant(room.localParticipant),
       ...Array.from(room.remoteParticipants.values()).map(mapParticipant),
-    ];
-    setParticipants(list);
-    updateState({ participantCount: list.length });
-  }, [room, mapParticipant, updateState]);
+    ]
+    setParticipants(list)
+    updateState({ participantCount: list.length })
+  }, [room, mapParticipant, updateState])
 
   useEffect(() => {
     const handleConnected = () => {
-      updateState({ isConnected: true, isConnecting: false });
-      refreshParticipants();
+      updateState({ isConnected: true, isConnecting: false })
+      refreshParticipants()
       timerRef.current = setInterval(() => {
-        setSessionState((s) => ({
+        setSessionState(s => ({
           ...s,
           elapsedSeconds: s.elapsedSeconds + 1,
-        }));
-      }, 1000);
-    };
+        }))
+      }, 1000)
+    }
 
     const handleDisconnected = () => {
-      updateState({ isConnected: false, isConnecting: false });
-      if (timerRef.current) clearInterval(timerRef.current);
-      onSessionEnd?.();
-    };
+      updateState({ isConnected: false, isConnecting: false })
+      if (timerRef.current) clearInterval(timerRef.current)
+      onSessionEnd?.()
+    }
 
     const handleParticipantConnected = (p: RemoteParticipant) => {
-      refreshParticipants();
-      onParticipantJoined?.(mapParticipant(p));
-    };
+      refreshParticipants()
+      onParticipantJoined?.(mapParticipant(p))
+    }
 
     const handleParticipantDisconnected = (p: RemoteParticipant) => {
-      refreshParticipants();
-      onParticipantLeft?.(p.identity);
-    };
+      refreshParticipants()
+      onParticipantLeft?.(p.identity)
+    }
 
     const handleConnectionQuality = () => {
-      const quality = room.localParticipant.connectionQuality;
+      const quality = room.localParticipant.connectionQuality
       const mapped =
         quality === ConnectionQuality.Excellent
-          ? "excellent"
+          ? 'excellent'
           : quality === ConnectionQuality.Good
-            ? "good"
+            ? 'good'
             : quality === ConnectionQuality.Poor
-              ? "poor"
-              : "unknown";
-      updateState({ networkQuality: mapped });
-    };
+              ? 'poor'
+              : 'unknown'
+      updateState({ networkQuality: mapped })
+    }
 
     room
       .on(RoomEvent.Connected, handleConnected)
@@ -174,12 +172,12 @@ export function useLiveKitSession({
       .on(RoomEvent.LocalTrackUnpublished, refreshParticipants)
       .on(RoomEvent.ConnectionQualityChanged, handleConnectionQuality)
       .on(RoomEvent.TrackMuted, refreshParticipants)
-      .on(RoomEvent.TrackUnmuted, refreshParticipants);
+      .on(RoomEvent.TrackUnmuted, refreshParticipants)
 
     return () => {
-      room.removeAllListeners();
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+      room.removeAllListeners()
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
   }, [
     room,
     refreshParticipants,
@@ -188,58 +186,57 @@ export function useLiveKitSession({
     onSessionEnd,
     onParticipantJoined,
     onParticipantLeft,
-  ]);
+  ])
 
   const connect = useCallback(async () => {
-    if (sessionState.isConnecting || sessionState.isConnected) return;
-    setError(null);
-    updateState({ isConnecting: true });
+    if (sessionState.isConnecting || sessionState.isConnected) return
+    setError(null)
+    updateState({ isConnecting: true })
 
     try {
-      const res = await fetch("/api/telemedicine/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/telemedicine/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appointmentId, participantRole }),
-      });
+      })
 
       if (!res.ok) {
-        const body = (await res.json()) as { message?: string };
-        throw new Error(body.message ?? "Gagal mendapatkan token");
+        const body = (await res.json()) as { message?: string }
+        throw new Error(body.message ?? 'Gagal mendapatkan token')
       }
 
-      const { data } = (await res.json()) as { data: LiveKitTokenResponse };
-      if (!data) throw new Error("Token tidak tersedia");
+      const { data } = (await res.json()) as { data: LiveKitTokenResponse }
+      if (!data) throw new Error('Token tidak tersedia')
 
-      await room.connect(data.serverUrl, data.token);
+      await room.connect(data.serverUrl, data.token)
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Gagal terhubung ke sesi";
-      setError(msg);
-      updateState({ isConnecting: false });
+      const msg = err instanceof Error ? err.message : 'Gagal terhubung ke sesi'
+      setError(msg)
+      updateState({ isConnecting: false })
     }
-  }, [room, appointmentId, participantRole, sessionState, updateState]);
+  }, [room, appointmentId, participantRole, sessionState, updateState])
 
   const disconnect = useCallback(async () => {
-    await room.disconnect();
-  }, [room]);
+    await room.disconnect()
+  }, [room])
 
   const toggleMic = useCallback(async () => {
-    const enabled = !sessionState.isMicEnabled;
-    await room.localParticipant.setMicrophoneEnabled(enabled);
-    updateState({ isMicEnabled: enabled });
-  }, [room, sessionState.isMicEnabled, updateState]);
+    const enabled = !sessionState.isMicEnabled
+    await room.localParticipant.setMicrophoneEnabled(enabled)
+    updateState({ isMicEnabled: enabled })
+  }, [room, sessionState.isMicEnabled, updateState])
 
   const toggleCamera = useCallback(async () => {
-    const enabled = !sessionState.isCameraEnabled;
-    await room.localParticipant.setCameraEnabled(enabled);
-    updateState({ isCameraEnabled: enabled });
-  }, [room, sessionState.isCameraEnabled, updateState]);
+    const enabled = !sessionState.isCameraEnabled
+    await room.localParticipant.setCameraEnabled(enabled)
+    updateState({ isCameraEnabled: enabled })
+  }, [room, sessionState.isCameraEnabled, updateState])
 
   const toggleScreenShare = useCallback(async () => {
-    const enabled = !sessionState.isScreenSharing;
-    await room.localParticipant.setScreenShareEnabled(enabled);
-    updateState({ isScreenSharing: enabled });
-  }, [room, sessionState.isScreenSharing, updateState]);
+    const enabled = !sessionState.isScreenSharing
+    await room.localParticipant.setScreenShareEnabled(enabled)
+    updateState({ isScreenSharing: enabled })
+  }, [room, sessionState.isScreenSharing, updateState])
 
   return {
     room,
@@ -251,5 +248,5 @@ export function useLiveKitSession({
     toggleCamera,
     toggleScreenShare,
     error,
-  };
+  }
 }

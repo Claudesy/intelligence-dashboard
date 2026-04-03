@@ -1,62 +1,62 @@
 // Designed and constructed by Claudesy.
-"use client";
+'use client'
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import styles from "./AdminOperationalSummary.module.css";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import styles from './AdminOperationalSummary.module.css'
 
 function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+  return classes.filter(Boolean).join(' ')
 }
 
-import { useIntelligenceSocket } from "@/hooks/useIntelligenceSocket";
 import type {
   ApiResponse,
   DashboardEncounterStatus,
   DashboardOperationalMetrics,
-} from "@abyss/types";
+} from '@abyss/types'
+import { useIntelligenceSocket } from '@/hooks/useIntelligenceSocket'
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<DashboardEncounterStatus, string> = {
-  waiting: "Menunggu",
-  in_consultation: "Konsultasi",
-  cdss_pending: "CDSS Pending",
-  documentation_incomplete: "Dok. Belum Lengkap",
-  completed: "Selesai",
-};
+  waiting: 'Menunggu',
+  in_consultation: 'Konsultasi',
+  cdss_pending: 'CDSS Pending',
+  documentation_incomplete: 'Dok. Belum Lengkap',
+  completed: 'Selesai',
+}
 
 const ORDERED_STATUSES: DashboardEncounterStatus[] = [
-  "in_consultation",
-  "cdss_pending",
-  "documentation_incomplete",
-  "waiting",
-  "completed",
-];
+  'in_consultation',
+  'cdss_pending',
+  'documentation_incomplete',
+  'waiting',
+  'completed',
+]
 
 // ─── HELPERS ───────────────────────────────────────────────────────
 
 function fmtRate(r: number): string {
-  return `${(r * 100).toFixed(0)}%`;
+  return `${(r * 100).toFixed(0)}%`
 }
 
 function fmtScore(s: number): string {
-  return `${(s * 100).toFixed(0)}`;
+  return `${(s * 100).toFixed(0)}`
 }
 
 function fmtGeneratedAt(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
 }
 
 // ─── SUB-COMPONENT: KPI CARD ───────────────────────────────────────
 
 interface KpiCardProps {
-  value: string | number;
-  label: string;
-  green?: boolean;
-  amber?: boolean;
-  red?: boolean;
+  value: string | number
+  label: string
+  green?: boolean
+  amber?: boolean
+  red?: boolean
 }
 
 function KpiCard({ value, label, green, amber, red }: KpiCardProps) {
@@ -66,22 +66,22 @@ function KpiCard({ value, label, green, amber, red }: KpiCardProps) {
       ? `${styles.kpiValue} ${styles.kpiValueCritical}`
       : amber
         ? `${styles.kpiValue} ${styles.kpiValueAccent}`
-        : styles.kpiValue;
+        : styles.kpiValue
 
   return (
     <div className={styles.kpiCard}>
       <div className={valueClassName}>{value}</div>
       <div className={styles.kpiLabel}>{label}</div>
     </div>
-  );
+  )
 }
 
 // ─── SUB-COMPONENT: STATUS ROW ─────────────────────────────────────
 
 interface StatusRowProps {
-  label: string;
-  count: number;
-  total: number;
+  label: string
+  count: number
+  total: number
 }
 
 function StatusRow({ label, count, total }: StatusRowProps) {
@@ -95,63 +95,55 @@ function StatusRow({ label, count, total }: StatusRowProps) {
       />
       <span className={styles.statusCount}>{count}</span>
     </div>
-  );
+  )
 }
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────────
 
 export default function AdminOperationalSummary() {
-  const [metrics, setMetrics] = useState<DashboardOperationalMetrics | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const socketState = useIntelligenceSocket();
+  const [metrics, setMetrics] = useState<DashboardOperationalMetrics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const socketState = useIntelligenceSocket()
 
-  const cancelledRef = useRef(false);
+  const cancelledRef = useRef(false)
 
   const fetchMetrics = useCallback(async (isInitial: boolean) => {
-    if (isInitial) setLoading(true);
+    if (isInitial) setLoading(true)
     try {
-      const res = await fetch("/api/dashboard/intelligence/metrics", {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json =
-        (await res.json()) as ApiResponse<DashboardOperationalMetrics>;
-      if (!json.success)
-        throw new Error(json.error?.message ?? "Gagal memuat data");
-      if (!cancelledRef.current && json.data) setMetrics(json.data);
-      if (!cancelledRef.current && isInitial) setError("");
+      const res = await fetch('/api/dashboard/intelligence/metrics', {
+        cache: 'no-store',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = (await res.json()) as ApiResponse<DashboardOperationalMetrics>
+      if (!json.success) throw new Error(json.error?.message ?? 'Gagal memuat data')
+      if (!cancelledRef.current && json.data) setMetrics(json.data)
+      if (!cancelledRef.current && isInitial) setError('')
     } catch (err) {
       if (!cancelledRef.current && isInitial)
-        setError(err instanceof Error ? err.message : "Fetch gagal");
+        setError(err instanceof Error ? err.message : 'Fetch gagal')
     } finally {
-      if (!cancelledRef.current && isInitial) setLoading(false);
+      if (!cancelledRef.current && isInitial) setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    cancelledRef.current = false;
-    void fetchMetrics(true);
+    cancelledRef.current = false
+    void fetchMetrics(true)
     return () => {
-      cancelledRef.current = true;
-    };
-  }, [fetchMetrics]);
+      cancelledRef.current = true
+    }
+  }, [fetchMetrics])
 
   // Re-fetch silently on any encounter update event
   useEffect(() => {
     if (socketState.lastEncounterUpdate) {
-      void fetchMetrics(false);
+      void fetchMetrics(false)
     }
-  }, [socketState.lastEncounterUpdate, fetchMetrics]);
+  }, [socketState.lastEncounterUpdate, fetchMetrics])
 
   if (loading) {
-    return (
-      <div className={cx(styles.statusMessage, styles.loadingMessage)}>
-        LOADING METRICS...
-      </div>
-    );
+    return <div className={cx(styles.statusMessage, styles.loadingMessage)}>LOADING METRICS...</div>
   }
 
   if (error) {
@@ -159,16 +151,16 @@ export default function AdminOperationalSummary() {
       <div className={cx(styles.statusMessage, styles.errorMessage)}>
         Gagal memuat metrics operasional: {error}
       </div>
-    );
+    )
   }
 
-  if (!metrics) return null;
+  if (!metrics) return null
 
   const liveIndicatorClassName = socketState.isConnected
     ? `${styles.liveIndicator} ${styles.liveIndicatorOnline}`
     : socketState.isReconnecting
       ? `${styles.liveIndicator} ${styles.liveIndicatorReconnecting}`
-      : `${styles.liveIndicator} ${styles.liveIndicatorOffline}`;
+      : `${styles.liveIndicator} ${styles.liveIndicatorOffline}`
 
   return (
     <div className={styles.root}>
@@ -177,9 +169,8 @@ export default function AdminOperationalSummary() {
         <p className={styles.sectionKick}>Operasional Shift</p>
         <h2 className={styles.headerTitle}>{metrics.shiftLabel}</h2>
         <p className={styles.headerDescription}>
-          Ringkasan metrik operasional shift — encounter, utilisasi CDSS,
-          readiness e-klaim, rata-rata skor kepercayaan, dan tingkat override
-          klinisi.
+          Ringkasan metrik operasional shift — encounter, utilisasi CDSS, readiness e-klaim,
+          rata-rata skor kepercayaan, dan tingkat override klinisi.
         </p>
       </div>
 
@@ -188,14 +179,12 @@ export default function AdminOperationalSummary() {
         <span className={liveIndicatorClassName} />
         <span>
           {socketState.isReconnecting
-            ? "MEMPERBARUI..."
+            ? 'MEMPERBARUI...'
             : socketState.isConnected
-              ? "LIVE"
-              : "OFFLINE"}
+              ? 'LIVE'
+              : 'OFFLINE'}
         </span>
-        <span className={styles.liveStatusMeta}>
-          DATA: {fmtGeneratedAt(metrics.generatedAt)}
-        </span>
+        <span className={styles.liveStatusMeta}>DATA: {fmtGeneratedAt(metrics.generatedAt)}</span>
       </div>
 
       {/* ── KPI Grid ── */}
@@ -205,30 +194,21 @@ export default function AdminOperationalSummary() {
           value={fmtRate(metrics.cdssUtilizationRate)}
           label="Utilisasi CDSS"
           green={metrics.cdssUtilizationRate >= 0.8}
-          amber={
-            metrics.cdssUtilizationRate >= 0.5 &&
-            metrics.cdssUtilizationRate < 0.8
-          }
+          amber={metrics.cdssUtilizationRate >= 0.5 && metrics.cdssUtilizationRate < 0.8}
           red={metrics.cdssUtilizationRate < 0.5}
         />
         <KpiCard
           value={fmtRate(metrics.eklaimReadinessRate)}
           label="e-Klaim Ready"
           green={metrics.eklaimReadinessRate >= 0.95}
-          amber={
-            metrics.eklaimReadinessRate >= 0.5 &&
-            metrics.eklaimReadinessRate < 0.95
-          }
+          amber={metrics.eklaimReadinessRate >= 0.5 && metrics.eklaimReadinessRate < 0.95}
           red={metrics.eklaimReadinessRate < 0.5}
         />
         <KpiCard
           value={fmtScore(metrics.averageConfidenceScore)}
           label="Rata-rata Skor"
           green={metrics.averageConfidenceScore >= 0.85}
-          amber={
-            metrics.averageConfidenceScore >= 0.6 &&
-            metrics.averageConfidenceScore < 0.85
-          }
+          amber={metrics.averageConfidenceScore >= 0.6 && metrics.averageConfidenceScore < 0.85}
           red={metrics.averageConfidenceScore < 0.6}
         />
         <KpiCard
@@ -248,7 +228,7 @@ export default function AdminOperationalSummary() {
           </span>
         </div>
         <div className={styles.breakdownBody}>
-          {ORDERED_STATUSES.map((status) => (
+          {ORDERED_STATUSES.map(status => (
             <StatusRow
               key={status}
               label={STATUS_LABELS[status]}
@@ -259,5 +239,5 @@ export default function AdminOperationalSummary() {
         </div>
       </div>
     </div>
-  );
+  )
 }

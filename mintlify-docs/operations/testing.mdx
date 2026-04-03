@@ -1,0 +1,32 @@
+---
+title: "Testing"
+description: "Test suite and quality assurance"
+---
+
+# Testing
+
+AADI includes dedicated test scripts for each major subsystem.
+
+## Test Commands
+
+| Command | Scope |
+|---------|-------|
+| `npm test` | Full test suite |
+| `npm run test:cdss` | CDSS engine tests |
+| `npm run test:cdss:engine` | Core engine unit tests |
+| `npm run test:news2` | NEWS2 early warning tests |
+| `npm run test:auth-hardening` | Authentication security tests |
+
+## Running Tests
+
+```bash
+# Full suite
+npm test
+
+# Specific module
+npm run test:cdss
+```
+
+<Note>
+  For the full testing guide, see the internal [TESTING.md](https://github.com/sentra-healthcare/abyss-monorepo/blob/main/app/primary-healthcare/dashboard/docs/TESTING.md).
+</Note>

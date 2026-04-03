@@ -1,77 +1,61 @@
 // Designed and constructed by Claudesy.
-"use client";
+'use client'
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { AlertTriangle, ArrowLeft, Calculator, HeartPulse, Info, ShieldAlert } from 'lucide-react'
+import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import {
-  AlertTriangle,
-  ArrowLeft,
-  Calculator,
-  HeartPulse,
-  Info,
-  ShieldAlert,
-} from "lucide-react";
-import {
-  CalculatorField,
-  CalculatorResult,
+  type CalculatorField,
+  type CalculatorResult,
   getCalculatorBySlug,
-} from "@/lib/calculators/medical-calculators";
+} from '@/lib/calculators/medical-calculators'
 
 type Props = {
-  slug: string;
-};
+  slug: string
+}
 
-const TONE_COLOR: Record<CalculatorResult["tone"], string> = {
-  normal: "var(--c-asesmen)",
-  warning: "var(--c-warning)",
-  critical: "var(--c-critical)",
-};
+const TONE_COLOR: Record<CalculatorResult['tone'], string> = {
+  normal: 'var(--c-asesmen)',
+  warning: 'var(--c-warning)',
+  critical: 'var(--c-critical)',
+}
 
 function renderSuffix(field: CalculatorField) {
-  return "suffix" in field && field.suffix ? (
+  return 'suffix' in field && field.suffix ? (
     <span className="calculator-field-suffix">{field.suffix}</span>
-  ) : null;
+  ) : null
 }
 
 export default function CalculatorWorkspace({ slug }: Props) {
-  const calculator = getCalculatorBySlug(slug);
-  const [values, setValues] = useState<Record<string, string>>({});
+  const calculator = getCalculatorBySlug(slug)
+  const [values, setValues] = useState<Record<string, string>>({})
 
   const result = useMemo(
     () => (calculator ? calculator.compute(values) : null),
-    [calculator, values],
-  );
+    [calculator, values]
+  )
 
   if (!calculator) {
-    return null;
+    return null
   }
 
   function updateValue(id: string, value: string) {
-    setValues((current) => ({ ...current, [id]: value }));
+    setValues(current => ({ ...current, [id]: value }))
   }
 
   return (
     <div className="calculator-page-shell">
-      <div className="page-header" style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <div className="page-header" style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div className="page-header-block">
-          <div
-            className="page-title-row"
-            style={{ alignItems: "center", gap: 12 }}
-          >
-            <Link
-              href="/calculator"
-              className="calculator-back-link"
-              title="Kembali ke katalog"
-            >
+          <div className="page-title-row" style={{ alignItems: 'center', gap: 12 }}>
+            <Link href="/calculator" className="calculator-back-link" title="Kembali ke katalog">
               <ArrowLeft size={14} />
             </Link>
             <div>
               <h1 className="page-title">{calculator.title}</h1>
               <p className="page-subtitle">
-                {calculator.summary}{" "}
-                <span style={{ color: "var(--text-main)" }}>
-                  {calculator.clinicalUse}
-                </span>
+                {calculator.summary}{' '}
+                <span style={{ color: 'var(--text-main)' }}>{calculator.clinicalUse}</span>
               </p>
             </div>
           </div>
@@ -87,71 +71,63 @@ export default function CalculatorWorkspace({ slug }: Props) {
           </div>
 
           <div className="calculator-form-grid">
-            {calculator.fields.map((field) => {
-              if (field.type === "number") {
+            {calculator.fields.map(field => {
+              if (field.type === 'number') {
                 return (
                   <label key={field.id} className="calculator-field">
-                    <span className="calculator-field-label">
-                      {field.label}
-                    </span>
+                    <span className="calculator-field-label">{field.label}</span>
                     <div className="calculator-field-input-wrap">
                       <input
                         type="number"
                         min={field.min}
                         step={field.step}
-                        value={values[field.id] ?? ""}
+                        value={values[field.id] ?? ''}
                         placeholder={field.placeholder}
-                        onChange={(event) =>
-                          updateValue(field.id, event.target.value)
-                        }
+                        onChange={event => updateValue(field.id, event.target.value)}
                         className="calculator-field-input"
                       />
                       {renderSuffix(field)}
                     </div>
                   </label>
-                );
+                )
               }
 
-              if (field.type === "date") {
+              if (field.type === 'date') {
                 return (
                   <label key={field.id} className="calculator-field">
-                    <span className="calculator-field-label">
-                      {field.label}
-                    </span>
+                    <span className="calculator-field-label">{field.label}</span>
                     <div className="calculator-field-input-wrap">
                       <input
                         type="date"
-                        value={values[field.id] ?? ""}
-                        onChange={(event) =>
-                          updateValue(field.id, event.target.value)
-                        }
+                        value={values[field.id] ?? ''}
+                        onChange={event => updateValue(field.id, event.target.value)}
                         className="calculator-field-input"
                       />
                     </div>
                   </label>
-                );
+                )
               }
 
               return (
                 <div key={field.id} className="calculator-field">
                   <span className="calculator-field-label">{field.label}</span>
                   <div className="calculator-toggle-grid">
-                    {field.options.map((option) => {
-                      const active = values[field.id] === option.value;
+                    {field.options.map(option => {
+                      const active = values[field.id] === option.value
                       return (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => updateValue(field.id, option.value)}
-                          className={`calculator-toggle-btn${active ? " active" : ""}`}
+                          className={`calculator-toggle-btn${active ? ' active' : ''}`}
                         >
                           {option.label}
                         </button>
-                      );
+                      )
                     })}
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
 
@@ -159,9 +135,7 @@ export default function CalculatorWorkspace({ slug }: Props) {
             <Info size={14} />
             <div>
               <strong>Sumber logika:</strong> adaptasi dari repo Medlink.
-              <div className="calculator-source-path">
-                {calculator.sourcePath}
-              </div>
+              <div className="calculator-source-path">{calculator.sourcePath}</div>
             </div>
           </div>
         </section>
@@ -179,13 +153,9 @@ export default function CalculatorWorkspace({ slug }: Props) {
                 style={{ borderColor: TONE_COLOR[result.tone] }}
               >
                 <div className="calculator-primary-value-row">
-                  <span className="calculator-primary-value">
-                    {result.primaryValue}
-                  </span>
+                  <span className="calculator-primary-value">{result.primaryValue}</span>
                   {result.primaryUnit ? (
-                    <span className="calculator-primary-unit">
-                      {result.primaryUnit}
-                    </span>
+                    <span className="calculator-primary-unit">{result.primaryUnit}</span>
                   ) : null}
                 </div>
                 {result.secondaryValue ? (
@@ -194,30 +164,23 @@ export default function CalculatorWorkspace({ slug }: Props) {
                     <strong>{result.secondaryValue}</strong>
                   </div>
                 ) : null}
-                <p
-                  className="calculator-interpretation"
-                  style={{ color: TONE_COLOR[result.tone] }}
-                >
+                <p className="calculator-interpretation" style={{ color: TONE_COLOR[result.tone] }}>
                   {result.interpretation}
                 </p>
               </div>
 
               <div className="calculator-summary-grid">
-                {result.detailItems.map((item) => (
+                {result.detailItems.map(item => (
                   <div key={item.label} className="calculator-summary-item">
-                    <span className="calculator-summary-label">
-                      {item.label}
-                    </span>
-                    <strong className="calculator-summary-value">
-                      {item.value}
-                    </strong>
+                    <span className="calculator-summary-label">{item.label}</span>
+                    <strong className="calculator-summary-value">{item.value}</strong>
                   </div>
                 ))}
               </div>
 
               <div className="calculator-note-box">
                 <div className="calculator-note-title">
-                  {result.tone === "critical" ? (
+                  {result.tone === 'critical' ? (
                     <ShieldAlert size={14} />
                   ) : (
                     <HeartPulse size={14} />
@@ -225,7 +188,7 @@ export default function CalculatorWorkspace({ slug }: Props) {
                   <span>Catatan klinis</span>
                 </div>
                 <ul className="calculator-note-list">
-                  {result.notes.map((note) => (
+                  {result.notes.map(note => (
                     <li key={note}>{note}</li>
                   ))}
                 </ul>
@@ -240,11 +203,10 @@ export default function CalculatorWorkspace({ slug }: Props) {
 
           <div className="calculator-warning-strip">
             <AlertTriangle size={14} />
-            Kalkulator ini untuk referensi klinis. Verifikasi akhir tetap
-            mengikuti protokol lokal.
+            Kalkulator ini untuk referensi klinis. Verifikasi akhir tetap mengikuti protokol lokal.
           </div>
         </section>
       </div>
     </div>
-  );
+  )
 }

@@ -1,0 +1,21 @@
+---
+title: "Clinical Logic"
+description: "Clinical decision rules and diagnostic methodology"
+---
+
+# Clinical Logic
+
+AADI's clinical logic is documented in detail in the internal docs. This page provides key highlights.
+
+<Note>
+  For the full clinical logic specification, see the internal [CLINICAL_LOGIC.md](https://github.com/sentra-healthcare/abyss-monorepo/blob/main/app/primary-healthcare/dashboard/docs/CLINICAL_LOGIC.md).
+</Note>
+
+## Diagnosis Flow
+
+1. **Symptom collection** — Chief complaint + vital signs + patient history
+2. **Red flag detection** — Hardcoded vital sign thresholds (no AI needed)
+3. **Candidate retrieval** — Hybrid keyword + semantic search from 159 KKI diseases
+4. **LLM reasoning** — Structured differential diagnosis via DeepSeek / Gemini
+5. **Validation** — Cross-check with clinical guidelines
+6. **Output** — Ranked differentials with ICD-10 codes and confidence scores

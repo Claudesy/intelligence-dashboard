@@ -855,9 +855,7 @@ a {
   --nav-hover-bg: rgba(230, 126, 34, 0.07);
   --nav-active-bg: rgba(230, 126, 34, 0.12);
   --nav-shadow: 4px 4px 10px #060504, -2px -2px 6px rgba(255, 255, 255, 0.018);
-  --nav-inset:
-    inset 2px 2px 5px rgba(0, 0, 0, 0.5),
-    inset -1px -1px 3px rgba(255, 255, 255, 0.015);
+  --nav-inset: inset 2px 2px 5px rgba(0, 0, 0, 0.5), inset -1px -1px 3px rgba(255, 255, 255, 0.015);
 }
 
 /* ─── Sidebar / AppNav (Aether design ported) ─── */
@@ -1451,11 +1449,7 @@ a {
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    rgba(230, 126, 34, 0.28),
-    rgba(230, 126, 34, 0)
-  );
+  background: linear-gradient(90deg, rgba(230, 126, 34, 0.28), rgba(230, 126, 34, 0));
 }
 
 .emr-context-bar {
@@ -2696,8 +2690,7 @@ a {
   color: var(--pharm-muted);
 }
 
-.finalize-pharmacology-manual-card.is-active
-  .finalize-pharmacology-manual-kicker {
+.finalize-pharmacology-manual-card.is-active .finalize-pharmacology-manual-kicker {
   color: var(--pharm-kicker);
 }
 
@@ -3337,11 +3330,7 @@ a {
   height: 182px;
   margin: 12px 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.04);
-  background: radial-gradient(
-    circle at 1px 1px,
-    rgba(121, 153, 182, 0.16) 1px,
-    transparent 0
-  );
+  background: radial-gradient(circle at 1px 1px, rgba(121, 153, 182, 0.16) 1px, transparent 0);
   background-size: 14px 14px;
   overflow: hidden;
 }
@@ -3400,11 +3389,7 @@ a {
   height: 28px;
   border-radius: 999px;
   border: 1px solid rgba(214, 199, 180, 0.28);
-  background: linear-gradient(
-    180deg,
-    rgba(25, 24, 24, 0.9),
-    rgba(31, 29, 28, 0.78)
-  );
+  background: linear-gradient(180deg, rgba(25, 24, 24, 0.9), rgba(31, 29, 28, 0.78));
   color: rgba(234, 227, 215, 0.84);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -3464,11 +3449,7 @@ a {
   top: 12px;
   width: 72px;
   height: 72px;
-  background: linear-gradient(
-    180deg,
-    rgba(224, 211, 194, 0.82),
-    rgba(196, 183, 169, 0.7)
-  );
+  background: linear-gradient(180deg, rgba(224, 211, 194, 0.82), rgba(196, 183, 169, 0.7));
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
@@ -3481,11 +3462,7 @@ a {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(
-    145deg,
-    rgba(45, 41, 38, 0.96),
-    rgba(31, 28, 26, 0.94)
-  );
+  background: linear-gradient(145deg, rgba(45, 41, 38, 0.96), rgba(31, 28, 26, 0.94));
   border: 1px solid rgba(236, 228, 216, 0.12);
   box-shadow:
     -7px -7px 18px rgba(255, 248, 238, 0.06),
@@ -3520,8 +3497,7 @@ a {
 .cdss-core-loader-chroma {
   position: absolute;
   inset: 0;
-  animation: cdssCoreLoaderColorize calc(var(--time-animation) * 3) ease-in-out
-    infinite;
+  animation: cdssCoreLoaderColorize calc(var(--time-animation) * 3) ease-in-out infinite;
 }
 
 .cdss-core-loader-ring {
@@ -3530,11 +3506,7 @@ a {
   border-top: 1px solid var(--color-one);
   border-bottom: 1px solid var(--color-two);
   border-radius: 50%;
-  background: linear-gradient(
-    180deg,
-    var(--color-five),
-    rgba(191, 74, 29, 0.16)
-  );
+  background: linear-gradient(180deg, var(--color-five), rgba(191, 74, 29, 0.16));
   box-shadow:
     inset 0 10px 10px 0 var(--color-three),
     inset 0 -10px 10px 0 var(--color-four),
@@ -3550,8 +3522,7 @@ a {
 
 .cdss-core-loader-svg mask {
   filter: contrast(15);
-  animation: cdssCoreLoaderRoundness calc(var(--time-animation) / 2) linear
-    infinite;
+  animation: cdssCoreLoaderRoundness calc(var(--time-animation) / 2) linear infinite;
 }
 
 .cdss-core-loader-polygon {
@@ -3565,8 +3536,7 @@ a {
 
 .cdss-core-loader-polygon-b {
   transform-origin: 50% 50%;
-  animation: cdssCoreLoaderRotation var(--time-animation) linear infinite
-    reverse;
+  animation: cdssCoreLoaderRotation var(--time-animation) linear infinite reverse;
 }
 
 .cdss-core-loader-polygon-c {
@@ -3577,14 +3547,12 @@ a {
 
 .cdss-core-loader-polygon-d {
   transform-origin: 40% 40%;
-  animation: cdssCoreLoaderRotation var(--time-animation) linear infinite
-    reverse;
+  animation: cdssCoreLoaderRotation var(--time-animation) linear infinite reverse;
 }
 
 .cdss-core-loader-polygon-e {
   transform-origin: 40% 40%;
-  animation: cdssCoreLoaderRotation var(--time-animation) linear infinite
-    reverse;
+  animation: cdssCoreLoaderRotation var(--time-animation) linear infinite reverse;
   animation-delay: calc(var(--time-animation) / -2);
 }
 
@@ -5729,11 +5697,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  background-image: linear-gradient(
-    to bottom,
-    var(--grid-faint) 1px,
-    transparent 1px
-  );
+  background-image: linear-gradient(to bottom, var(--grid-faint) 1px, transparent 1px);
   background-size: 100% 40px;
   position: relative;
 }

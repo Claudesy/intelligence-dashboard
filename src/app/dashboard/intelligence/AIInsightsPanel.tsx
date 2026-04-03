@@ -1,11 +1,8 @@
-"use client";
+'use client'
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import {
-  buildAIInsightsSnapshot,
-  type AIInsightsSnapshot,
-} from "@/lib/intelligence/ai-insights";
+import { type AIInsightsSnapshot, buildAIInsightsSnapshot } from '@/lib/intelligence/ai-insights'
 import {
   buildSnapshotObservabilityPayload,
   canDispatchObservabilityFingerprint,
@@ -14,72 +11,69 @@ import {
   markObservabilityDeliveryPending,
   markObservabilityDeliverySucceeded,
   type ObservabilityDeliveryState,
-} from "@/lib/intelligence/observability";
+} from '@/lib/intelligence/observability'
 
-import { AIDisclosureBadge } from "./AIDisclosureBadge";
-import { useSharedIntelligenceSocket } from "./IntelligenceSocketProvider";
+import { AIDisclosureBadge } from './AIDisclosureBadge'
+import { useSharedIntelligenceSocket } from './IntelligenceSocketProvider'
 
-type OverrideAction = "accept" | "modify" | "reject";
+type OverrideAction = 'accept' | 'modify' | 'reject'
 
 export interface OverrideDraftState {
-  finalIcd: string;
-  reason: string;
-  status: "idle" | "submitting" | "success" | "error";
-  message: string | null;
+  finalIcd: string
+  reason: string
+  status: 'idle' | 'submitting' | 'success' | 'error'
+  message: string | null
 }
 
-type OverrideStateMap = Record<string, OverrideDraftState>;
+type OverrideStateMap = Record<string, OverrideDraftState>
 
 const DEFAULT_DRAFT_STATE: OverrideDraftState = {
-  finalIcd: "",
-  reason: "",
-  status: "idle",
+  finalIcd: '',
+  reason: '',
+  status: 'idle',
   message: null,
-};
+}
 
-function getDraftState(
-  overrideState: OverrideStateMap,
-  suggestionId: string,
-): OverrideDraftState {
-  return overrideState[suggestionId] ?? DEFAULT_DRAFT_STATE;
+function getDraftState(overrideState: OverrideStateMap, suggestionId: string): OverrideDraftState {
+  return overrideState[suggestionId] ?? DEFAULT_DRAFT_STATE
 }
 
 function formatConfidence(value: number): string {
-  return `${Math.round(value * 100)}%`;
+  return `${Math.round(value * 100)}%`
 }
 
 function formatDateTime(value: string | null): string {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (!value) return '-'
+  return new Date(value).toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 const inputStyle: React.CSSProperties = {
-  width: "100%",
+  width: '100%',
   borderRadius: 4,
-  border: "1px solid var(--line-base)",
-  background: "transparent",
-  padding: "8px 12px",
+  border: '1px solid var(--line-base)',
+  background: 'transparent',
+  padding: '8px 12px',
   fontSize: 13,
-  color: "var(--text-main)",
-  outline: "none",
-  fontFamily: "var(--font-sans)",
-};
+  color: 'var(--text-main)',
+  outline: 'none',
+  fontFamily: 'var(--font-sans)',
+}
 
 const actionBtnBase: React.CSSProperties = {
   borderRadius: 4,
-  padding: "8px 14px",
+  padding: '8px 14px',
   fontSize: 13,
-  fontFamily: "var(--font-mono)",
-  letterSpacing: "0.05em",
-  cursor: "pointer",
-  background: "transparent",
-  transition: "opacity 0.2s",
-};
+  fontFamily: 'var(--font-mono)',
+  letterSpacing: '0.05em',
+  cursor: 'pointer',
+  background: 'transparent',
+  transition: 'opacity 0.2s',
+}
 
 export function AIInsightsPanelContent({
   snapshot,
@@ -87,70 +81,65 @@ export function AIInsightsPanelContent({
   onDraftChange,
   onSubmitOverride,
 }: {
-  snapshot: AIInsightsSnapshot;
-  overrideState: OverrideStateMap;
+  snapshot: AIInsightsSnapshot
+  overrideState: OverrideStateMap
   onDraftChange?: (
     suggestionId: string,
-    patch: Partial<Pick<OverrideDraftState, "finalIcd" | "reason">>,
-  ) => void;
-  onSubmitOverride: (
-    suggestionId: string,
-    action: OverrideAction,
-  ) => Promise<void>;
+    patch: Partial<Pick<OverrideDraftState, 'finalIcd' | 'reason'>>
+  ) => void
+  onSubmitOverride: (suggestionId: string, action: OverrideAction) => Promise<void>
 }): React.JSX.Element {
   if (snapshot.isIdle) {
     return (
       <div
         style={{
-          padding: "40px 24px",
-          textAlign: "center",
-          color: "var(--text-muted)",
+          padding: '40px 24px',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
         }}
       >
         <div
           style={{
             fontSize: 28,
-            fontFamily: "var(--font-mono)",
+            fontFamily: 'var(--font-mono)',
             opacity: 0.2,
             marginBottom: 12,
           }}
         >
           ◇
         </div>
-        <div style={{ fontSize: 14, marginBottom: 4 }}>
-          Menunggu event CDSS pertama
-        </div>
+        <div style={{ fontSize: 14, marginBottom: 4 }}>Menunggu event CDSS pertama</div>
         <div
           style={{
             fontSize: 12,
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.05em",
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.05em',
             opacity: 0.5,
           }}
         >
           To be filled — insights muncul saat encounter diproses engine
         </div>
       </div>
-    );
+    )
   }
 
   if (snapshot.isDegraded) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div
           style={{
             borderRadius: 4,
-            border: "1px dashed var(--c-critical)",
-            padding: "16px 20px",
+            border: '1px dashed var(--c-critical)',
+            padding: '16px 20px',
           }}
         >
           <div
             style={{
               fontSize: 10,
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--c-critical)",
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--c-critical)',
               marginBottom: 8,
             }}
           >
@@ -160,7 +149,7 @@ export function AIInsightsPanelContent({
             style={{
               fontSize: 14,
               lineHeight: 1.6,
-              color: "var(--text-main)",
+              color: 'var(--text-main)',
             }}
           >
             {snapshot.degradedMessage}
@@ -170,17 +159,17 @@ export function AIInsightsPanelContent({
           <div
             style={{
               borderRadius: 4,
-              border: "1px solid var(--line-base)",
-              padding: "16px 20px",
+              border: '1px solid var(--line-base)',
+              padding: '16px 20px',
             }}
           >
             <div
               style={{
                 fontSize: 10,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "var(--text-muted)",
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                color: 'var(--text-muted)',
                 marginBottom: 12,
               }}
             >
@@ -188,21 +177,21 @@ export function AIInsightsPanelContent({
             </div>
             <ul
               style={{
-                listStyle: "none",
+                listStyle: 'none',
                 padding: 0,
                 margin: 0,
-                display: "flex",
-                flexDirection: "column",
+                display: 'flex',
+                flexDirection: 'column',
                 gap: 8,
               }}
             >
-              {snapshot.validation.violations.map((violation) => (
+              {snapshot.validation.violations.map(violation => (
                 <li
                   key={violation.code}
                   style={{
                     fontSize: 13,
                     lineHeight: 1.6,
-                    color: "var(--text-muted)",
+                    color: 'var(--text-muted)',
                   }}
                 >
                   {violation.code}: {violation.message}
@@ -212,40 +201,40 @@ export function AIInsightsPanelContent({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Engine info */}
       <div
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
           gap: 12,
           borderRadius: 4,
-          border: "1px solid var(--line-base)",
-          padding: "12px 16px",
+          border: '1px solid var(--line-base)',
+          padding: '12px 16px',
         }}
       >
         <AIDisclosureBadge />
         <span
           style={{
             fontSize: 11,
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
           }}
         >
-          Engine {snapshot.engineVersion ?? "unknown"}
+          Engine {snapshot.engineVersion ?? 'unknown'}
         </span>
         <span
           style={{
             fontSize: 12,
-            color: "var(--text-muted)",
-            marginLeft: "auto",
+            color: 'var(--text-muted)',
+            marginLeft: 'auto',
           }}
         >
           {formatDateTime(snapshot.processedAt)} · {snapshot.latencyMs ?? 0}ms
@@ -257,17 +246,17 @@ export function AIInsightsPanelContent({
         <div
           style={{
             borderRadius: 4,
-            border: "1px solid var(--c-critical)",
-            padding: "16px 20px",
+            border: '1px solid var(--c-critical)',
+            padding: '16px 20px',
           }}
         >
           <div
             style={{
               fontSize: 10,
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--c-critical)",
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--c-critical)',
               marginBottom: 12,
             }}
           >
@@ -275,21 +264,21 @@ export function AIInsightsPanelContent({
           </div>
           <ul
             style={{
-              listStyle: "none",
+              listStyle: 'none',
               padding: 0,
               margin: 0,
-              display: "flex",
-              flexDirection: "column",
+              display: 'flex',
+              flexDirection: 'column',
               gap: 8,
             }}
           >
-            {snapshot.alerts.map((alert) => (
+            {snapshot.alerts.map(alert => (
               <li
                 key={alert.id}
                 style={{
                   fontSize: 14,
                   lineHeight: 1.6,
-                  color: "var(--text-main)",
+                  color: 'var(--text-main)',
                 }}
               >
                 {alert.message}
@@ -304,17 +293,17 @@ export function AIInsightsPanelContent({
         <div
           style={{
             borderRadius: 4,
-            border: "1px solid var(--line-base)",
-            padding: "16px 20px",
+            border: '1px solid var(--line-base)',
+            padding: '16px 20px',
           }}
         >
           <div
             style={{
               fontSize: 10,
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "var(--text-muted)",
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
               marginBottom: 12,
             }}
           >
@@ -322,21 +311,21 @@ export function AIInsightsPanelContent({
           </div>
           <ul
             style={{
-              listStyle: "none",
+              listStyle: 'none',
               padding: 0,
               margin: 0,
-              display: "flex",
-              flexDirection: "column",
+              display: 'flex',
+              flexDirection: 'column',
               gap: 8,
             }}
           >
-            {snapshot.validation.warnings.map((warning) => (
+            {snapshot.validation.warnings.map(warning => (
               <li
                 key={warning.code}
                 style={{
                   fontSize: 13,
                   lineHeight: 1.6,
-                  color: "var(--text-muted)",
+                  color: 'var(--text-muted)',
                 }}
               >
                 {warning.code}: {warning.message}
@@ -347,25 +336,25 @@ export function AIInsightsPanelContent({
       )}
 
       {/* Suggestions */}
-      {snapshot.suggestions.map((suggestion) => {
-        const draftState = getDraftState(overrideState, suggestion.id);
+      {snapshot.suggestions.map(suggestion => {
+        const draftState = getDraftState(overrideState, suggestion.id)
 
         return (
           <article
             key={suggestion.id}
             style={{
               borderRadius: 4,
-              border: "1px solid var(--line-base)",
-              background: "var(--bg-card)",
-              padding: "20px",
+              border: '1px solid var(--line-base)',
+              background: 'var(--bg-card)',
+              padding: '20px',
             }}
           >
             {/* Badges */}
             <div
               style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
                 gap: 8,
                 marginBottom: 12,
               }}
@@ -373,13 +362,13 @@ export function AIInsightsPanelContent({
               <span
                 style={{
                   borderRadius: 20,
-                  border: "1px solid var(--line-base)",
-                  padding: "3px 10px",
+                  border: '1px solid var(--line-base)',
+                  padding: '3px 10px',
                   fontSize: 10,
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: "var(--text-muted)",
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
                 }}
               >
                 {suggestion.primaryDiagnosis.icd10Code}
@@ -387,13 +376,13 @@ export function AIInsightsPanelContent({
               <span
                 style={{
                   borderRadius: 20,
-                  border: "1px solid var(--c-asesmen)",
-                  padding: "3px 10px",
+                  border: '1px solid var(--c-asesmen)',
+                  padding: '3px 10px',
                   fontSize: 10,
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  color: "var(--c-asesmen)",
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--c-asesmen)',
                 }}
               >
                 Confidence {formatConfidence(suggestion.confidence)}
@@ -401,10 +390,10 @@ export function AIInsightsPanelContent({
               <span
                 style={{
                   fontSize: 11,
-                  fontFamily: "var(--font-mono)",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "var(--text-muted)",
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
                   opacity: 0.6,
                 }}
               >
@@ -417,7 +406,7 @@ export function AIInsightsPanelContent({
               style={{
                 fontSize: 16,
                 fontWeight: 500,
-                color: "var(--text-main)",
+                color: 'var(--text-main)',
                 marginBottom: 8,
               }}
             >
@@ -427,7 +416,7 @@ export function AIInsightsPanelContent({
               style={{
                 fontSize: 13,
                 lineHeight: 1.6,
-                color: "var(--text-muted)",
+                color: 'var(--text-muted)',
                 marginBottom: 12,
               }}
             >
@@ -438,21 +427,21 @@ export function AIInsightsPanelContent({
             {suggestion.supportingEvidence.length > 0 && (
               <ul
                 style={{
-                  listStyle: "none",
+                  listStyle: 'none',
                   padding: 0,
-                  margin: "0 0 16px",
-                  display: "flex",
-                  flexDirection: "column",
+                  margin: '0 0 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
                   gap: 6,
                 }}
               >
-                {suggestion.supportingEvidence.map((item) => (
+                {suggestion.supportingEvidence.map(item => (
                   <li
                     key={item}
                     style={{
                       fontSize: 13,
                       lineHeight: 1.6,
-                      color: "var(--text-muted)",
+                      color: 'var(--text-muted)',
                     }}
                   >
                     • {item}
@@ -464,8 +453,8 @@ export function AIInsightsPanelContent({
             {/* Override inputs */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "160px 1fr",
+                display: 'grid',
+                gridTemplateColumns: '160px 1fr',
                 gap: 12,
                 marginBottom: 16,
               }}
@@ -474,10 +463,10 @@ export function AIInsightsPanelContent({
                 <div
                   style={{
                     fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "var(--text-muted)",
+                    fontFamily: 'var(--font-mono)',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
                     marginBottom: 6,
                   }}
                 >
@@ -485,7 +474,7 @@ export function AIInsightsPanelContent({
                 </div>
                 <input
                   value={draftState.finalIcd}
-                  onChange={(event) =>
+                  onChange={event =>
                     onDraftChange?.(suggestion.id, {
                       finalIcd: event.target.value,
                     })
@@ -498,10 +487,10 @@ export function AIInsightsPanelContent({
                 <div
                   style={{
                     fontSize: 10,
-                    fontFamily: "var(--font-mono)",
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "var(--text-muted)",
+                    fontFamily: 'var(--font-mono)',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
                     marginBottom: 6,
                   }}
                 >
@@ -509,7 +498,7 @@ export function AIInsightsPanelContent({
                 </div>
                 <input
                   value={draftState.reason}
-                  onChange={(event) =>
+                  onChange={event =>
                     onDraftChange?.(suggestion.id, {
                       reason: event.target.value,
                     })
@@ -523,47 +512,47 @@ export function AIInsightsPanelContent({
             {/* Action buttons */}
             <div
               style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
                 gap: 8,
               }}
             >
               <button
                 type="button"
-                onClick={() => void onSubmitOverride(suggestion.id, "accept")}
-                disabled={draftState.status === "submitting"}
+                onClick={() => void onSubmitOverride(suggestion.id, 'accept')}
+                disabled={draftState.status === 'submitting'}
                 style={{
                   ...actionBtnBase,
-                  border: "1px solid var(--c-asesmen)",
-                  color: "var(--c-asesmen)",
-                  opacity: draftState.status === "submitting" ? 0.5 : 1,
+                  border: '1px solid var(--c-asesmen)',
+                  color: 'var(--c-asesmen)',
+                  opacity: draftState.status === 'submitting' ? 0.5 : 1,
                 }}
               >
                 Terima
               </button>
               <button
                 type="button"
-                onClick={() => void onSubmitOverride(suggestion.id, "modify")}
-                disabled={draftState.status === "submitting"}
+                onClick={() => void onSubmitOverride(suggestion.id, 'modify')}
+                disabled={draftState.status === 'submitting'}
                 style={{
                   ...actionBtnBase,
-                  border: "1px solid var(--line-base)",
-                  color: "var(--text-main)",
-                  opacity: draftState.status === "submitting" ? 0.5 : 1,
+                  border: '1px solid var(--line-base)',
+                  color: 'var(--text-main)',
+                  opacity: draftState.status === 'submitting' ? 0.5 : 1,
                 }}
               >
                 Override
               </button>
               <button
                 type="button"
-                onClick={() => void onSubmitOverride(suggestion.id, "reject")}
-                disabled={draftState.status === "submitting"}
+                onClick={() => void onSubmitOverride(suggestion.id, 'reject')}
+                disabled={draftState.status === 'submitting'}
                 style={{
                   ...actionBtnBase,
-                  border: "1px solid var(--c-critical)",
-                  color: "var(--c-critical)",
-                  opacity: draftState.status === "submitting" ? 0.5 : 1,
+                  border: '1px solid var(--c-critical)',
+                  color: 'var(--c-critical)',
+                  opacity: draftState.status === 'submitting' ? 0.5 : 1,
                 }}
               >
                 Tolak
@@ -576,187 +565,170 @@ export function AIInsightsPanelContent({
                 style={{
                   marginTop: 12,
                   fontSize: 13,
-                  color:
-                    draftState.status === "error"
-                      ? "var(--c-critical)"
-                      : "var(--text-muted)",
+                  color: draftState.status === 'error' ? 'var(--c-critical)' : 'var(--text-muted)',
                 }}
               >
                 {draftState.message}
               </p>
             )}
           </article>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
 export default function AIInsightsPanel(): React.JSX.Element {
-  const socket = useSharedIntelligenceSocket();
+  const socket = useSharedIntelligenceSocket()
   const snapshot = useMemo(
     () => buildAIInsightsSnapshot(socket.lastCdssSuggestion),
-    [socket.lastCdssSuggestion],
-  );
+    [socket.lastCdssSuggestion]
+  )
   const observabilityDeliveryRef = useRef<ObservabilityDeliveryState>({
     pendingFingerprint: null,
     reportedFingerprint: null,
-  });
-  const [overrideState, setOverrideState] = useState<OverrideStateMap>({});
+  })
+  const [overrideState, setOverrideState] = useState<OverrideStateMap>({})
 
   useEffect(() => {
-    const payload = buildSnapshotObservabilityPayload(snapshot);
-    if (!payload) return;
+    const payload = buildSnapshotObservabilityPayload(snapshot)
+    if (!payload) return
 
-    const fingerprint = getObservabilityFingerprint(payload);
-    if (
-      !canDispatchObservabilityFingerprint(
-        observabilityDeliveryRef.current,
-        fingerprint,
-      )
-    ) {
-      return;
+    const fingerprint = getObservabilityFingerprint(payload)
+    if (!canDispatchObservabilityFingerprint(observabilityDeliveryRef.current, fingerprint)) {
+      return
     }
 
     observabilityDeliveryRef.current = markObservabilityDeliveryPending(
       observabilityDeliveryRef.current,
-      fingerprint,
-    );
+      fingerprint
+    )
 
-    void fetch("/api/dashboard/intelligence/observability", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+    void fetch('/api/dashboard/intelligence/observability', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     })
-      .then((response) => {
+      .then(response => {
         if (!response.ok) {
-          throw new Error("Failed to report intelligence observability.");
+          throw new Error('Failed to report intelligence observability.')
         }
         observabilityDeliveryRef.current = markObservabilityDeliverySucceeded(
           observabilityDeliveryRef.current,
-          fingerprint,
-        );
+          fingerprint
+        )
       })
       .catch(() => {
         observabilityDeliveryRef.current = markObservabilityDeliveryFailed(
           observabilityDeliveryRef.current,
-          fingerprint,
-        );
-      });
-  }, [snapshot]);
+          fingerprint
+        )
+      })
+  }, [snapshot])
 
   function updateDraft(
     suggestionId: string,
-    patch: Partial<Pick<OverrideDraftState, "finalIcd" | "reason">>,
+    patch: Partial<Pick<OverrideDraftState, 'finalIcd' | 'reason'>>
   ): void {
-    setOverrideState((current) => ({
+    setOverrideState(current => ({
       ...current,
       [suggestionId]: {
         ...getDraftState(current, suggestionId),
         ...patch,
-        status: "idle",
+        status: 'idle',
         message: null,
       },
-    }));
+    }))
   }
 
-  async function submitOverride(
-    suggestionId: string,
-    action: OverrideAction,
-  ): Promise<void> {
-    const suggestion = snapshot.suggestions.find(
-      (item) => item.id === suggestionId,
-    );
-    if (!snapshot.encounterId || !suggestion) return;
+  async function submitOverride(suggestionId: string, action: OverrideAction): Promise<void> {
+    const suggestion = snapshot.suggestions.find(item => item.id === suggestionId)
+    if (!snapshot.encounterId || !suggestion) return
 
-    const draftState = getDraftState(overrideState, suggestionId);
-    if (action !== "accept" && !draftState.reason.trim()) {
-      setOverrideState((current) => ({
+    const draftState = getDraftState(overrideState, suggestionId)
+    if (action !== 'accept' && !draftState.reason.trim()) {
+      setOverrideState(current => ({
         ...current,
         [suggestionId]: {
           ...getDraftState(current, suggestionId),
-          status: "error",
-          message: "Alasan override diperlukan untuk modify atau reject.",
+          status: 'error',
+          message: 'Alasan override diperlukan untuk modify atau reject.',
         },
-      }));
-      return;
+      }))
+      return
     }
 
-    if (action === "modify" && !draftState.finalIcd.trim()) {
-      setOverrideState((current) => ({
+    if (action === 'modify' && !draftState.finalIcd.trim()) {
+      setOverrideState(current => ({
         ...current,
         [suggestionId]: {
           ...getDraftState(current, suggestionId),
-          status: "error",
-          message: "Masukkan ICD-10 final sebelum menyimpan override.",
+          status: 'error',
+          message: 'Masukkan ICD-10 final sebelum menyimpan override.',
         },
-      }));
-      return;
+      }))
+      return
     }
 
-    setOverrideState((current) => ({
+    setOverrideState(current => ({
       ...current,
       [suggestionId]: {
         ...getDraftState(current, suggestionId),
-        status: "submitting",
-        message: "Merekam override...",
+        status: 'submitting',
+        message: 'Merekam override...',
       },
-    }));
+    }))
 
     try {
-      const response = await fetch("/api/dashboard/intelligence/override", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+      const response = await fetch('/api/dashboard/intelligence/override', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           encounterId: snapshot.encounterId,
           action,
           selectedIcd: suggestion.primaryDiagnosis.icd10Code,
           finalIcd:
-            action === "accept"
+            action === 'accept'
               ? suggestion.primaryDiagnosis.icd10Code
               : draftState.finalIcd.trim() || undefined,
           selectedConfidence: suggestion.confidence,
           overrideReason:
-            action === "accept"
-              ? draftState.reason.trim() ||
-                "Clinician accepted guarded suggestion"
+            action === 'accept'
+              ? draftState.reason.trim() || 'Clinician accepted guarded suggestion'
               : draftState.reason.trim(),
           metadata: {
-            source: "dashboard-intelligence",
+            source: 'dashboard-intelligence',
             requestId: snapshot.requestId,
             engineVersion: snapshot.engineVersion,
           },
         }),
-      });
+      })
 
       const body = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
+        error?: { message?: string }
+      } | null
 
       if (!response.ok) {
-        throw new Error(
-          body?.error?.message ?? "Gagal merekam override intelligence.",
-        );
+        throw new Error(body?.error?.message ?? 'Gagal merekam override intelligence.')
       }
 
-      setOverrideState((current) => ({
+      setOverrideState(current => ({
         ...current,
         [suggestionId]: {
           ...getDraftState(current, suggestionId),
-          status: "success",
-          message: "Override berhasil direkam.",
+          status: 'success',
+          message: 'Override berhasil direkam.',
         },
-      }));
+      }))
     } catch (error) {
-      setOverrideState((current) => ({
+      setOverrideState(current => ({
         ...current,
         [suggestionId]: {
           ...getDraftState(current, suggestionId),
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "Gagal merekam override.",
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Gagal merekam override.',
         },
-      }));
+      }))
     }
   }
 
@@ -767,5 +739,5 @@ export default function AIInsightsPanel(): React.JSX.Element {
       onDraftChange={updateDraft}
       onSubmitOverride={submitOverride}
     />
-  );
+  )
 }

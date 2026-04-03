@@ -1,0 +1,43 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions"
+---
+
+# Troubleshooting
+
+<Note>
+  For the full troubleshooting guide, see the internal [TROUBLESHOOTING.md](https://github.com/sentra-healthcare/abyss-monorepo/blob/main/app/primary-healthcare/dashboard/docs/TROUBLESHOOTING.md).
+</Note>
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Port 3000 already in use">
+    The custom server defaults to port 3000. If it's in use:
+    ```bash
+    # Windows
+    netstat -ano | findstr :3000
+    taskkill /PID [PID] /F
+
+    # Or use a different port
+    PORT=3001 npm run dev
+    ```
+  </Accordion>
+  <Accordion title="Prisma migration errors">
+    ```bash
+    npx prisma migrate reset    # Reset DB (destructive!)
+    npx prisma migrate dev      # Re-run migrations
+    npx prisma generate          # Regenerate client
+    ```
+  </Accordion>
+  <Accordion title="Socket.IO connection fails">
+    - Check CORS origins in `server.ts`
+    - Verify cookie-based auth is working
+    - Ensure the custom server is running (not `next dev`)
+  </Accordion>
+  <Accordion title="CDSS returns no suggestions">
+    - Verify `DEEPSEEK_API_KEY` is set
+    - Check `GOOGLE_AI_API_KEY` for fallback
+    - Ensure `penyakit.json` is present in `src/lib/cdss/`
+  </Accordion>
+</AccordionGroup>

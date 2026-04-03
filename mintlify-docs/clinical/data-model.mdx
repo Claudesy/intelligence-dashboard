@@ -1,0 +1,25 @@
+---
+title: "Data Model"
+description: "Database schema and data relationships"
+---
+
+# Data Model
+
+AADI uses **PostgreSQL** with **Prisma ORM**. The schema is defined in `prisma/schema.prisma`.
+
+<Note>
+  For the full data model specification, see the internal [DATA_MODEL.md](https://github.com/sentra-healthcare/abyss-monorepo/blob/main/app/primary-healthcare/dashboard/docs/DATA_MODEL.md).
+</Note>
+
+## Key Commands
+
+```bash
+# Run migrations
+npx prisma migrate dev
+
+# Seed the database
+npm run seed
+
+# Open Prisma Studio
+npm run db:studio
+```

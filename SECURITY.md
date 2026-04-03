@@ -25,6 +25,15 @@ Laporkan langsung ke Chief (Dr. Ferdi Iskandar). **Jangan buka GitHub issue publ
 - Role check: TODO (noted di route handler, pending RBAC matrix produksi)
 - Semua request dicatat ke Security Audit Log
 
+### Security Baseline Gate
+- Repo baseline security checks dijalankan lewat `npm run security:baseline`
+- Baseline saat ini mencakup:
+  - `test:auth-hardening`
+  - `test:cdss:protected`
+- CI baseline memakai install non-interaktif tanpa lifecycle side effects lewat `npm ci --ignore-scripts`
+- Setelah install non-interaktif, repo menjalankan `prisma generate` dengan `DATABASE_URL` placeholder lokal untuk membentuk Prisma Client tanpa menyentuh database nyata
+- `test:cdss:protected` dijalankan lewat `node --import ./node_modules/tsx/dist/loader.mjs ...` agar runner TypeScript stabil di Node 24 tanpa bergantung ke loader lama
+
 ### Security Audit Log
 - File: `src/lib/server/security-audit.ts`
 - Setiap request ke `/api/cdss/*` dan `/api/auth/*` dicatat ke database
@@ -74,6 +83,9 @@ https://primary-healthcare-production.up.railway.app
 
 - Role-based authorization di `/api/cdss/diagnose` belum diimplementasi (lihat comment `TODO(security)` di route handler)
 - `RBAC_BACKEND` masih OPEN di `infra/ci/missing-inputs.md` (#3)
+- Dependency graph masih memiliki audit findings bawaan; triage dan remediation version upgrade perlu batch terpisah
+- Surface Prisma readiness untuk lint/CI sudah dipulihkan lewat explicit generate step; lint sekarang kembali hijau
+- Debt berikutnya berpindah ke hardening auth/RBAC dan audit package upgrades
 
 ---
 

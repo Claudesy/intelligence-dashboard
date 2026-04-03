@@ -1,82 +1,79 @@
 // Masterplan and masterpiece by Claudesy.
-import "server-only";
+import 'server-only'
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from 'node:crypto'
 
 export interface CDSSQualityMetrics {
-  total_requests: number;
-  total_displayed: number;
-  total_selected: number;
-  selection_rate: number;
-  red_flag_trigger_rate: number;
-  unverified_icd_avg_count: number;
-  latency_p95_ms: number;
-  feedback_total: number;
-  override_rate: number;
-  concordance_rate: number;
-  must_not_miss_surfaced_count: number;
+  total_requests: number
+  total_displayed: number
+  total_selected: number
+  selection_rate: number
+  red_flag_trigger_rate: number
+  unverified_icd_avg_count: number
+  latency_p95_ms: number
+  feedback_total: number
+  override_rate: number
+  concordance_rate: number
+  must_not_miss_surfaced_count: number
 }
 
 interface CDSSAuditEntryInput {
-  sessionId?: string;
-  action: string;
-  validationStatus: string;
-  outputSummary?: Record<string, unknown>;
-  modelVersion?: string;
-  latencyMs?: number;
-  metadata?: Record<string, unknown>;
+  sessionId?: string
+  action: string
+  validationStatus: string
+  outputSummary?: Record<string, unknown>
+  modelVersion?: string
+  latencyMs?: number
+  metadata?: Record<string, unknown>
 }
 
 interface CDSSOutcomeFeedbackInput {
-  sessionId?: string;
-  selectedIcd: string;
-  selectedConfidence: number;
-  finalIcd: string;
-  outcomeConfirmed?: boolean | null;
-  followUpNote?: string;
-  doctorUserId?: string | null;
-  overrideReason?: string;
-  metadata?: Record<string, unknown>;
+  sessionId?: string
+  selectedIcd: string
+  selectedConfidence: number
+  finalIcd: string
+  outcomeConfirmed?: boolean | null
+  followUpNote?: string
+  doctorUserId?: string | null
+  overrideReason?: string
+  metadata?: Record<string, unknown>
 }
 
 type CDSSAuditRow = {
-  sessionHash: string;
-  timestamp: Date;
-  latencyMs: number;
-  action: string;
-  outputSummary: Record<string, unknown> | null;
-  metadata: Record<string, unknown> | null;
-};
+  sessionHash: string
+  timestamp: Date
+  latencyMs: number
+  action: string
+  outputSummary: Record<string, unknown> | null
+  metadata: Record<string, unknown> | null
+}
 
 type CDSSOutcomeFeedbackRow = {
-  selectedIcd: string;
-  finalIcd: string;
-  overrideReason: string | null;
-  outcomeConfirmed: boolean | null;
-};
+  selectedIcd: string
+  finalIcd: string
+  overrideReason: string | null
+  outcomeConfirmed: boolean | null
+}
 
 function shouldUseDatabase(): boolean {
-  return Boolean(process.env.DATABASE_URL?.trim());
+  return Boolean(process.env.DATABASE_URL?.trim())
 }
 
 function hashSessionId(sessionId?: string): string {
-  return createHash("sha256")
-    .update(sessionId?.trim() || "anonymous-session")
-    .digest("hex");
+  return createHash('sha256')
+    .update(sessionId?.trim() || 'anonymous-session')
+    .digest('hex')
 }
 
 function toNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 function percentile95(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((left, right) => left - right);
-  const index = Math.min(
-    sorted.length - 1,
-    Math.ceil(sorted.length * 0.95) - 1,
-  );
-  return sorted[index] ?? 0;
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((left, right) => left - right)
+  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)
+  return sorted[index] ?? 0
 }
 
 export async function writeCDSSAuditEntry({
@@ -84,36 +81,34 @@ export async function writeCDSSAuditEntry({
   action,
   validationStatus,
   outputSummary = {},
-  modelVersion = "IDE-V2-HYBRID",
+  modelVersion = 'IDE-V2-HYBRID',
   latencyMs = 0,
   metadata = {},
 }: CDSSAuditEntryInput): Promise<void> {
-  if (!shouldUseDatabase()) return;
+  if (!shouldUseDatabase()) return
 
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import('@/lib/prisma')
     const delegate = (
       prisma as unknown as {
-        cDSSAuditLog?: { create: (args: unknown) => Promise<unknown> };
+        cDSSAuditLog?: { create: (args: unknown) => Promise<unknown> }
       }
-    ).cDSSAuditLog;
-    if (!delegate?.create) return;
+    ).cDSSAuditLog
+    if (!delegate?.create) return
 
     await delegate.create({
       data: {
         id: randomUUID(),
         sessionHash: hashSessionId(sessionId),
         action,
-        inputHash: createHash("sha256")
-          .update(`${action}:${validationStatus}`)
-          .digest("hex"),
+        inputHash: createHash('sha256').update(`${action}:${validationStatus}`).digest('hex'),
         outputSummary,
         modelVersion,
         latencyMs: Math.max(0, Math.round(latencyMs)),
         validationStatus,
         metadata,
       },
-    });
+    })
   } catch {
     // Audit write failure — silent to avoid leaking info
   }
@@ -130,16 +125,16 @@ export async function writeCDSSOutcomeFeedbackEntry({
   overrideReason,
   metadata = {},
 }: CDSSOutcomeFeedbackInput): Promise<void> {
-  if (!shouldUseDatabase()) return;
+  if (!shouldUseDatabase()) return
 
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import('@/lib/prisma')
     const delegate = (
       prisma as unknown as {
-        cDSSOutcomeFeedback?: { create: (args: unknown) => Promise<unknown> };
+        cDSSOutcomeFeedback?: { create: (args: unknown) => Promise<unknown> }
       }
-    ).cDSSOutcomeFeedback;
-    if (!delegate?.create) return;
+    ).cDSSOutcomeFeedback
+    if (!delegate?.create) return
 
     await delegate.create({
       data: {
@@ -153,15 +148,13 @@ export async function writeCDSSOutcomeFeedbackEntry({
         overrideReason,
         metadata,
       },
-    });
+    })
   } catch {
     // Outcome feedback write failure — silent
   }
 }
 
-export async function getCDSSQualityMetrics(
-  days = 14,
-): Promise<CDSSQualityMetrics> {
+export async function getCDSSQualityMetrics(days = 14): Promise<CDSSQualityMetrics> {
   const empty: CDSSQualityMetrics = {
     total_requests: 0,
     total_displayed: 0,
@@ -174,22 +167,20 @@ export async function getCDSSQualityMetrics(
     override_rate: 0,
     concordance_rate: 0,
     must_not_miss_surfaced_count: 0,
-  };
+  }
 
-  if (!shouldUseDatabase()) return empty;
+  if (!shouldUseDatabase()) return empty
 
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import('@/lib/prisma')
     const prismaLike = prisma as unknown as {
-      cDSSAuditLog?: { findMany: (args: unknown) => Promise<CDSSAuditRow[]> };
+      cDSSAuditLog?: { findMany: (args: unknown) => Promise<CDSSAuditRow[]> }
       cDSSOutcomeFeedback?: {
-        findMany: (args: unknown) => Promise<CDSSOutcomeFeedbackRow[]>;
-      };
-    };
+        findMany: (args: unknown) => Promise<CDSSOutcomeFeedbackRow[]>
+      }
+    }
 
-    const since = new Date(
-      Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000,
-    );
+    const since = new Date(Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000)
     const auditRows =
       (await prismaLike.cDSSAuditLog?.findMany({
         where: { timestamp: { gte: since } },
@@ -201,7 +192,7 @@ export async function getCDSSQualityMetrics(
           outputSummary: true,
           metadata: true,
         },
-      })) ?? [];
+      })) ?? []
 
     const feedbackRows =
       (await prismaLike.cDSSOutcomeFeedback?.findMany({
@@ -212,83 +203,61 @@ export async function getCDSSQualityMetrics(
           overrideReason: true,
           outcomeConfirmed: true,
         },
-      })) ?? [];
+      })) ?? []
 
-    const diagnoseRows = auditRows.filter(
-      (row) => row.action === "DIAGNOSE_RESULT",
-    );
+    const diagnoseRows = auditRows.filter(row => row.action === 'DIAGNOSE_RESULT')
     const selectionRows = auditRows.filter(
-      (row) =>
-        row.action === "SUGGESTION_SELECTED" &&
-        row.outputSummary?.selectionIntent !== "must_not_miss_considered",
-    );
-    const selectedSessions = new Set(
-      selectionRows.map((row) => row.sessionHash),
-    );
-    const displayedCounts = diagnoseRows.map((row) =>
-      toNumber(row.outputSummary?.totalDisplayed),
-    );
+      row =>
+        row.action === 'SUGGESTION_SELECTED' &&
+        row.outputSummary?.selectionIntent !== 'must_not_miss_considered'
+    )
+    const selectedSessions = new Set(selectionRows.map(row => row.sessionHash))
+    const displayedCounts = diagnoseRows.map(row => toNumber(row.outputSummary?.totalDisplayed))
     const redFlagCount = diagnoseRows.filter(
-      (row) => toNumber(row.outputSummary?.redFlagCount) > 0,
-    ).length;
-    const unverifiedCounts = diagnoseRows.map((row) =>
-      toNumber(row.outputSummary?.unverifiedCount),
-    );
-    const mustNotMissCounts = diagnoseRows.map((row) =>
-      toNumber(row.outputSummary?.mustNotMissCount),
-    );
+      row => toNumber(row.outputSummary?.redFlagCount) > 0
+    ).length
+    const unverifiedCounts = diagnoseRows.map(row => toNumber(row.outputSummary?.unverifiedCount))
+    const mustNotMissCounts = diagnoseRows.map(row => toNumber(row.outputSummary?.mustNotMissCount))
 
     return {
       total_requests: diagnoseRows.length,
       total_displayed: displayedCounts.reduce((sum, count) => sum + count, 0),
       total_selected: selectedSessions.size,
-      selection_rate:
-        diagnoseRows.length > 0
-          ? selectedSessions.size / diagnoseRows.length
-          : 0,
-      red_flag_trigger_rate:
-        diagnoseRows.length > 0 ? redFlagCount / diagnoseRows.length : 0,
+      selection_rate: diagnoseRows.length > 0 ? selectedSessions.size / diagnoseRows.length : 0,
+      red_flag_trigger_rate: diagnoseRows.length > 0 ? redFlagCount / diagnoseRows.length : 0,
       unverified_icd_avg_count:
         unverifiedCounts.length > 0
-          ? unverifiedCounts.reduce((sum, count) => sum + count, 0) /
-            unverifiedCounts.length
+          ? unverifiedCounts.reduce((sum, count) => sum + count, 0) / unverifiedCounts.length
           : 0,
-      latency_p95_ms: percentile95(
-        diagnoseRows.map((row) => toNumber(row.latencyMs)),
-      ),
+      latency_p95_ms: percentile95(diagnoseRows.map(row => toNumber(row.latencyMs))),
       feedback_total: feedbackRows.length,
       override_rate:
         feedbackRows.length > 0
           ? feedbackRows.filter(
-              (row) =>
-                Boolean(row.overrideReason?.trim()) ||
-                row.selectedIcd !== row.finalIcd,
+              row => Boolean(row.overrideReason?.trim()) || row.selectedIcd !== row.finalIcd
             ).length / feedbackRows.length
           : 0,
       concordance_rate:
         feedbackRows.length > 0
-          ? feedbackRows.filter((row) => row.selectedIcd === row.finalIcd)
-              .length / feedbackRows.length
+          ? feedbackRows.filter(row => row.selectedIcd === row.finalIcd).length /
+            feedbackRows.length
           : 0,
-      must_not_miss_surfaced_count: mustNotMissCounts.reduce(
-        (sum, count) => sum + count,
-        0,
-      ),
-    };
+      must_not_miss_surfaced_count: mustNotMissCounts.reduce((sum, count) => sum + count, 0),
+    }
   } catch {
-    return empty;
+    return empty
   }
 }
 
 // ─── Per-Encounter CDSS Summary (for Intelligence Dashboard) ─────────────────
 
 export interface CDSSEncounterSummary {
-  sessionHash: string;
-  hasDiagnoseResult: boolean;
-  redFlagCount: number;
-  totalDisplayed: number;
-  modelVersion: string;
-  latestAt: Date;
+  sessionHash: string
+  hasDiagnoseResult: boolean
+  redFlagCount: number
+  totalDisplayed: number
+  modelVersion: string
+  latestAt: Date
 }
 
 /**
@@ -296,27 +265,27 @@ export interface CDSSEncounterSummary {
  * Returns a Map<encounterId, CDSSEncounterSummary>.
  */
 export async function getCDSSEncounterSummaries(
-  encounterIds: string[],
+  encounterIds: string[]
 ): Promise<Map<string, CDSSEncounterSummary>> {
-  const result = new Map<string, CDSSEncounterSummary>();
-  if (encounterIds.length === 0 || !shouldUseDatabase()) return result;
+  const result = new Map<string, CDSSEncounterSummary>()
+  if (encounterIds.length === 0 || !shouldUseDatabase()) return result
 
-  const hashToId = new Map<string, string>();
+  const hashToId = new Map<string, string>()
   for (const id of encounterIds) {
-    hashToId.set(hashSessionId(id), id);
+    hashToId.set(hashSessionId(id), id)
   }
 
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import('@/lib/prisma')
     const prismaLike = prisma as unknown as {
-      cDSSAuditLog?: { findMany: (args: unknown) => Promise<CDSSAuditRow[]> };
-    };
+      cDSSAuditLog?: { findMany: (args: unknown) => Promise<CDSSAuditRow[]> }
+    }
 
     const rows =
       (await prismaLike.cDSSAuditLog?.findMany({
         where: {
           sessionHash: { in: Array.from(hashToId.keys()) },
-          action: "DIAGNOSE_RESULT",
+          action: 'DIAGNOSE_RESULT',
         },
         select: {
           sessionHash: true,
@@ -324,25 +293,27 @@ export async function getCDSSEncounterSummaries(
           outputSummary: true,
           modelVersion: true,
         },
-        orderBy: { timestamp: "desc" },
-      })) ?? [];
+        orderBy: { timestamp: 'desc' },
+      })) ?? []
 
     for (const row of rows) {
-      const encounterId = hashToId.get(row.sessionHash);
-      if (!encounterId || result.has(encounterId)) continue;
+      const encounterId = hashToId.get(row.sessionHash)
+      if (!encounterId || result.has(encounterId)) continue
 
       result.set(encounterId, {
         sessionHash: row.sessionHash,
         hasDiagnoseResult: true,
         redFlagCount: toNumber(row.outputSummary?.redFlagCount),
         totalDisplayed: toNumber(row.outputSummary?.totalDisplayed),
-        modelVersion: String(row.metadata?.modelVersion ?? row.outputSummary?.modelVersion ?? "unknown"),
+        modelVersion: String(
+          row.metadata?.modelVersion ?? row.outputSummary?.modelVersion ?? 'unknown'
+        ),
         latestAt: row.timestamp,
-      });
+      })
     }
   } catch {
     // Silent — intelligence dashboard degrades gracefully
   }
 
-  return result;
+  return result
 }

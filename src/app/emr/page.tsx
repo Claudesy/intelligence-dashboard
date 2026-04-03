@@ -1,160 +1,142 @@
 // Claudesy's vision, brought to life.
-"use client";
+'use client'
 
-import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-  Fragment,
-  useId,
-} from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { generateNarrative } from "@/lib/narrative-generator";
-import {
-  hasRespiratoryComplaint,
-  suggestContextualVitals,
-  type MedicationFlag,
-  type RecentActivity,
-  type StressState,
-} from "@/lib/ttv-inference";
-import {
-  classifyHypertension,
-  getHTNRecommendations,
-  BP_THRESHOLDS,
-  type BPMeasurementSession,
-} from "@/lib/htn-classifier";
-import {
-  classifyBloodGlucose,
-  type GlucoseData,
-} from "@/lib/glucose-classifier";
-import { detectOccultShock } from "@/lib/occult-shock-detector";
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { Socket } from 'socket.io-client'
+import type {
+  CompositeAlert as CompositeDeteriorationAlert,
+  CompositeDeteriorationResult as SharedCompositeDeteriorationResult,
+  CompositeVitalSnapshot,
+} from '@abyss/types'
+import { DrugStatusBadge } from '@/components/clinical/DrugStatusBadge'
 import {
   buildFinalizationTherapyPlan,
   type FinalizationMedicationItem,
-} from "@/lib/clinical/finalization-therapy-engine";
+} from '@/lib/clinical/finalization-therapy-engine'
 import {
-  searchManualMedicationSuggestions,
   type ManualMedicationSuggestion,
-} from "@/lib/clinical/manual-medication-suggestions";
-import TrajectoryPanel from "./TrajectoryPanel";
-import ClinicalTrajectoryChart from "./ClinicalTrajectoryChart";
-import ClinicalPrognosisChart from "./ClinicalPrognosisChart";
-import TrustLayerGhost, { PROCESSING_SCRIPT } from "./TrustLayerGhost";
-import { DrugStatusBadge } from "@/components/clinical/DrugStatusBadge";
-
-import { io as socketIO, type Socket } from "socket.io-client";
-import {
-  mapDashboardToTransferPayload,
-  type DashboardEncounterData,
-} from "@/lib/emr/bridge-mapper";
+  searchManualMedicationSuggestions,
+} from '@/lib/clinical/manual-medication-suggestions'
+import { type DashboardEncounterData, mapDashboardToTransferPayload } from '@/lib/emr/bridge-mapper'
 import {
   type EmrBridgeStatus,
   getBridgeStatusLabel,
   isBridgeActionLocked,
   mapBridgeQueueStatusToEmrStatus,
   resolveEmrSourceInput,
-} from "@/lib/emr/source-trace";
+} from '@/lib/emr/source-trace'
 import {
-  getOccultShockHistoryWindow,
   getTrajectoryHistoryWindow,
   normalizeScrapedVisitHistory,
   type ScrapedVisit,
-} from "@/lib/emr/visit-history";
-
-// Screening Alert — Gate 2/3/4 clinical decision alerts
-interface ScreeningAlert {
-  id: string;
-  gate: "GATE_2_HTN" | "GATE_3_GLUCOSE" | "GATE_4_OCCULT_SHOCK";
-  type: string;
-  severity: "critical" | "high" | "warning";
-  title: string;
-  reasoning: string;
-  recommendations: string[];
-}
+} from '@/lib/emr/visit-history'
+import { generateNarrative } from '@/lib/narrative-generator'
+import {
+  hasRespiratoryComplaint,
+  type MedicationFlag,
+  type RecentActivity,
+  type StressState,
+  suggestContextualVitals,
+} from '@/lib/ttv-inference'
+import {
+  evaluateCompositeDeteriorationFromEmrPayload,
+} from '@/lib/vitals/composite-deterioration'
+import {
+  extractTriageSignalContext,
+  type ScreeningAlert,
+  type StructuredTriageSigns,
+  type TriageSignalContext,
+} from '@/lib/vitals/instant-red-alerts'
+import ClinicalPrognosisChart from './ClinicalPrognosisChart'
+import ClinicalTrajectoryChart from './ClinicalTrajectoryChart'
+import TrajectoryPanel from './TrajectoryPanel'
+import TrustLayerGhost, { PROCESSING_SCRIPT } from './TrustLayerGhost'
+import { AudreyMicButton } from '@/components/features/audrey/AudreyMicButton'
+import { useAudreySTT } from '@/hooks/useAudreySTT'
 
 // Iskandar Engine V1 response types
 interface CDSSSuggestion {
-  rank: number;
-  llm_rank?: number;
-  icd10_code: string;
-  diagnosis_name: string;
-  confidence: number;
-  reasoning: string;
-  key_reasons?: string[];
-  missing_information?: string[];
-  red_flags?: string[];
-  recommended_actions?: string[];
-  rag_verified?: boolean;
-  decision_status?: "recommended" | "review" | "must_not_miss" | "deferred";
-  decision_reason?: string;
-  deterministic_score?: number;
-  rank_source?: "llm" | "hybrid";
-  validation_flags?: Array<{ type: string; code: string; message: string }>;
+  rank: number
+  llm_rank?: number
+  icd10_code: string
+  diagnosis_name: string
+  confidence: number
+  reasoning: string
+  key_reasons?: string[]
+  missing_information?: string[]
+  red_flags?: string[]
+  recommended_actions?: string[]
+  rag_verified?: boolean
+  decision_status?: 'recommended' | 'review' | 'must_not_miss' | 'deferred'
+  decision_reason?: string
+  deterministic_score?: number
+  rank_source?: 'llm' | 'hybrid'
+  validation_flags?: Array<{ type: string; code: string; message: string }>
 }
 interface CDSSRedFlag {
-  severity: "emergency" | "urgent" | "warning";
-  condition: string;
-  action: string;
-  criteria_met: string[];
+  severity: 'emergency' | 'urgent' | 'warning'
+  condition: string
+  action: string
+  criteria_met: string[]
 }
 interface CDSSAlert {
-  id: string;
-  type: string;
-  severity: string;
-  title: string;
-  message: string;
-  icd_codes?: string[];
-  action?: string;
+  id: string
+  type: string
+  severity: string
+  title: string
+  message: string
+  icd_codes?: string[]
+  action?: string
 }
 interface CDSSResult {
-  suggestions: CDSSSuggestion[];
-  red_flags: CDSSRedFlag[];
-  alerts: CDSSAlert[];
-  processing_time_ms: number;
-  source: "ai" | "local" | "error";
-  model_version: string;
+  suggestions: CDSSSuggestion[]
+  red_flags: CDSSRedFlag[]
+  alerts: CDSSAlert[]
+  processing_time_ms: number
+  source: 'ai' | 'local' | 'error'
+  model_version: string
   validation_summary: {
-    total_raw: number;
-    total_validated: number;
-    recommended_count: number;
-    review_count: number;
-    must_not_miss_count: number;
-    deferred_count: number;
-    requires_more_data: boolean;
-    unverified_codes: string[];
-    warnings: string[];
-  };
-  next_best_questions: string[];
+    total_raw: number
+    total_validated: number
+    recommended_count: number
+    review_count: number
+    must_not_miss_count: number
+    deferred_count: number
+    requires_more_data: boolean
+    unverified_codes: string[]
+    warnings: string[]
+  }
+  next_best_questions: string[]
 }
 
+type CompositeDeteriorationState = SharedCompositeDeteriorationResult | null
+
+const ENCOUNTER_BASELINE_WINDOW_MINUTES = 120
+const MAX_ENCOUNTER_MEASUREMENTS = 12
+
 interface ManualMedicationEntry {
-  id: string;
-  name: string;
-  canonicalName: string | null;
-  dose: string;
-  frequency: string;
-  route: string;
-  duration?: string;
-  timingHint?: string;
-  stockLabel?: string;
-  source: "catalog" | "manual";
+  id: string
+  name: string
+  canonicalName: string | null
+  dose: string
+  frequency: string
+  route: string
+  duration?: string
+  timingHint?: string
+  stockLabel?: string
+  source: 'catalog' | 'manual'
 }
 
 function formatManualMedicationInline(entry: ManualMedicationEntry): string {
-  const details = [
-    entry.dose,
-    entry.frequency,
-    entry.route ? `(${entry.route})` : "",
-  ]
+  const details = [entry.dose, entry.frequency, entry.route ? `(${entry.route})` : '']
     .filter(Boolean)
-    .join(" ");
-  return details ? `${entry.name} ${details}` : entry.name;
+    .join(' ')
+  return details ? `${entry.name} ${details}` : entry.name
 }
 
 function createManualMedicationEntryFromSuggestion(
-  suggestion: ManualMedicationSuggestion,
+  suggestion: ManualMedicationSuggestion
 ): ManualMedicationEntry {
   return {
     id: suggestion.id,
@@ -166,107 +148,157 @@ function createManualMedicationEntryFromSuggestion(
     duration: suggestion.duration,
     timingHint: suggestion.timingHint,
     stockLabel: suggestion.stockLabel,
-    source: "catalog",
-  };
+    source: 'catalog',
+  }
 }
 
-function createManualMedicationEntryFromFreeText(
-  value: string,
-): ManualMedicationEntry {
-  const trimmed = value.trim();
+function createManualMedicationEntryFromFreeText(value: string): ManualMedicationEntry {
+  const trimmed = value.trim()
   return {
-    id: `manual-${trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    id: `manual-${trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     name: trimmed,
     canonicalName: null,
-    dose: "",
-    frequency: "",
-    route: "",
-    source: "manual",
-  };
+    dose: '',
+    frequency: '',
+    route: '',
+    source: 'manual',
+  }
 }
 
-type EmrVitalKey = "gcs" | "td" | "nadi" | "napas" | "suhu" | "spo2" | "map";
-type VitalEntryMode = "empty" | "measured" | "estimated" | "manual_required";
-type VitalConfidence = "high" | "medium" | "low";
+type EmrVitalKey = 'gcs' | 'td' | 'nadi' | 'napas' | 'suhu' | 'spo2' | 'map'
+type VitalEntryMode = 'empty' | 'measured' | 'estimated' | 'manual_required'
+type VitalConfidence = 'high' | 'medium' | 'low'
 
 type VitalEntryMeta = {
-  mode: VitalEntryMode;
-  confidence?: VitalConfidence;
-  note?: string;
-};
+  mode: VitalEntryMode
+  confidence?: VitalConfidence
+  note?: string
+}
 
-type WorkflowTab = "triage" | "review" | "assessment" | "finalize";
-type ImportantBestQuestionVisual = "abdomen_mcburney";
+type StructuredSignSection = keyof StructuredTriageSigns
+
+function createInitialStructuredSigns(): StructuredTriageSigns {
+  return {
+    respiratoryDistress: {},
+    hmod: {},
+    dkaHhs: {},
+    perfusionShock: {},
+  }
+}
+
+function normalizeStructuredSignsDraft(
+  signs?: StructuredTriageSigns | null
+): StructuredTriageSigns {
+  return {
+    respiratoryDistress: { ...(signs?.respiratoryDistress ?? {}) },
+    hmod: { ...(signs?.hmod ?? {}) },
+    dkaHhs: { ...(signs?.dkaHhs ?? {}) },
+    perfusionShock: { ...(signs?.perfusionShock ?? {}) },
+  }
+}
+
+const STRUCTURED_SIGN_CONFIG = {
+  respiratoryDistress: [
+    { key: 'accessoryMuscleUse', label: 'Otot bantu napas' },
+    { key: 'retractions', label: 'Retraksi' },
+    { key: 'unableToSpeakFullSentences', label: 'Tidak bisa bicara kalimat penuh' },
+    { key: 'cyanosis', label: 'Sianosis' },
+    { key: 'distressObserved', label: 'Distress napas terobservasi' },
+  ],
+  hmod: [
+    { key: 'chest_pain', label: 'Nyeri dada' },
+    { key: 'pulmonary_edema', label: 'Edema paru / orthopnea' },
+    { key: 'neurological_deficit', label: 'Defisit neurologis fokal' },
+    { key: 'vision_changes', label: 'Perubahan visus' },
+    { key: 'severe_headache', label: 'Sakit kepala hebat' },
+    { key: 'oliguria', label: 'Oliguria' },
+    { key: 'altered_mental_status', label: 'Gangguan kesadaran' },
+  ],
+  dkaHhs: [
+    { key: 'kussmaul_breathing', label: 'Napas Kussmaul' },
+    { key: 'acetone_breath', label: 'Napas aseton' },
+    { key: 'nausea_vomiting', label: 'Mual / muntah' },
+    { key: 'abdominal_pain', label: 'Nyeri perut' },
+    { key: 'altered_mental_status', label: 'Gangguan kesadaran' },
+    { key: 'severe_dehydration', label: 'Dehidrasi berat' },
+    { key: 'seizures', label: 'Kejang' },
+  ],
+  perfusionShock: [
+    { key: 'dizziness', label: 'Pusing' },
+    { key: 'presyncope', label: 'Presinkop' },
+    { key: 'syncope', label: 'Sinkop / pingsan' },
+    { key: 'weakness', label: 'Lemah / malaise' },
+    { key: 'clammySkin', label: 'Kulit dingin berkeringat' },
+    { key: 'coldExtremities', label: 'Ekstremitas dingin' },
+    { key: 'oliguria', label: 'Oliguria' },
+  ],
+} as const
+
+type WorkflowTab = 'triage' | 'review' | 'assessment' | 'finalize'
+type ImportantBestQuestionVisual = 'abdomen_mcburney'
 
 interface ImportantBestQuestion {
-  id: string;
-  title: string;
-  prompt: string;
-  cue: string;
-  visual?: ImportantBestQuestionVisual;
+  id: string
+  title: string
+  prompt: string
+  cue: string
+  visual?: ImportantBestQuestionVisual
 }
 
 function summarizeValidationWarning(warning: string): string {
-  const trimmed = warning.trim();
-  if (trimmed.length <= 140) return trimmed;
-  return `${trimmed.slice(0, 137).trimEnd()}...`;
+  const trimmed = warning.trim()
+  if (trimmed.length <= 140) return trimmed
+  return `${trimmed.slice(0, 137).trimEnd()}...`
 }
 
 function summarizeClinicalSnippet(value: string, limit = 132): string {
-  const normalized = normalizeClinicalPhrase(value);
-  if (!normalized) return "";
-  if (normalized.length <= limit) return normalized;
-  return `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+  const normalized = normalizeClinicalPhrase(value)
+  if (!normalized) return ''
+  if (normalized.length <= limit) return normalized
+  return `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...`
 }
 
 type ExamState = {
-  kepala: string;
-  dada: string;
-  perut: string;
-  ekstremitas: string;
-  kulit: string;
-  genitalia: string;
-};
+  kepala: string
+  dada: string
+  perut: string
+  ekstremitas: string
+  kulit: string
+  genitalia: string
+}
 
 type ExamFocusDraft = {
-  kepala: string[];
-  dada: string[];
-  perut: string[];
-  ekstremitas: string[];
-  kulit: string[];
-  genitalia: string[];
-};
+  kepala: string[]
+  dada: string[]
+  perut: string[]
+  ekstremitas: string[]
+  kulit: string[]
+  genitalia: string[]
+}
 
-type ExamTemplateSet = Record<keyof ExamState, string>;
+type ExamTemplateSet = Record<keyof ExamState, string>
 
-function getDecisionBucketLabel(
-  status: CDSSSuggestion["decision_status"],
-): string {
+function getDecisionBucketLabel(status: CDSSSuggestion['decision_status']): string {
   switch (status) {
-    case "recommended":
-      return "Recommended";
-    case "review":
-      return "Review Dokter";
-    case "must_not_miss":
-      return "Must-not-miss";
+    case 'recommended':
+      return 'Recommended'
+    case 'review':
+      return 'Review Dokter'
+    case 'must_not_miss':
+      return 'Must-not-miss'
     default:
-      return "Deferred";
+      return 'Deferred'
   }
 }
 
 interface EmrPhaseFooterButtonProps {
-  label: string;
-  tone: "blue" | "critical";
-  onClick: () => void;
-  disabled?: boolean;
+  label: string
+  tone: 'blue' | 'critical'
+  onClick: () => void
+  disabled?: boolean
 }
 
-function EmrPhaseFooterButton({
-  label,
-  tone,
-  onClick,
-  disabled,
-}: EmrPhaseFooterButtonProps) {
+function EmrPhaseFooterButton({ label, tone, onClick, disabled }: EmrPhaseFooterButtonProps) {
   return (
     <button
       type="button"
@@ -277,25 +309,134 @@ function EmrPhaseFooterButton({
     >
       <span className="emr-neu-nav-btn-label">{label}</span>
     </button>
-  );
+  )
 }
 
-function getDecisionAccent(status: CDSSSuggestion["decision_status"]): string {
+function getDecisionAccent(status: CDSSSuggestion['decision_status']): string {
   switch (status) {
-    case "recommended":
-      return "var(--c-asesmen)";
-    case "review":
-      return "#E8A838";
-    case "must_not_miss":
-      return "var(--c-critical)";
+    case 'recommended':
+      return 'var(--c-asesmen)'
+    case 'review':
+      return '#E8A838'
+    case 'must_not_miss':
+      return 'var(--c-critical)'
     default:
-      return "var(--text-muted)";
+      return 'var(--text-muted)'
   }
 }
 
+function getCompositeSeverityColor(severity: CompositeDeteriorationAlert['severity']): string {
+  switch (severity) {
+    case 'critical':
+      return '#ef4444'
+    case 'high':
+      return '#f97316'
+    default:
+      return '#eab308'
+  }
+}
+
+function getCompositeConfidenceLabel(confidence: CompositeDeteriorationAlert['confidence']): string {
+  switch (confidence) {
+    case 'high':
+      return 'High confidence'
+    case 'medium':
+      return 'Medium confidence'
+    default:
+      return 'Low confidence'
+  }
+}
+
+function parseEncounterMeasurement(value: unknown): CompositeVitalSnapshot | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const toFinite = (input: unknown): number | undefined => {
+    if (typeof input === 'number' && Number.isFinite(input)) return input
+    if (typeof input === 'string') {
+      const normalized = input.trim().replace(',', '.')
+      if (!normalized) return undefined
+      const parsed = Number.parseFloat(normalized)
+      if (Number.isFinite(parsed)) return parsed
+    }
+    return undefined
+  }
+  const normalizeAvpu = (input: unknown): CompositeVitalSnapshot['avpu'] => {
+    if (typeof input !== 'string') return undefined
+    const normalized = input.trim().toUpperCase()
+    return ['A', 'C', 'V', 'P', 'U'].includes(normalized)
+      ? (normalized as CompositeVitalSnapshot['avpu'])
+      : undefined
+  }
+
+  const snapshot: CompositeVitalSnapshot = {
+    hr: toFinite(record.hr),
+    sbp: toFinite(record.sbp),
+    dbp: toFinite(record.dbp),
+    rr: toFinite(record.rr),
+    temp: toFinite(record.temp),
+    spo2: toFinite(record.spo2),
+    avpu: normalizeAvpu(record.avpu),
+    supplementalO2: record.supplementalO2 === true,
+    glucose: toFinite(record.glucose),
+    capillaryRefillSec: toFinite(record.capillaryRefillSec),
+    measuredAt:
+      typeof record.measuredAt === 'string' && record.measuredAt.trim()
+        ? record.measuredAt
+        : undefined,
+  }
+
+  const hasCoreVitals =
+    typeof snapshot.sbp === 'number' &&
+    typeof snapshot.dbp === 'number' &&
+    typeof snapshot.hr === 'number' &&
+    typeof snapshot.rr === 'number' &&
+    typeof snapshot.temp === 'number' &&
+    typeof snapshot.spo2 === 'number'
+
+  return hasCoreVitals ? snapshot : null
+}
+
+function normalizeEncounterMeasurements(value: unknown): CompositeVitalSnapshot[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(item => parseEncounterMeasurement(item))
+    .filter((item): item is CompositeVitalSnapshot => item !== null)
+}
+
+function trimEncounterMeasurements(
+  measurements: CompositeVitalSnapshot[]
+): CompositeVitalSnapshot[] {
+  const cutoff = Date.now() - ENCOUNTER_BASELINE_WINDOW_MINUTES * 60 * 1000
+  const filtered = measurements.filter(item => {
+    if (!item.measuredAt) return true
+    const time = new Date(item.measuredAt).getTime()
+    return Number.isFinite(time) ? time >= cutoff : true
+  })
+  return filtered.slice(-MAX_ENCOUNTER_MEASUREMENTS)
+}
+
+function buildEncounterMeasurementSignature(snapshot: CompositeVitalSnapshot): string {
+  return [
+    snapshot.sbp ?? '',
+    snapshot.dbp ?? '',
+    snapshot.hr ?? '',
+    snapshot.rr ?? '',
+    snapshot.temp ?? '',
+    snapshot.spo2 ?? '',
+    snapshot.avpu ?? '',
+    snapshot.supplementalO2 ? '1' : '0',
+    snapshot.glucose ?? '',
+    snapshot.capillaryRefillSec ?? '',
+  ].join('|')
+}
+
+function readObjectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+}
+
 function CdssCoreLoader() {
-  const svgId = useId();
-  const clippingId = `${svgId}-clipping`;
+  const svgId = useId()
+  const clippingId = `${svgId}-clipping`
 
   return (
     <div className="cdss-core-loader" aria-hidden="true">
@@ -341,13 +482,7 @@ function CdssCoreLoader() {
                 fill="white"
               />
             </mask>
-            <linearGradient
-              id={`${svgId}-box-gradient`}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
+            <linearGradient id={`${svgId}-box-gradient`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0.3" stopColor="#ffbf48" />
               <stop offset="0.7" stopColor="#be4a1d" />
             </linearGradient>
@@ -364,29 +499,29 @@ function CdssCoreLoader() {
         <div className="cdss-core-loader-ring" />
       </div>
     </div>
-  );
+  )
 }
 
 function getSuggestionKey(
   suggestion: Pick<
     CDSSSuggestion,
-    "rank" | "llm_rank" | "icd10_code" | "diagnosis_name" | "decision_status"
-  >,
+    'rank' | 'llm_rank' | 'icd10_code' | 'diagnosis_name' | 'decision_status'
+  >
 ): string {
   return [
     suggestion.llm_rank ?? suggestion.rank,
     suggestion.icd10_code,
     suggestion.diagnosis_name.trim().toLowerCase(),
-    suggestion.decision_status ?? "review",
-  ].join("::");
+    suggestion.decision_status ?? 'review',
+  ].join('::')
 }
 
 function normalizeDraftToken(value: string): string {
   return value
     .trim()
-    .replace(/[.,;:]+$/g, "")
-    .replace(/\s+/g, " ")
-    .toLowerCase();
+    .replace(/[.,;:]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
 }
 
 function summarizeSuggestionReason(suggestion: CDSSSuggestion): string {
@@ -394,173 +529,153 @@ function summarizeSuggestionReason(suggestion: CDSSSuggestion): string {
     suggestion.decision_reason?.trim() ||
     suggestion.key_reasons?.[0]?.trim() ||
     suggestion.reasoning?.trim() ||
-    "Perlu pertimbangan klinis lanjutan.";
-  return source.length <= 132 ? source : `${source.slice(0, 129).trimEnd()}...`;
+    'Perlu pertimbangan klinis lanjutan.'
+  return source.length <= 132 ? source : `${source.slice(0, 129).trimEnd()}...`
 }
 
 function getSuggestionDisposition(suggestion: CDSSSuggestion): {
-  label: string;
-  note: string;
-  tone: "puskesmas" | "referral";
+  label: string
+  note: string
+  tone: 'puskesmas' | 'referral'
 } {
   const context = [
     suggestion.reasoning,
     suggestion.decision_reason,
     ...(suggestion.red_flags ?? []),
     ...(suggestion.recommended_actions ?? []),
-    ...(suggestion.validation_flags?.map((flag) => flag.message) ?? []),
+    ...(suggestion.validation_flags?.map(flag => flag.message) ?? []),
   ]
-    .join(" ")
-    .toLowerCase();
+    .join(' ')
+    .toLowerCase()
 
   const referralSignals = [
-    "rujuk",
-    "igd",
-    "emergency",
-    "urgent",
-    "stabilisasi",
-    "rawat inap",
-    "observasi ketat",
-    "sepsis",
-    "syok",
-    "acs",
-    "stroke",
-    "appendisitis akut",
-  ];
+    'rujuk',
+    'igd',
+    'emergency',
+    'urgent',
+    'stabilisasi',
+    'rawat inap',
+    'observasi ketat',
+    'sepsis',
+    'syok',
+    'acs',
+    'stroke',
+    'appendisitis akut',
+  ]
 
   const shouldRefer =
-    suggestion.decision_status === "must_not_miss" ||
-    referralSignals.some((signal) => context.includes(signal));
+    suggestion.decision_status === 'must_not_miss' ||
+    referralSignals.some(signal => context.includes(signal))
 
   if (shouldRefer) {
     return {
-      label: "Rujukan available",
-      note: "Pertimbangkan rujukan atau eskalasi layanan bila fasilitas Puskesmas tidak memadai.",
-      tone: "referral",
-    };
+      label: 'Rujukan available',
+      note: 'Pertimbangkan rujukan atau eskalasi layanan bila fasilitas Puskesmas tidak memadai.',
+      tone: 'referral',
+    }
   }
 
   return {
-    label: "Tuntaskan di Puskesmas",
-    note: "Dapat ditangani di layanan primer bila evaluasi klinis dan monitoring tetap terpenuhi.",
-    tone: "puskesmas",
-  };
+    label: 'Tuntaskan di Puskesmas',
+    note: 'Dapat ditangani di layanan primer bila evaluasi klinis dan monitoring tetap terpenuhi.',
+    tone: 'puskesmas',
+  }
 }
 
 function getMedicationCategoryLabel(category: string): string {
   switch (category) {
-    case "cardiovascular":
-      return "Kardiovaskular";
-    case "analgesic":
-      return "Analgesik";
-    case "antibiotic":
-      return "Antibiotik";
-    case "antidiabetic":
-      return "Antidiabetik";
-    case "antihypertensive":
-      return "Antihipertensi";
-    case "bronchodilator":
-      return "Bronkodilator";
-    case "antihistamine":
-      return "Antihistamin";
-    case "gastrointestinal":
-      return "Gastrointestinal";
-    case "vitamin_mineral":
-      return "Vitamin / Mineral";
-    case "emergency":
-      return "Emergency";
+    case 'cardiovascular':
+      return 'Kardiovaskular'
+    case 'analgesic':
+      return 'Analgesik'
+    case 'antibiotic':
+      return 'Antibiotik'
+    case 'antidiabetic':
+      return 'Antidiabetik'
+    case 'antihypertensive':
+      return 'Antihipertensi'
+    case 'bronchodilator':
+      return 'Bronkodilator'
+    case 'antihistamine':
+      return 'Antihistamin'
+    case 'gastrointestinal':
+      return 'Gastrointestinal'
+    case 'vitamin_mineral':
+      return 'Vitamin / Mineral'
+    case 'emergency':
+      return 'Emergency'
     default:
-      return "Golongan lain";
+      return 'Golongan lain'
   }
 }
 
 function inferMedicationRouteLabel(input: {
-  name: string;
-  canonicalName: string | null;
-  dose: string;
-  frequency: string;
+  name: string
+  canonicalName: string | null
+  dose: string
+  frequency: string
 }): string {
-  const source = [
-    input.name,
-    input.canonicalName ?? "",
-    input.dose,
-    input.frequency,
-  ]
-    .join(" ")
-    .toLowerCase();
-  if (source.includes("subling")) return "Sublingual";
-  if (source.includes("iv") || source.includes("intravena")) return "Intravena";
-  if (source.includes("im") || source.includes("intramusk"))
-    return "Intramuskular";
-  if (source.includes("inhal")) return "Inhalasi";
-  if (source.includes("salep") || source.includes("topikal")) return "Topikal";
-  if (source.includes("sirup")) return "Sirup / oral";
-  return "Oral";
+  const source = [input.name, input.canonicalName ?? '', input.dose, input.frequency]
+    .join(' ')
+    .toLowerCase()
+  if (source.includes('subling')) return 'Sublingual'
+  if (source.includes('iv') || source.includes('intravena')) return 'Intravena'
+  if (source.includes('im') || source.includes('intramusk')) return 'Intramuskular'
+  if (source.includes('inhal')) return 'Inhalasi'
+  if (source.includes('salep') || source.includes('topikal')) return 'Topikal'
+  if (source.includes('sirup')) return 'Sirup / oral'
+  return 'Oral'
 }
 
-function sortSuggestionsForDisplay(
-  suggestions: CDSSSuggestion[],
-): CDSSSuggestion[] {
+function sortSuggestionsForDisplay(suggestions: CDSSSuggestion[]): CDSSSuggestion[] {
   return [...suggestions].sort((left, right) => {
-    const leftHybrid =
-      typeof left.deterministic_score === "number"
-        ? left.deterministic_score
-        : -1;
+    const leftHybrid = typeof left.deterministic_score === 'number' ? left.deterministic_score : -1
     const rightHybrid =
-      typeof right.deterministic_score === "number"
-        ? right.deterministic_score
-        : -1;
+      typeof right.deterministic_score === 'number' ? right.deterministic_score : -1
 
     if (rightHybrid !== leftHybrid) {
-      return rightHybrid - leftHybrid;
+      return rightHybrid - leftHybrid
     }
 
     if (right.confidence !== left.confidence) {
-      return right.confidence - left.confidence;
+      return right.confidence - left.confidence
     }
 
-    const leftRank = left.llm_rank ?? left.rank;
-    const rightRank = right.llm_rank ?? right.rank;
-    return leftRank - rightRank;
-  });
+    const leftRank = left.llm_rank ?? left.rank
+    const rightRank = right.llm_rank ?? right.rank
+    return leftRank - rightRank
+  })
 }
 
-function buildExamNarrative(
-  template: string,
-  focusNotes: string[] = [],
-): string {
+function buildExamNarrative(template: string, focusNotes: string[] = []): string {
   const uniqueFocus = focusNotes.filter((note, index, source) => {
-    const normalized = normalizeDraftToken(note);
+    const normalized = normalizeDraftToken(note)
     return (
       normalized &&
-      source.findIndex(
-        (candidate) => normalizeDraftToken(candidate) === normalized,
-      ) === index
-    );
-  });
+      source.findIndex(candidate => normalizeDraftToken(candidate) === normalized) === index
+    )
+  })
 
   if (uniqueFocus.length === 0) {
-    return template;
+    return template
   }
 
-  return `${template} Fokus klinis: ${uniqueFocus.join("; ")}.`;
+  return `${template} Fokus klinis: ${uniqueFocus.join('; ')}.`
 }
 
 function deriveExamFocusDraft(
   keluhanUtama: string,
   keluhanTambahan: string,
-  physicalSuggestions: string[] = [],
+  physicalSuggestions: string[] = []
 ): ExamFocusDraft {
   const complaintContext = normalizeClinicalPhrase(
-    `${keluhanUtama} ${keluhanTambahan}`,
-  ).toLowerCase();
-  const joinedSuggestions = physicalSuggestions.join(" ").toLowerCase();
+    `${keluhanUtama} ${keluhanTambahan}`
+  ).toLowerCase()
+  const joinedSuggestions = physicalSuggestions.join(' ').toLowerCase()
   const hasSignal = (keywords: string[]) =>
     keywords.some(
-      (keyword) =>
-        complaintContext.includes(keyword) ||
-        joinedSuggestions.includes(keyword),
-    );
+      keyword => complaintContext.includes(keyword) || joinedSuggestions.includes(keyword)
+    )
 
   const draft: ExamFocusDraft = {
     kepala: [],
@@ -569,193 +684,154 @@ function deriveExamFocusDraft(
     ekstremitas: [],
     kulit: [],
     genitalia: [],
-  };
+  }
 
-  if (hasSignal(["sesak", "batuk", "nyeri dada", "napas", "wheezing"])) {
-    draft.dada.push("Inspeksi kerja napas, retraksi, dan pola napas");
-    draft.dada.push("Auskultasi cor-pulmo untuk ronki, wheezing, atau murmur");
-    draft.ekstremitas.push("Perfusi perifer, CRT, dan akral hangat/dingin");
+  if (hasSignal(['sesak', 'batuk', 'nyeri dada', 'napas', 'wheezing'])) {
+    draft.dada.push('Inspeksi kerja napas, retraksi, dan pola napas')
+    draft.dada.push('Auskultasi cor-pulmo untuk ronki, wheezing, atau murmur')
+    draft.ekstremitas.push('Perfusi perifer, CRT, dan akral hangat/dingin')
   }
 
   if (
     hasSignal([
-      "nyeri perut",
-      "perut kanan bawah",
-      "mual",
-      "muntah",
-      "diare",
-      "appendis",
-      "apendisitis",
+      'nyeri perut',
+      'perut kanan bawah',
+      'mual',
+      'muntah',
+      'diare',
+      'appendis',
+      'apendisitis',
     ])
   ) {
-    draft.perut.push("Inspeksi distensi dan bising usus");
-    draft.perut.push("Palpasi nyeri tekan, rebound, dan defans muskular");
-    draft.perut.push("Nilai titik McBurney bila nyeri kuadran kanan bawah");
-    draft.kulit.push("Status hidrasi dan turgor kulit");
+    draft.perut.push('Inspeksi distensi dan bising usus')
+    draft.perut.push('Palpasi nyeri tekan, rebound, dan defans muskular')
+    draft.perut.push('Nilai titik McBurney bila nyeri kuadran kanan bawah')
+    draft.kulit.push('Status hidrasi dan turgor kulit')
   }
 
-  if (
-    hasSignal([
-      "nyeri pinggang",
-      "pinggang",
-      "anyang",
-      "disuria",
-      "cva",
-      "flank",
-    ])
-  ) {
-    draft.perut.push("Ketok CVA kanan dan kiri");
-    draft.perut.push("Palpasi abdomen bawah dan suprapubik");
-    draft.kulit.push("Status hidrasi dan turgor kulit");
+  if (hasSignal(['nyeri pinggang', 'pinggang', 'anyang', 'disuria', 'cva', 'flank'])) {
+    draft.perut.push('Ketok CVA kanan dan kiri')
+    draft.perut.push('Palpasi abdomen bawah dan suprapubik')
+    draft.kulit.push('Status hidrasi dan turgor kulit')
   }
 
-  if (hasSignal(["demam", "ruam", "gatal", "kulit"])) {
-    draft.kulit.push("Inspeksi ruam, lesi, dan warna kulit");
-    draft.kulit.push("Turgor dan suhu akral");
+  if (hasSignal(['demam', 'ruam', 'gatal', 'kulit'])) {
+    draft.kulit.push('Inspeksi ruam, lesi, dan warna kulit')
+    draft.kulit.push('Turgor dan suhu akral')
   }
 
-  if (
-    hasSignal(["sakit kepala", "vertigo", "mata", "telinga", "tenggorokan"])
-  ) {
-    draft.kepala.push("Konjungtiva, pupil, dan refleks cahaya sesuai indikasi");
-    draft.kepala.push("Orofaring, tonsil, dan KGB servikal");
+  if (hasSignal(['sakit kepala', 'vertigo', 'mata', 'telinga', 'tenggorokan'])) {
+    draft.kepala.push('Konjungtiva, pupil, dan refleks cahaya sesuai indikasi')
+    draft.kepala.push('Orofaring, tonsil, dan KGB servikal')
   }
 
-  if (hasSignal(["lemah", "baal", "kesemutan", "lumpuh"])) {
-    draft.ekstremitas.push("Kekuatan motorik dan ROM sendi");
-    draft.ekstremitas.push("Status sensorik perifer sesuai keluhan");
+  if (hasSignal(['lemah', 'baal', 'kesemutan', 'lumpuh'])) {
+    draft.ekstremitas.push('Kekuatan motorik dan ROM sendi')
+    draft.ekstremitas.push('Status sensorik perifer sesuai keluhan')
   }
 
-  return draft;
+  return draft
 }
 
-function createNormalExamTemplate(
-  vitals: Record<EmrVitalKey, string>,
-): ExamTemplateSet {
-  const gcs = vitals.gcs.trim() || "E4 V5 M6";
-  const td = vitals.td.trim() || "120/80";
-  const nadi = vitals.nadi.trim() || "80";
-  const napas = vitals.napas.trim() || "18";
-  const suhu = vitals.suhu.trim() || "36.5";
-  const spo2 = vitals.spo2.trim() || "99";
+function createNormalExamTemplate(vitals: Record<EmrVitalKey, string>): ExamTemplateSet {
+  const gcs = vitals.gcs.trim() || 'E4 V5 M6'
+  const td = vitals.td.trim() || '120/80'
+  const nadi = vitals.nadi.trim() || '80'
+  const napas = vitals.napas.trim() || '18'
+  const suhu = vitals.suhu.trim() || '36.5'
+  const spo2 = vitals.spo2.trim() || '99'
 
   return {
     kepala: `Status generalis: Keadaan umum tampak sakit sedang, compos mentis; GCS ${gcs}; TD ${td} mmHg | Nadi ${nadi} x/menit reguler | RR ${napas} x/menit | Suhu ${suhu} °C | SpO2 ${spo2}% on room air | Skala nyeri 0/10. Kepala & leher dalam batas normal: normocephal, deformitas (-), jejas (-); konjungtiva anemis (-/-), sklera ikterik (-/-), pupil isokor 3mm/3mm, refleks cahaya (+/+); mukosa bibir lembap, faring hiperemis (-), tonsil T1/T1; JVP 5-2 cmH2O, KGB servikal (-), tiroid (-), kaku kuduk (-).`,
-    dada: "Thorax dalam batas normal: inspeksi dada simetris statis-dinamis, retraksi interkostal (-), jejas (-); vokal fremitus dan ekspansi dada simetris; perkusi sonor di seluruh lapang paru; auskultasi paru vesikuler (+/+), ronki (-/-), wheezing (-/-); bunyi jantung I-II murni reguler, murmur (-), gallop (-).",
+    dada: 'Thorax dalam batas normal: inspeksi dada simetris statis-dinamis, retraksi interkostal (-), jejas (-); vokal fremitus dan ekspansi dada simetris; perkusi sonor di seluruh lapang paru; auskultasi paru vesikuler (+/+), ronki (-/-), wheezing (-/-); bunyi jantung I-II murni reguler, murmur (-), gallop (-).',
     perut:
-      "Abdomen dalam batas normal: inspeksi datar, jejas (-), distensi (-), venektasi (-); bising usus (+) normal; perkusi timpani di seluruh kuadran, shifting dullness (-); palpasi supel, nyeri tekan (-), defans muskuler (-), hepatomegali (-), splenomegali (-).",
+      'Abdomen dalam batas normal: inspeksi datar, jejas (-), distensi (-), venektasi (-); bising usus (+) normal; perkusi timpani di seluruh kuadran, shifting dullness (-); palpasi supel, nyeri tekan (-), defans muskuler (-), hepatomegali (-), splenomegali (-).',
     ekstremitas:
-      "Ekstremitas dalam batas normal: akral hangat, CRT < 2 detik; edema ekstremitas superior (-/-), inferior (-/-); pulsasi perifer teraba kuat; kekuatan motorik 5555 / 5555 atas dan 5555 / 5555 bawah.",
-    kulit:
-      "Kulit dalam batas normal: turgor baik, ruam (-), ikterik (-), sianosis (-).",
+      'Ekstremitas dalam batas normal: akral hangat, CRT < 2 detik; edema ekstremitas superior (-/-), inferior (-/-); pulsasi perifer teraba kuat; kekuatan motorik 5555 / 5555 atas dan 5555 / 5555 bawah.',
+    kulit: 'Kulit dalam batas normal: turgor baik, ruam (-), ikterik (-), sianosis (-).',
     genitalia:
-      "Genitalia tidak diperiksa rutin, dalam batas indikasi klinis; temuan khusus tidak ada saat ini.",
-  };
+      'Genitalia tidak diperiksa rutin, dalam batas indikasi klinis; temuan khusus tidak ada saat ini.',
+  }
 }
 
 function sanitizeClinicalInput(value: string): string {
-  return value.replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/\u00A0/g, " ");
+  return value.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ')
 }
 
 function normalizeClinicalPhrase(value: string): string {
-  return sanitizeClinicalInput(value).replace(/\s+/g, " ").trim();
+  return sanitizeClinicalInput(value).replace(/\s+/g, ' ').trim()
 }
 
 function hasKeywordSignal(source: string, keywords: string[]): boolean {
-  return keywords.some((keyword) => source.includes(keyword));
+  return keywords.some(keyword => source.includes(keyword))
 }
 
 function deriveImportantBestQuestions(
   keluhanUtama: string,
   keluhanTambahan: string,
-  nextBestQuestions: string[] = [],
+  nextBestQuestions: string[] = []
 ): ImportantBestQuestion[] {
   const complaintContext = normalizeClinicalPhrase(
-    `${keluhanUtama} ${keluhanTambahan}`,
-  ).toLowerCase();
+    `${keluhanUtama} ${keluhanTambahan}`
+  ).toLowerCase()
   const normalizedQuestions = nextBestQuestions
-    .map((question) => {
-      const original = question.trim();
-      const normalized = normalizeClinicalPhrase(question).toLowerCase();
-      return normalized ? { original, normalized } : null;
+    .map(question => {
+      const original = question.trim()
+      const normalized = normalizeClinicalPhrase(question).toLowerCase()
+      return normalized ? { original, normalized } : null
     })
-    .filter((item): item is { original: string; normalized: string } =>
-      Boolean(item),
-    );
-  const items: ImportantBestQuestion[] = [];
+    .filter((item): item is { original: string; normalized: string } => Boolean(item))
+  const items: ImportantBestQuestion[] = []
 
-  const hasMcBurneyQuestion = normalizedQuestions.some((question) =>
-    hasKeywordSignal(question.normalized, [
-      "mcburney",
-      "kanan bawah",
-      "appendis",
-      "apendisitis",
-    ]),
-  );
+  const hasMcBurneyQuestion = normalizedQuestions.some(question =>
+    hasKeywordSignal(question.normalized, ['mcburney', 'kanan bawah', 'appendis', 'apendisitis'])
+  )
   const hasRightLowerQuadrantComplaint = hasKeywordSignal(complaintContext, [
-    "nyeri perut kanan bawah",
-    "perut kanan bawah",
-    "nyeri kuadran kanan bawah",
-    "appendis",
-    "apendisitis",
-    "mcburney",
-  ]);
+    'nyeri perut kanan bawah',
+    'perut kanan bawah',
+    'nyeri kuadran kanan bawah',
+    'appendis',
+    'apendisitis',
+    'mcburney',
+  ])
   const hasAcuteAbdominalSignal =
-    hasKeywordSignal(complaintContext, [
-      "nyeri perut",
-      "mual",
-      "muntah",
-      "demam",
-    ]) && hasKeywordSignal(complaintContext, ["kanan", "bawah", "perut"]);
+    hasKeywordSignal(complaintContext, ['nyeri perut', 'mual', 'muntah', 'demam']) &&
+    hasKeywordSignal(complaintContext, ['kanan', 'bawah', 'perut'])
 
-  if (
-    hasMcBurneyQuestion ||
-    hasRightLowerQuadrantComplaint ||
-    hasAcuteAbdominalSignal
-  ) {
+  if (hasMcBurneyQuestion || hasRightLowerQuadrantComplaint || hasAcuteAbdominalSignal) {
     items.push({
-      id: "mcburney-point",
-      title: "Nyeri tekan titik McBurney",
+      id: 'mcburney-point',
+      title: 'Nyeri tekan titik McBurney',
       prompt:
-        "Pastikan ada atau tidak nyeri tekan pada titik McBurney untuk menilai kemungkinan apendisitis.",
-      cue: "Fokus pada kuadran kanan bawah abdomen sebelum masuk ke diferensial lanjutan.",
-      visual: "abdomen_mcburney",
-    });
+        'Pastikan ada atau tidak nyeri tekan pada titik McBurney untuk menilai kemungkinan apendisitis.',
+      cue: 'Fokus pada kuadran kanan bawah abdomen sebelum masuk ke diferensial lanjutan.',
+      visual: 'abdomen_mcburney',
+    })
   }
 
   normalizedQuestions.forEach((question, index) => {
     if (
-      hasKeywordSignal(question.normalized, [
-        "mcburney",
-        "kanan bawah",
-        "appendis",
-        "apendisitis",
-      ])
+      hasKeywordSignal(question.normalized, ['mcburney', 'kanan bawah', 'appendis', 'apendisitis'])
     ) {
-      return;
+      return
     }
 
     items.push({
       id: `best-question-${index}`,
-      title: "Konfirmasi klinis penting",
+      title: 'Konfirmasi klinis penting',
       prompt: question.original,
-      cue: "Gunakan sebagai pertanyaan lanjut atau fokus pemeriksaan saat review dokter.",
-    });
-  });
+      cue: 'Gunakan sebagai pertanyaan lanjut atau fokus pemeriksaan saat review dokter.',
+    })
+  })
 
-  return items.slice(0, 4);
+  return items.slice(0, 4)
 }
 
-function renderImportantBestQuestionVisual(
-  visual: ImportantBestQuestionVisual,
-) {
-  if (visual !== "abdomen_mcburney") return null;
+function renderImportantBestQuestionVisual(visual: ImportantBestQuestionVisual) {
+  if (visual !== 'abdomen_mcburney') return null
 
   return (
-    <div
-      className="best-question-visual best-question-visual-abdomen"
-      aria-hidden="true"
-    >
+    <div className="best-question-visual best-question-visual-abdomen" aria-hidden="true">
       <svg viewBox="0 0 220 150" focusable="false">
         <path
           d="M74 26 C66 44, 60 58, 60 72 C60 104, 76 124, 110 132 C144 124, 160 104, 160 72 C160 58, 154 44, 146 26"
@@ -796,467 +872,408 @@ function renderImportantBestQuestionVisual(
           strokeWidth="1.4"
         />
         <circle cx="146" cy="92" r="2.5" fill="rgba(232, 168, 56, 1)" />
-        <text
-          x="128"
-          y="20"
-          fill="rgba(240, 232, 220, 0.44)"
-          fontSize="11"
-          letterSpacing="0.14em"
-        >
+        <text x="128" y="20" fill="rgba(240, 232, 220, 0.44)" fontSize="11" letterSpacing="0.14em">
           ABDOMEN
         </text>
-        <text
-          x="154"
-          y="60"
-          fill="rgba(232, 168, 56, 0.92)"
-          fontSize="10.5"
-          letterSpacing="0.08em"
-        >
+        <text x="154" y="60" fill="rgba(232, 168, 56, 0.92)" fontSize="10.5" letterSpacing="0.08em">
           McBurney
         </text>
       </svg>
     </div>
-  );
+  )
 }
 
 function normalizeBloodPressureInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 6);
-  if (digits.length <= 3 && !value.includes("/")) {
-    return digits;
+  const digits = value.replace(/\D/g, '').slice(0, 6)
+  if (digits.length <= 3 && !value.includes('/')) {
+    return digits
   }
 
-  const systolic = digits.slice(0, 3);
-  const diastolic = digits.slice(3, 6);
+  const systolic = digits.slice(0, 3)
+  const diastolic = digits.slice(3, 6)
 
   if (digits.length <= 3) {
-    return `${systolic}/`;
+    return `${systolic}/`
   }
 
-  return `${systolic}/${diastolic}`;
+  return `${systolic}/${diastolic}`
 }
 
 async function fetchAutocompleteChain(
   payload: { query: string; context: string[] },
   signal: AbortSignal,
-  attempt = 0,
+  attempt = 0
 ): Promise<Response> {
-  const response = await fetch("/api/cdss/autocomplete", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch('/api/cdss/autocomplete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     signal,
-  });
+  })
 
   if (response.status !== 404 || attempt >= 4) {
-    return response;
+    return response
   }
 
-  console.warn(`[AC] route belum siap, retry ${attempt + 1}...`);
-  await new Promise((resolve) => setTimeout(resolve, 450 + attempt * 350));
+  console.warn(`[AC] route belum siap, retry ${attempt + 1}...`)
+  await new Promise(resolve => setTimeout(resolve, 450 + attempt * 350))
   if (signal.aborted) {
-    throw new DOMException("Autocomplete request aborted", "AbortError");
+    throw new DOMException('Autocomplete request aborted', 'AbortError')
   }
-  return fetchAutocompleteChain(payload, signal, attempt + 1);
+  return fetchAutocompleteChain(payload, signal, attempt + 1)
 }
 
 function createInitialVitalMeta(): Record<EmrVitalKey, VitalEntryMeta> {
   return {
-    gcs: { mode: "empty" },
-    td: { mode: "empty" },
-    nadi: { mode: "empty" },
-    napas: { mode: "empty" },
-    suhu: { mode: "empty" },
-    spo2: { mode: "empty" },
-    map: { mode: "empty" },
-  };
+    gcs: { mode: 'empty' },
+    td: { mode: 'empty' },
+    nadi: { mode: 'empty' },
+    napas: { mode: 'empty' },
+    suhu: { mode: 'empty' },
+    spo2: { mode: 'empty' },
+    map: { mode: 'empty' },
+  }
 }
 
 const MEDICATION_OPTIONS: Array<{ key: MedicationFlag; label: string }> = [
-  { key: "beta_blocker", label: "Beta blocker" },
-  { key: "stimulant", label: "Stimulan" },
-  { key: "sedative", label: "Sedatif" },
-  { key: "antipyretic", label: "Antipiretik" },
-];
+  { key: 'beta_blocker', label: 'Beta blocker' },
+  { key: 'stimulant', label: 'Stimulan' },
+  { key: 'sedative', label: 'Sedatif' },
+  { key: 'antipyretic', label: 'Antipiretik' },
+]
 
-function appendUniqueDelimitedValue(
-  previous: string,
-  nextValue: string,
-  joiner = ", ",
-): string {
-  const cleanNext = nextValue.trim().replace(/[.,;:]+$/g, "");
-  if (!cleanNext) return previous;
+function appendUniqueDelimitedValue(previous: string, nextValue: string, joiner = ', '): string {
+  const cleanNext = nextValue.trim().replace(/[.,;:]+$/g, '')
+  if (!cleanNext) return previous
 
-  const normalizedNext = normalizeDraftToken(cleanNext);
-  const splitPattern = joiner.includes(";") ? /[;]/ : /[,]/;
+  const normalizedNext = normalizeDraftToken(cleanNext)
+  const splitPattern = joiner.includes(';') ? /[;]/ : /[,]/
   const existingTokens = previous
     .split(splitPattern)
-    .map((part) => normalizeDraftToken(part))
-    .filter(Boolean);
+    .map(part => normalizeDraftToken(part))
+    .filter(Boolean)
 
-  if (existingTokens.includes(normalizedNext)) return previous;
-  return previous.trim()
-    ? `${previous.trimEnd()}${joiner}${cleanNext}`
-    : cleanNext;
+  if (existingTokens.includes(normalizedNext)) return previous
+  return previous.trim() ? `${previous.trimEnd()}${joiner}${cleanNext}` : cleanNext
 }
 
-function appendUniqueNarrativeValue(
-  previous: string,
-  nextValue: string,
-): string {
-  const cleanPrevious = previous.trim();
+function appendUniqueNarrativeValue(previous: string, nextValue: string): string {
+  const cleanPrevious = previous.trim()
   const cleanNext = nextValue
     .trim()
-    .replace(/\s+/g, " ")
-    .replace(/[.;:,]+$/g, "");
-  if (!cleanNext) return previous;
+    .replace(/\s+/g, ' ')
+    .replace(/[.;:,]+$/g, '')
+  if (!cleanNext) return previous
 
-  const normalizedPrevious = normalizeDraftToken(cleanPrevious);
-  const normalizedNext = normalizeDraftToken(cleanNext);
+  const normalizedPrevious = normalizeDraftToken(cleanPrevious)
+  const normalizedNext = normalizeDraftToken(cleanNext)
 
   if (normalizedPrevious && normalizedPrevious.includes(normalizedNext)) {
-    return previous;
+    return previous
   }
 
   if (normalizedPrevious && normalizedNext.includes(normalizedPrevious)) {
-    return cleanNext;
+    return cleanNext
   }
 
   if (!cleanPrevious) {
-    return cleanNext;
+    return cleanNext
   }
 
-  const previousWithSentenceEnd = /[.!?]$/.test(cleanPrevious)
-    ? cleanPrevious
-    : `${cleanPrevious}.`;
+  const previousWithSentenceEnd = /[.!?]$/.test(cleanPrevious) ? cleanPrevious : `${cleanPrevious}.`
 
-  return `${previousWithSentenceEnd} ${cleanNext}`;
+  return `${previousWithSentenceEnd} ${cleanNext}`
 }
 
 // Mapping sub-items pemeriksaan — keyword matching (lowercase)
 const PEM_SUB_ITEMS: Record<string, string[]> = {
-  "darah lengkap": [
-    "Hemoglobin (Hb)",
-    "Leukosit (WBC)",
-    "Trombosit",
-    "Hematokrit",
-    "Eritrosit (RBC)",
-    "MCV",
-    "MCH",
-    "MCHC",
-    "Diff Count",
+  'darah lengkap': [
+    'Hemoglobin (Hb)',
+    'Leukosit (WBC)',
+    'Trombosit',
+    'Hematokrit',
+    'Eritrosit (RBC)',
+    'MCV',
+    'MCH',
+    'MCHC',
+    'Diff Count',
   ],
-  "hitung darah": [
-    "Hemoglobin (Hb)",
-    "Leukosit (WBC)",
-    "Trombosit",
-    "Hematokrit",
-    "Eritrosit (RBC)",
-    "MCV",
-    "MCH",
-    "MCHC",
-    "Diff Count",
+  'hitung darah': [
+    'Hemoglobin (Hb)',
+    'Leukosit (WBC)',
+    'Trombosit',
+    'Hematokrit',
+    'Eritrosit (RBC)',
+    'MCV',
+    'MCH',
+    'MCHC',
+    'Diff Count',
   ],
-  "fungsi hati": [
-    "SGOT (AST)",
-    "SGPT (ALT)",
-    "Albumin",
-    "Bilirubin Total",
-    "Bilirubin Direk",
-    "Bilirubin Indirek",
-    "Gamma GT",
+  'fungsi hati': [
+    'SGOT (AST)',
+    'SGPT (ALT)',
+    'Albumin',
+    'Bilirubin Total',
+    'Bilirubin Direk',
+    'Bilirubin Indirek',
+    'Gamma GT',
   ],
-  "fungsi ginjal": ["Ureum", "Kreatinin", "Asam Urat", "eGFR", "BUN"],
-  "urin lengkap": [
-    "Protein Urin",
-    "Glukosa Urin",
-    "Keton",
-    "pH",
-    "Berat Jenis",
-    "Sedimen Urin",
-    "Leukosit Urin",
-    "Eritrosit Urin",
+  'fungsi ginjal': ['Ureum', 'Kreatinin', 'Asam Urat', 'eGFR', 'BUN'],
+  'urin lengkap': [
+    'Protein Urin',
+    'Glukosa Urin',
+    'Keton',
+    'pH',
+    'Berat Jenis',
+    'Sedimen Urin',
+    'Leukosit Urin',
+    'Eritrosit Urin',
   ],
-  "gula darah": [
-    "GDS (Gula Darah Sewaktu)",
-    "GDP (Gula Darah Puasa)",
-    "GD2PP (2 Jam PP)",
-    "HbA1c",
-  ],
+  'gula darah': ['GDS (Gula Darah Sewaktu)', 'GDP (Gula Darah Puasa)', 'GD2PP (2 Jam PP)', 'HbA1c'],
   elektrolit: [
-    "Natrium (Na)",
-    "Kalium (K)",
-    "Klorida (Cl)",
-    "Kalsium (Ca)",
-    "Magnesium (Mg)",
-    "Fosfor (P)",
+    'Natrium (Na)',
+    'Kalium (K)',
+    'Klorida (Cl)',
+    'Kalsium (Ca)',
+    'Magnesium (Mg)',
+    'Fosfor (P)',
   ],
-  lipid: ["Kolesterol Total", "LDL", "HDL", "Trigliserida"],
-  "profil lemak": ["Kolesterol Total", "LDL", "HDL", "Trigliserida"],
-  crp: ["CRP Kuantitatif", "CRP Kualitatif"],
-  led: ["LED (Laju Endap Darah)"],
-  kultur: [
-    "Kultur Darah",
-    "Kultur Urin",
-    "Kultur Sputum",
-    "Sensitivitas Antibiotik",
-  ],
-  "foto toraks": [
-    "PA (Posterior-Anterior)",
-    "Lateral",
-    "AP (Anterior-Posterior)",
-  ],
-  rontgen: ["Foto Thorax PA", "Foto Thorax Lateral"],
-  ekg: ["EKG 12 Lead", "Interpretasi Ritme", "Interpretasi ST-T"],
-  elektrokardiografi: [
-    "EKG 12 Lead",
-    "Interpretasi Ritme",
-    "Interpretasi ST-T",
-  ],
+  lipid: ['Kolesterol Total', 'LDL', 'HDL', 'Trigliserida'],
+  'profil lemak': ['Kolesterol Total', 'LDL', 'HDL', 'Trigliserida'],
+  crp: ['CRP Kuantitatif', 'CRP Kualitatif'],
+  led: ['LED (Laju Endap Darah)'],
+  kultur: ['Kultur Darah', 'Kultur Urin', 'Kultur Sputum', 'Sensitivitas Antibiotik'],
+  'foto toraks': ['PA (Posterior-Anterior)', 'Lateral', 'AP (Anterior-Posterior)'],
+  rontgen: ['Foto Thorax PA', 'Foto Thorax Lateral'],
+  ekg: ['EKG 12 Lead', 'Interpretasi Ritme', 'Interpretasi ST-T'],
+  elektrokardiografi: ['EKG 12 Lead', 'Interpretasi Ritme', 'Interpretasi ST-T'],
   echocardiography: [
-    "Fraksi Ejeksi (EF)",
-    "Dimensi Ruang Jantung",
-    "Fungsi Sistolik",
-    "Fungsi Diastolik",
+    'Fraksi Ejeksi (EF)',
+    'Dimensi Ruang Jantung',
+    'Fungsi Sistolik',
+    'Fungsi Diastolik',
   ],
-  "usg abdomen": [
-    "USG Hati",
-    "USG Limpa",
-    "USG Ginjal",
-    "USG Kandung Kemih",
-    "USG Pankreas",
+  'usg abdomen': ['USG Hati', 'USG Limpa', 'USG Ginjal', 'USG Kandung Kemih', 'USG Pankreas'],
+  usg: ['USG Abdomen', 'USG Pelvis', 'USG Tiroid', 'USG Mammae'],
+  thyroid: ['TSH', 'FT4', 'FT3', 'Anti-TPO'],
+  tiroid: ['TSH', 'FT4', 'FT3', 'Anti-TPO'],
+  hba1c: ['HbA1c (%)'],
+  widal: ['Widal S. typhi O', 'Widal S. typhi H', 'Widal S. paratyphi AO', 'Widal S. paratyphi AH'],
+  malaria: ['Apusan Darah Tebal', 'Apusan Darah Tipis', 'RDT Malaria'],
+  dengue: ['NS1 Antigen', 'IgM Anti-Dengue', 'IgG Anti-Dengue'],
+  covid: ['Antigen SARS-CoV-2', 'PCR SARS-CoV-2'],
+  sputum: ['BTA Sputum (3 Spesimen)', 'Kultur Sputum', 'GeneXpert MTB/RIF'],
+  'pungsi lumbal': [
+    'Warna & Kejernihan CSS',
+    'Protein CSS',
+    'Glukosa CSS',
+    'Sel CSS',
+    'Kultur CSS',
   ],
-  usg: ["USG Abdomen", "USG Pelvis", "USG Tiroid", "USG Mammae"],
-  thyroid: ["TSH", "FT4", "FT3", "Anti-TPO"],
-  tiroid: ["TSH", "FT4", "FT3", "Anti-TPO"],
-  hba1c: ["HbA1c (%)"],
-  widal: [
-    "Widal S. typhi O",
-    "Widal S. typhi H",
-    "Widal S. paratyphi AO",
-    "Widal S. paratyphi AH",
-  ],
-  malaria: ["Apusan Darah Tebal", "Apusan Darah Tipis", "RDT Malaria"],
-  dengue: ["NS1 Antigen", "IgM Anti-Dengue", "IgG Anti-Dengue"],
-  covid: ["Antigen SARS-CoV-2", "PCR SARS-CoV-2"],
-  sputum: ["BTA Sputum (3 Spesimen)", "Kultur Sputum", "GeneXpert MTB/RIF"],
-  "pungsi lumbal": [
-    "Warna & Kejernihan CSS",
-    "Protein CSS",
-    "Glukosa CSS",
-    "Sel CSS",
-    "Kultur CSS",
-  ],
-};
+}
 
 function getPemSubItems(itemLabel: string): string[] {
-  const lower = itemLabel.toLowerCase();
+  const lower = itemLabel.toLowerCase()
   for (const [key, subs] of Object.entries(PEM_SUB_ITEMS)) {
-    if (lower.includes(key)) return subs;
+    if (lower.includes(key)) return subs
   }
-  return [];
+  return []
 }
 
 // ── Kamus istilah medis — klik kanan untuk penjelasan ──
 const MED_GLOSSARY: Record<string, string> = {
   // Lab
-  DL: "Darah Lengkap — Hb, Ht, Leukosit, Trombosit, Hitung Jenis",
-  "Hb/Ht": "Hemoglobin / Hematokrit",
-  Hb: "Hemoglobin — kadar sel darah merah",
-  Trombosit: "Hitung Trombosit — fungsi pembekuan darah",
-  "LED/CRP": "Laju Endap Darah / C-Reactive Protein — penanda inflamasi",
-  LED: "Laju Endap Darah — penanda inflamasi non-spesifik",
-  CRP: "C-Reactive Protein — protein fase akut, penanda inflamasi",
-  "CRP/Prokalsitonin":
-    "C-Reactive Protein / Prokalsitonin — penanda infeksi bakteri",
-  GDS: "Gula Darah Sewaktu",
-  GDP: "Gula Darah Puasa",
-  "GDP/GDS": "Gula Darah Puasa / Sewaktu",
-  "GDP/HbA1c": "Gula Darah Puasa / HbA1c (kontrol gula 3 bulan)",
-  "GDS/HbA1c": "Gula Darah Sewaktu / HbA1c",
-  HbA1c: "Hemoglobin A1c — rata-rata gula darah 3 bulan terakhir",
-  "BUN/SK": "Blood Urea Nitrogen / Serum Kreatinin — fungsi ginjal",
-  SK: "Serum Kreatinin — fungsi filtrasi ginjal",
-  "SGOT/SGPT": "Enzim hati — Serum Glutamic Oxaloacetic/Pyruvic Transaminase",
-  "SGOT/SGPT/ALP": "Enzim hati + Alkaline Phosphatase",
-  "SGOT/SGPT/BUN/SK": "Fungsi hati + fungsi ginjal",
-  "SGOT/SGPT/Amilase/Lipase": "Fungsi hati + enzim pankreas",
-  "Bilirubin Total/Direk":
-    "Bilirubin — penanda fungsi hati dan sumbatan empedu",
-  Albumin: "Albumin serum — status nutrisi dan fungsi hati",
-  UL: "Urinalisis Lengkap — warna, pH, protein, glukosa, sedimen",
-  FL: "Feses Lengkap — warna, konsistensi, parasit, darah samar",
-  "FL/FOBT": "Feses Lengkap + Fecal Occult Blood Test (darah samar)",
-  FOBT: "Fecal Occult Blood Test — deteksi darah samar dalam feses",
-  PPT: "Plano/Pregnancy Pack Test — tes kehamilan urin (hCG)",
-  AGD: "Analisis Gas Darah — pH, pO2, pCO2, HCO3, BE",
-  Elektrolit: "Natrium (Na), Kalium (K), Klorida (Cl)",
-  "Elektrolit/BUN/SK": "Elektrolit + fungsi ginjal",
-  "DL/Elektrolit": "Darah Lengkap + Elektrolit",
-  "DL/GDS": "Darah Lengkap + Gula Darah Sewaktu",
-  "DL/LED/CRP": "Darah Lengkap + penanda inflamasi",
-  "Elektrolit/BUN/SK/SGOT/SGPT": "Panel metabolik — elektrolit + ginjal + hati",
-  "Elektrolit/TFT": "Elektrolit + Tes Fungsi Tiroid",
-  TFT: "Thyroid Function Test — TSH, FT4, FT3",
-  TSH: "Thyroid Stimulating Hormone",
-  "TSH/FT4": "TSH + Free T4 — skrining fungsi tiroid",
-  "PT/aPTT":
-    "Prothrombin Time / Activated Partial Thromboplastin Time — koagulasi",
-  "BT/CT": "Bleeding Time / Clotting Time — waktu perdarahan/pembekuan",
-  "BT/PT": "Bleeding Time / Prothrombin Time",
-  "D-Dimer": "D-Dimer — penanda pemecahan bekuan darah (DVT, emboli paru)",
-  Troponin: "Troponin I/T — penanda kerusakan otot jantung",
-  "BNP/NT-proBNP": "Brain Natriuretic Peptide — penanda gagal jantung",
-  EKG: "Elektrokardiogram — rekam aktivitas listrik jantung 12 lead",
-  "Amilase/Lipase": "Enzim pankreas — penanda pankreatitis",
-  "Asam Urat": "Asam Urat serum — penanda gout/hiperurisemia",
-  "RF/Anti-CCP": "Rheumatoid Factor / Anti-CCP — penanda autoimun sendi",
-  "ANA/Anti-dsDNA": "Antinuclear Antibody — penanda lupus/autoimun",
-  "ANA/RF": "Antinuclear Antibody / Rheumatoid Factor",
-  "ASO/Viral Panel": "Anti-Streptolysin O + Panel Virus",
-  CK: "Creatine Kinase — enzim otot (rhabdomyolisis)",
-  "Vit B12/Folat": "Vitamin B12 + Asam Folat serum",
-  "FSH/LH/Prolaktin/TSH": "Profil hormonal reproduksi + tiroid",
-  Androgen: "Hormon androgen (testosteron, DHEA-S)",
-  "Profil Lipid": "Kolesterol Total, LDL, HDL, Trigliserida",
-  "GDS/Profil Lipid": "Gula Darah Sewaktu + Profil Lipid",
-  "H. pylori": "Tes Helicobacter pylori — penyebab ulkus lambung",
-  "Kultur Darah": "Kultur Darah — identifikasi bakteri penyebab sepsis",
-  "Kultur Urin": "Kultur Urin — identifikasi bakteri ISK",
-  "Kultur Sputum": "Kultur Dahak — identifikasi bakteri pneumonia/TB",
-  "BTA/Kultur Sputum": "Basil Tahan Asam + Kultur Dahak (suspek TB)",
-  "Kultur Feses": "Kultur Feses — identifikasi bakteri diare",
-  "Kultur Kulit": "Kultur Kulit — identifikasi infeksi kulit",
-  "Kultur Konjungtiva": "Kultur swab mata — identifikasi infeksi konjungtiva",
-  "Kultur Vaginal": "Kultur cairan vagina — identifikasi infeksi",
-  "Rapid Strep/Kultur": "Tes Cepat Streptococcus + Kultur tenggorokan",
-  "Rapid Influenza": "Tes Cepat Antigen Influenza A/B",
-  Monospot: "Tes Monospot — deteksi mononukleosis (EBV)",
-  Serologi: "Pemeriksaan antibodi darah untuk infeksi",
-  "IgE Total": "Imunoglobulin E — penanda alergi",
-  "IgE Total/Skin Prick": "IgE Total + Skin Prick Test (uji tusuk alergi)",
-  "Skin Prick/IgE Spesifik": "Uji tusuk kulit + IgE spesifik alergen",
-  "PCR Viral": "Polymerase Chain Reaction — deteksi DNA/RNA virus",
-  "PCR Trichomonas": "PCR untuk Trichomonas vaginalis",
-  "Anti-AChR": "Anti-Acetylcholine Receptor — penanda Myasthenia Gravis",
-  "Tumor Marker": "Penanda Tumor (CEA, AFP, CA-125, PSA, dll)",
-  "GD/Crossmatch": "Golongan Darah + Crossmatch — persiapan transfusi",
-  "Biopsi Kulit": "Pengambilan jaringan kulit untuk pemeriksaan patologi",
-  Toksikologi: "Skrining toksikologi urin/darah",
-  "Pungsi Lumbal": "Pengambilan cairan otak (CSS) via tulang belakang bawah",
-  "Mikroskopis Vaginal": "Pemeriksaan mikroskopis cairan vagina",
-  "Kultur Sekret Hidung":
-    "Kultur sekret hidung — identifikasi bakteri sinusitis",
-  "Protein Urin 24 Jam":
-    "Pengumpulan urin 24 jam — kuantifikasi protein (nefropati)",
+  DL: 'Darah Lengkap — Hb, Ht, Leukosit, Trombosit, Hitung Jenis',
+  'Hb/Ht': 'Hemoglobin / Hematokrit',
+  Hb: 'Hemoglobin — kadar sel darah merah',
+  Trombosit: 'Hitung Trombosit — fungsi pembekuan darah',
+  'LED/CRP': 'Laju Endap Darah / C-Reactive Protein — penanda inflamasi',
+  LED: 'Laju Endap Darah — penanda inflamasi non-spesifik',
+  CRP: 'C-Reactive Protein — protein fase akut, penanda inflamasi',
+  'CRP/Prokalsitonin': 'C-Reactive Protein / Prokalsitonin — penanda infeksi bakteri',
+  GDS: 'Gula Darah Sewaktu',
+  GDP: 'Gula Darah Puasa',
+  'GDP/GDS': 'Gula Darah Puasa / Sewaktu',
+  'GDP/HbA1c': 'Gula Darah Puasa / HbA1c (kontrol gula 3 bulan)',
+  'GDS/HbA1c': 'Gula Darah Sewaktu / HbA1c',
+  HbA1c: 'Hemoglobin A1c — rata-rata gula darah 3 bulan terakhir',
+  'BUN/SK': 'Blood Urea Nitrogen / Serum Kreatinin — fungsi ginjal',
+  SK: 'Serum Kreatinin — fungsi filtrasi ginjal',
+  'SGOT/SGPT': 'Enzim hati — Serum Glutamic Oxaloacetic/Pyruvic Transaminase',
+  'SGOT/SGPT/ALP': 'Enzim hati + Alkaline Phosphatase',
+  'SGOT/SGPT/BUN/SK': 'Fungsi hati + fungsi ginjal',
+  'SGOT/SGPT/Amilase/Lipase': 'Fungsi hati + enzim pankreas',
+  'Bilirubin Total/Direk': 'Bilirubin — penanda fungsi hati dan sumbatan empedu',
+  Albumin: 'Albumin serum — status nutrisi dan fungsi hati',
+  UL: 'Urinalisis Lengkap — warna, pH, protein, glukosa, sedimen',
+  FL: 'Feses Lengkap — warna, konsistensi, parasit, darah samar',
+  'FL/FOBT': 'Feses Lengkap + Fecal Occult Blood Test (darah samar)',
+  FOBT: 'Fecal Occult Blood Test — deteksi darah samar dalam feses',
+  PPT: 'Plano/Pregnancy Pack Test — tes kehamilan urin (hCG)',
+  AGD: 'Analisis Gas Darah — pH, pO2, pCO2, HCO3, BE',
+  Elektrolit: 'Natrium (Na), Kalium (K), Klorida (Cl)',
+  'Elektrolit/BUN/SK': 'Elektrolit + fungsi ginjal',
+  'DL/Elektrolit': 'Darah Lengkap + Elektrolit',
+  'DL/GDS': 'Darah Lengkap + Gula Darah Sewaktu',
+  'DL/LED/CRP': 'Darah Lengkap + penanda inflamasi',
+  'Elektrolit/BUN/SK/SGOT/SGPT': 'Panel metabolik — elektrolit + ginjal + hati',
+  'Elektrolit/TFT': 'Elektrolit + Tes Fungsi Tiroid',
+  TFT: 'Thyroid Function Test — TSH, FT4, FT3',
+  TSH: 'Thyroid Stimulating Hormone',
+  'TSH/FT4': 'TSH + Free T4 — skrining fungsi tiroid',
+  'PT/aPTT': 'Prothrombin Time / Activated Partial Thromboplastin Time — koagulasi',
+  'BT/CT': 'Bleeding Time / Clotting Time — waktu perdarahan/pembekuan',
+  'BT/PT': 'Bleeding Time / Prothrombin Time',
+  'D-Dimer': 'D-Dimer — penanda pemecahan bekuan darah (DVT, emboli paru)',
+  Troponin: 'Troponin I/T — penanda kerusakan otot jantung',
+  'BNP/NT-proBNP': 'Brain Natriuretic Peptide — penanda gagal jantung',
+  EKG: 'Elektrokardiogram — rekam aktivitas listrik jantung 12 lead',
+  'Amilase/Lipase': 'Enzim pankreas — penanda pankreatitis',
+  'Asam Urat': 'Asam Urat serum — penanda gout/hiperurisemia',
+  'RF/Anti-CCP': 'Rheumatoid Factor / Anti-CCP — penanda autoimun sendi',
+  'ANA/Anti-dsDNA': 'Antinuclear Antibody — penanda lupus/autoimun',
+  'ANA/RF': 'Antinuclear Antibody / Rheumatoid Factor',
+  'ASO/Viral Panel': 'Anti-Streptolysin O + Panel Virus',
+  CK: 'Creatine Kinase — enzim otot (rhabdomyolisis)',
+  'Vit B12/Folat': 'Vitamin B12 + Asam Folat serum',
+  'FSH/LH/Prolaktin/TSH': 'Profil hormonal reproduksi + tiroid',
+  Androgen: 'Hormon androgen (testosteron, DHEA-S)',
+  'Profil Lipid': 'Kolesterol Total, LDL, HDL, Trigliserida',
+  'GDS/Profil Lipid': 'Gula Darah Sewaktu + Profil Lipid',
+  'H. pylori': 'Tes Helicobacter pylori — penyebab ulkus lambung',
+  'Kultur Darah': 'Kultur Darah — identifikasi bakteri penyebab sepsis',
+  'Kultur Urin': 'Kultur Urin — identifikasi bakteri ISK',
+  'Kultur Sputum': 'Kultur Dahak — identifikasi bakteri pneumonia/TB',
+  'BTA/Kultur Sputum': 'Basil Tahan Asam + Kultur Dahak (suspek TB)',
+  'Kultur Feses': 'Kultur Feses — identifikasi bakteri diare',
+  'Kultur Kulit': 'Kultur Kulit — identifikasi infeksi kulit',
+  'Kultur Konjungtiva': 'Kultur swab mata — identifikasi infeksi konjungtiva',
+  'Kultur Vaginal': 'Kultur cairan vagina — identifikasi infeksi',
+  'Rapid Strep/Kultur': 'Tes Cepat Streptococcus + Kultur tenggorokan',
+  'Rapid Influenza': 'Tes Cepat Antigen Influenza A/B',
+  Monospot: 'Tes Monospot — deteksi mononukleosis (EBV)',
+  Serologi: 'Pemeriksaan antibodi darah untuk infeksi',
+  'IgE Total': 'Imunoglobulin E — penanda alergi',
+  'IgE Total/Skin Prick': 'IgE Total + Skin Prick Test (uji tusuk alergi)',
+  'Skin Prick/IgE Spesifik': 'Uji tusuk kulit + IgE spesifik alergen',
+  'PCR Viral': 'Polymerase Chain Reaction — deteksi DNA/RNA virus',
+  'PCR Trichomonas': 'PCR untuk Trichomonas vaginalis',
+  'Anti-AChR': 'Anti-Acetylcholine Receptor — penanda Myasthenia Gravis',
+  'Tumor Marker': 'Penanda Tumor (CEA, AFP, CA-125, PSA, dll)',
+  'GD/Crossmatch': 'Golongan Darah + Crossmatch — persiapan transfusi',
+  'Biopsi Kulit': 'Pengambilan jaringan kulit untuk pemeriksaan patologi',
+  Toksikologi: 'Skrining toksikologi urin/darah',
+  'Pungsi Lumbal': 'Pengambilan cairan otak (CSS) via tulang belakang bawah',
+  'Mikroskopis Vaginal': 'Pemeriksaan mikroskopis cairan vagina',
+  'Kultur Sekret Hidung': 'Kultur sekret hidung — identifikasi bakteri sinusitis',
+  'Protein Urin 24 Jam': 'Pengumpulan urin 24 jam — kuantifikasi protein (nefropati)',
   // Fisik
-  "Tanda Vital": "TD, Nadi, Napas, Suhu — parameter dasar",
-  "Tanda Vital/SpO2": "Tanda Vital + Saturasi Oksigen",
-  SpO2: "Saturasi Oksigen — kadar O2 dalam darah (%)",
-  Suhu: "Pengukuran suhu tubuh",
-  "Suhu Aksila/Oral": "Pengukuran suhu ketiak atau mulut",
-  TD: "Tekanan Darah — sistolik/diastolik (mmHg)",
-  "TD/Nadi": "Tekanan Darah + Denyut Nadi",
-  "TD Ortostatik": "TD berdiri vs berbaring — deteksi hipotensi postural",
-  Nadi: "Denyut nadi — frekuensi, irama, isi",
-  "Auskultasi Pulmo": "Dengarkan suara napas paru dengan stetoskop",
-  "Auskultasi Cor": "Dengarkan suara jantung dengan stetoskop",
-  "Auskultasi Cor/Pulmo": "Dengarkan suara jantung + paru",
-  "Auskultasi Abdomen": "Dengarkan bising usus dengan stetoskop",
-  "Palpasi Abdomen": "Raba perut — nyeri tekan, massa, defans",
-  "Palpasi KGB": "Raba Kelenjar Getah Bening — leher, ketiak, inguinal",
-  "Palpasi Thorax": "Raba dada — nyeri tekan, krepitasi",
-  "Palpasi Sinus": "Raba sinus paranasal — nyeri tekan sinusitis",
-  "Palpasi Tiroid": "Raba kelenjar tiroid — pembesaran, nodul",
-  "Palpasi Sendi": "Raba sendi — bengkak, hangat, nyeri tekan",
-  "Palpasi Vertebra": "Raba tulang belakang — nyeri tekan",
-  "Palpasi Hepar/Lien": "Raba hati + limpa — pembesaran",
-  "Palpasi Hepar": "Raba hati — pembesaran (hepatomegali)",
-  "Palpasi Nadi Perifer": "Raba nadi di pergelangan kaki/tangan",
-  "Palpasi Edema": "Raba bengkak — pitting/non-pitting",
-  "Palpasi Epigastrium": "Raba ulu hati — nyeri tekan",
-  "Perkusi Abdomen": "Ketuk perut — timpani (gas) atau redup (cairan)",
-  "Perkusi Pulmo": "Ketuk dada — sonor/redup/hipersonor",
-  "Inspeksi Kulit": "Lihat kulit — ruam, lesi, warna, kelembaban",
-  "Inspeksi Faring": "Lihat tenggorokan — kemerahan, eksudat, tonsil",
-  "Inspeksi Hidung/Faring": "Lihat hidung + tenggorokan",
-  "Inspeksi Konjungtiva": "Lihat selaput mata — pucat (anemia), ikterus",
-  "Inspeksi Sklera/Konjungtiva": "Lihat putih mata + selaput mata",
-  "Inspeksi Edema": "Lihat bengkak — distribusi, simetri",
-  "Inspeksi Abdomen": "Lihat perut — distensi, asimetri, sikatriks",
-  "Inspeksi Anus": "Lihat anus — fisura, hemoroid, massa",
-  "Inspeksi Genitalia": "Lihat genitalia eksterna",
-  Inspekulo: "Pemeriksaan vagina + serviks dengan spekulum",
-  Bimanual: "Raba rahim + adneksa dengan dua tangan",
-  Otoskopi: "Lihat telinga dalam dengan otoskop — membran timpani",
-  "Rinoskopi Anterior": "Lihat rongga hidung dengan spekulum nasal",
-  Funduskopi: "Lihat retina mata dengan oftalmoskop",
-  "Slit Lamp": "Pemeriksaan mata depan dengan lampu celah",
-  Visus: "Tajam penglihatan — Snellen chart (6/6)",
-  Tonometri: "Ukur tekanan bola mata — skrining glaukoma",
-  "Status Neurologis":
-    "Pemeriksaan saraf — kesadaran, refleks, motorik, sensorik",
-  "Refleks Pupil": "Respons pupil terhadap cahaya — langsung + konsensual",
-  Nystagmus: "Gerakan mata involunter — tanda gangguan vestibular",
-  "Dix-Hallpike": "Manuver provokasi BPPV — nystagmus posisional",
-  "Tes Romberg": "Tes keseimbangan — berdiri mata tertutup",
-  "Tes Rinne/Weber":
-    "Tes garputala — membedakan tuli konduksi vs sensorineural",
-  "ROM Sendi": "Range of Motion — rentang gerak sendi",
-  "ROM Spine": "Range of Motion tulang belakang",
-  "SLR Test": "Straight Leg Raise — provokasi nyeri saraf sciatic (HNP)",
-  "Tes Patrick/Laseque": "Tes provokasi nyeri pinggul + saraf sciatic",
-  RT: "Rectal Touche — colok dubur",
-  JVP: "Jugular Venous Pressure — tekanan vena jugularis (gagal jantung)",
-  "Tanda Homan": "Nyeri betis saat dorsifleksi kaki — curiga DVT",
-  "Tanda Meningeal": "Kaku kuduk, Kernig, Brudzinski — curiga meningitis",
-  "Tanda Peritonitis": "Nyeri lepas, defans muskuler, perut papan",
-  "Status Hidrasi": "Turgor kulit, mukosa mulut, mata cekung",
-  "BB/IMT": "Berat Badan / Indeks Massa Tubuh",
+  'Tanda Vital': 'TD, Nadi, Napas, Suhu — parameter dasar',
+  'Tanda Vital/SpO2': 'Tanda Vital + Saturasi Oksigen',
+  SpO2: 'Saturasi Oksigen — kadar O2 dalam darah (%)',
+  Suhu: 'Pengukuran suhu tubuh',
+  'Suhu Aksila/Oral': 'Pengukuran suhu ketiak atau mulut',
+  TD: 'Tekanan Darah — sistolik/diastolik (mmHg)',
+  'TD/Nadi': 'Tekanan Darah + Denyut Nadi',
+  'TD Ortostatik': 'TD berdiri vs berbaring — deteksi hipotensi postural',
+  Nadi: 'Denyut nadi — frekuensi, irama, isi',
+  'Auskultasi Pulmo': 'Dengarkan suara napas paru dengan stetoskop',
+  'Auskultasi Cor': 'Dengarkan suara jantung dengan stetoskop',
+  'Auskultasi Cor/Pulmo': 'Dengarkan suara jantung + paru',
+  'Auskultasi Abdomen': 'Dengarkan bising usus dengan stetoskop',
+  'Palpasi Abdomen': 'Raba perut — nyeri tekan, massa, defans',
+  'Palpasi KGB': 'Raba Kelenjar Getah Bening — leher, ketiak, inguinal',
+  'Palpasi Thorax': 'Raba dada — nyeri tekan, krepitasi',
+  'Palpasi Sinus': 'Raba sinus paranasal — nyeri tekan sinusitis',
+  'Palpasi Tiroid': 'Raba kelenjar tiroid — pembesaran, nodul',
+  'Palpasi Sendi': 'Raba sendi — bengkak, hangat, nyeri tekan',
+  'Palpasi Vertebra': 'Raba tulang belakang — nyeri tekan',
+  'Palpasi Hepar/Lien': 'Raba hati + limpa — pembesaran',
+  'Palpasi Hepar': 'Raba hati — pembesaran (hepatomegali)',
+  'Palpasi Nadi Perifer': 'Raba nadi di pergelangan kaki/tangan',
+  'Palpasi Edema': 'Raba bengkak — pitting/non-pitting',
+  'Palpasi Epigastrium': 'Raba ulu hati — nyeri tekan',
+  'Perkusi Abdomen': 'Ketuk perut — timpani (gas) atau redup (cairan)',
+  'Perkusi Pulmo': 'Ketuk dada — sonor/redup/hipersonor',
+  'Inspeksi Kulit': 'Lihat kulit — ruam, lesi, warna, kelembaban',
+  'Inspeksi Faring': 'Lihat tenggorokan — kemerahan, eksudat, tonsil',
+  'Inspeksi Hidung/Faring': 'Lihat hidung + tenggorokan',
+  'Inspeksi Konjungtiva': 'Lihat selaput mata — pucat (anemia), ikterus',
+  'Inspeksi Sklera/Konjungtiva': 'Lihat putih mata + selaput mata',
+  'Inspeksi Edema': 'Lihat bengkak — distribusi, simetri',
+  'Inspeksi Abdomen': 'Lihat perut — distensi, asimetri, sikatriks',
+  'Inspeksi Anus': 'Lihat anus — fisura, hemoroid, massa',
+  'Inspeksi Genitalia': 'Lihat genitalia eksterna',
+  Inspekulo: 'Pemeriksaan vagina + serviks dengan spekulum',
+  Bimanual: 'Raba rahim + adneksa dengan dua tangan',
+  Otoskopi: 'Lihat telinga dalam dengan otoskop — membran timpani',
+  'Rinoskopi Anterior': 'Lihat rongga hidung dengan spekulum nasal',
+  Funduskopi: 'Lihat retina mata dengan oftalmoskop',
+  'Slit Lamp': 'Pemeriksaan mata depan dengan lampu celah',
+  Visus: 'Tajam penglihatan — Snellen chart (6/6)',
+  Tonometri: 'Ukur tekanan bola mata — skrining glaukoma',
+  'Status Neurologis': 'Pemeriksaan saraf — kesadaran, refleks, motorik, sensorik',
+  'Refleks Pupil': 'Respons pupil terhadap cahaya — langsung + konsensual',
+  Nystagmus: 'Gerakan mata involunter — tanda gangguan vestibular',
+  'Dix-Hallpike': 'Manuver provokasi BPPV — nystagmus posisional',
+  'Tes Romberg': 'Tes keseimbangan — berdiri mata tertutup',
+  'Tes Rinne/Weber': 'Tes garputala — membedakan tuli konduksi vs sensorineural',
+  'ROM Sendi': 'Range of Motion — rentang gerak sendi',
+  'ROM Spine': 'Range of Motion tulang belakang',
+  'SLR Test': 'Straight Leg Raise — provokasi nyeri saraf sciatic (HNP)',
+  'Tes Patrick/Laseque': 'Tes provokasi nyeri pinggul + saraf sciatic',
+  RT: 'Rectal Touche — colok dubur',
+  JVP: 'Jugular Venous Pressure — tekanan vena jugularis (gagal jantung)',
+  'Tanda Homan': 'Nyeri betis saat dorsifleksi kaki — curiga DVT',
+  'Tanda Meningeal': 'Kaku kuduk, Kernig, Brudzinski — curiga meningitis',
+  'Tanda Peritonitis': 'Nyeri lepas, defans muskuler, perut papan',
+  'Status Hidrasi': 'Turgor kulit, mukosa mulut, mata cekung',
+  'BB/IMT': 'Berat Badan / Indeks Massa Tubuh',
   // Penunjang
-  "Foto Thorax AP": "Rontgen dada Anterior-Posterior",
-  "Foto Sinus": "Rontgen sinus paranasal (Waters view)",
-  BNO: "Buik Niet Overzicht — foto polos abdomen",
-  "Foto Vertebra": "Rontgen tulang belakang",
-  "Foto Sendi": "Rontgen sendi",
-  "USG Abdomen": "Ultrasonografi perut — hati, ginjal, limpa, pankreas",
-  "USG Ginjal": "Ultrasonografi ginjal + saluran kemih",
-  "USG Pelvis": "Ultrasonografi panggul — rahim, ovarium",
-  "USG Transvaginal": "USG melalui vagina — detail rahim + ovarium",
-  "USG Tiroid": "Ultrasonografi kelenjar tiroid",
-  "USG Doppler Vena": "USG aliran darah vena — deteksi DVT",
-  "USG Doppler": "USG aliran darah pembuluh darah",
-  "CT-Scan Kepala": "CT Scan otak — stroke, tumor, perdarahan",
-  "CT-Scan Thorax": "CT Scan dada — massa, infeksi, emboli paru",
-  "CT-Scan Abdomen": "CT Scan perut — massa, batu, abses",
-  "CT-Scan Sinus": "CT Scan sinus — sinusitis, polip, tumor",
-  "CTA Paru": "CT Angiografi paru — deteksi emboli paru",
-  "MRI Kepala": "MRI otak — detail jaringan lunak, tumor, MS",
-  "MRI Spine": "MRI tulang belakang — HNP, kompresi medula",
-  Echocardiografi: "USG jantung — fungsi pompa, katup, ruang jantung",
-  "Holter Monitor": "Rekam EKG 24 jam — deteksi aritmia intermiten",
-  Spirometri: "Tes fungsi paru — FEV1, FVC (asma, PPOK)",
-  "Endoskopi/EGDS": "Teropong saluran cerna atas — esofagus, lambung, duodenum",
-  Kolonoskopi: "Teropong usus besar — polip, tumor, kolitis",
-  Bronkoskopi: "Teropong saluran napas — massa, benda asing",
-  Audiometri: "Tes pendengaran — ambang dengar frekuensi",
-  Timpanometri: "Tes fungsi telinga tengah — tekanan, compliance",
-  EEG: "Elektroensefalografi — rekam aktivitas listrik otak (epilepsi)",
-  "EMG/NCS": "Elektromiografi + Nerve Conduction Study — saraf tepi",
-  "Tilt Table Test": "Tes meja miring — sinkop vasovagal",
-};
+  'Foto Thorax AP': 'Rontgen dada Anterior-Posterior',
+  'Foto Sinus': 'Rontgen sinus paranasal (Waters view)',
+  BNO: 'Buik Niet Overzicht — foto polos abdomen',
+  'Foto Vertebra': 'Rontgen tulang belakang',
+  'Foto Sendi': 'Rontgen sendi',
+  'USG Abdomen': 'Ultrasonografi perut — hati, ginjal, limpa, pankreas',
+  'USG Ginjal': 'Ultrasonografi ginjal + saluran kemih',
+  'USG Pelvis': 'Ultrasonografi panggul — rahim, ovarium',
+  'USG Transvaginal': 'USG melalui vagina — detail rahim + ovarium',
+  'USG Tiroid': 'Ultrasonografi kelenjar tiroid',
+  'USG Doppler Vena': 'USG aliran darah vena — deteksi DVT',
+  'USG Doppler': 'USG aliran darah pembuluh darah',
+  'CT-Scan Kepala': 'CT Scan otak — stroke, tumor, perdarahan',
+  'CT-Scan Thorax': 'CT Scan dada — massa, infeksi, emboli paru',
+  'CT-Scan Abdomen': 'CT Scan perut — massa, batu, abses',
+  'CT-Scan Sinus': 'CT Scan sinus — sinusitis, polip, tumor',
+  'CTA Paru': 'CT Angiografi paru — deteksi emboli paru',
+  'MRI Kepala': 'MRI otak — detail jaringan lunak, tumor, MS',
+  'MRI Spine': 'MRI tulang belakang — HNP, kompresi medula',
+  Echocardiografi: 'USG jantung — fungsi pompa, katup, ruang jantung',
+  'Holter Monitor': 'Rekam EKG 24 jam — deteksi aritmia intermiten',
+  Spirometri: 'Tes fungsi paru — FEV1, FVC (asma, PPOK)',
+  'Endoskopi/EGDS': 'Teropong saluran cerna atas — esofagus, lambung, duodenum',
+  Kolonoskopi: 'Teropong usus besar — polip, tumor, kolitis',
+  Bronkoskopi: 'Teropong saluran napas — massa, benda asing',
+  Audiometri: 'Tes pendengaran — ambang dengar frekuensi',
+  Timpanometri: 'Tes fungsi telinga tengah — tekanan, compliance',
+  EEG: 'Elektroensefalografi — rekam aktivitas listrik otak (epilepsi)',
+  'EMG/NCS': 'Elektromiografi + Nerve Conduction Study — saraf tepi',
+  'Tilt Table Test': 'Tes meja miring — sinkop vasovagal',
+}
 
 function lookupMedTerm(term: string): string | null {
-  if (MED_GLOSSARY[term]) return MED_GLOSSARY[term];
+  if (MED_GLOSSARY[term]) return MED_GLOSSARY[term]
   // coba partial match — cari key yang ada di dalam term
   for (const [key, desc] of Object.entries(MED_GLOSSARY)) {
-    if (term.includes(key)) return desc;
+    if (term.includes(key)) return desc
   }
-  return null;
+  return null
 }
 
 // ── Custom Select — replaces native <select> to fix OS white dropdown on Windows ──
 
-type SelectOption = { value: string; label: string };
+type SelectOption = { value: string; label: string }
 
 function CustomSelect({
   value,
@@ -1264,38 +1281,37 @@ function CustomSelect({
   options,
   id,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  options: SelectOption[];
-  id?: string;
+  value: string
+  onChange: (value: string) => void
+  options: SelectOption[]
+  id?: string
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((o) => o.value === value);
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const selected = options.find(o => o.value === value)
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return
     function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [open]);
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [open])
 
   return (
-    <div ref={ref} style={{ position: "relative", width: "100%" }}>
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
       <button
         id={id}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(o => !o)}
         className="vitals-context-select"
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "100%",
-          textAlign: "left",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          textAlign: 'left',
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -1308,8 +1324,8 @@ function CustomSelect({
           fill="none"
           style={{
             flexShrink: 0,
-            transform: open ? "rotate(180deg)" : "none",
-            transition: "transform 0.2s ease",
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.2s ease',
           }}
         >
           <path
@@ -1325,46 +1341,43 @@ function CustomSelect({
         <ul
           role="listbox"
           style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
             left: 0,
             right: 0,
             zIndex: 200,
-            background: "#1e1e1e",
-            border: "1px solid rgba(255,255,255,0.1)",
-            padding: "4px 0",
+            background: '#1e1e1e',
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: '4px 0',
             margin: 0,
-            listStyle: "none",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+            listStyle: 'none',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           }}
         >
-          {options.map((opt) => (
+          {options.map(opt => (
             <li
               key={opt.value}
               role="option"
               aria-selected={opt.value === value}
               onClick={() => {
-                onChange(opt.value);
-                setOpen(false);
+                onChange(opt.value)
+                setOpen(false)
               }}
               style={{
-                padding: "9px 12px",
+                padding: '9px 12px',
                 fontSize: 13,
-                color:
-                  opt.value === value ? "var(--c-asesmen)" : "var(--text-main)",
-                background:
-                  opt.value === value ? "rgba(230,126,34,0.08)" : "transparent",
-                cursor: "pointer",
-                transition: "background 0.15s",
+                color: opt.value === value ? 'var(--c-asesmen)' : 'var(--text-main)',
+                background: opt.value === value ? 'rgba(230,126,34,0.08)' : 'transparent',
+                cursor: 'pointer',
+                transition: 'background 0.15s',
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 if (opt.value !== value)
-                  (e.currentTarget as HTMLElement).style.background =
-                    "rgba(255,255,255,0.05)";
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
               }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background =
-                  opt.value === value ? "rgba(230,126,34,0.08)" : "transparent";
+              onMouseLeave={e => {
+                ;(e.currentTarget as HTMLElement).style.background =
+                  opt.value === value ? 'rgba(230,126,34,0.08)' : 'transparent'
               }}
             >
               {opt.label}
@@ -1373,451 +1386,735 @@ function CustomSelect({
         </ul>
       )}
     </div>
-  );
+  )
 }
 
 export default function EMRPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const {
     appointmentId: sourceAppointmentId,
     consultId: sourceConsultId,
     bridgeEntryId: sourceBridgeEntryId,
     sourceOrigin: resolvedSourceOrigin,
   } = resolveEmrSourceInput({
-    appointmentId: searchParams.get("appointmentId"),
-    consultId: searchParams.get("consultId"),
-    bridgeEntryId: searchParams.get("bridgeEntryId"),
-    sourceOrigin: searchParams.get("sourceOrigin"),
-  });
+    appointmentId: searchParams.get('appointmentId'),
+    consultId: searchParams.get('consultId'),
+    bridgeEntryId: searchParams.get('bridgeEntryId'),
+    sourceOrigin: searchParams.get('sourceOrigin'),
+  })
   const [headerText, setHeaderText] = useState(
-    "SENTRA / PUSKESMAS KEDIRI // RM-BARU // SENAUTO ENGINE: IDLE",
-  );
-  const [headerColor, setHeaderColor] = useState("var(--text-muted)");
-  const [isTyping, setIsTyping] = useState(false);
-  const [ghostVisible, setGhostVisible] = useState(true);
-  const [words, setWords] = useState<string[]>([]);
-  const [anamnesaVisible, setAnamnesaVisible] = useState([false, false, false]);
-  const [showEmrLoader, setShowEmrLoader] = useState(false);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [draftBorderColor, setDraftBorderColor] = useState("var(--text-muted)");
+    'SENTRA / PUSKESMAS KEDIRI // RM-BARU // SENAUTO ENGINE: IDLE'
+  )
+  const [headerColor, setHeaderColor] = useState('var(--text-muted)')
+  const [isTyping, setIsTyping] = useState(false)
+  const [ghostVisible, setGhostVisible] = useState(true)
+  const [words, setWords] = useState<string[]>([])
+  const [anamnesaVisible, setAnamnesaVisible] = useState([false, false, false])
+  const [showEmrLoader, setShowEmrLoader] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [draftBorderColor, setDraftBorderColor] = useState('var(--text-muted)')
 
-  const [activeScenario, setActiveScenario] = useState<string | null>(null);
-  const [scanFlash, setScanFlash] = useState(false);
-  const [flashingVital, setFlashingVital] = useState<string | null>(null);
+  const [activeScenario, setActiveScenario] = useState<string | null>(null)
+  const [scanFlash, setScanFlash] = useState(false)
+  const [flashingVital, setFlashingVital] = useState<string | null>(null)
 
   // ── Patient Context (Critical for CDSS V3.4) ──────────────────────────────
-  const [patientAge, setPatientAge] = useState<number>(35);
-  const [patientGender, setPatientGender] = useState<"L" | "P">("L");
-  const [bodyWeightKg, setBodyWeightKg] = useState("");
-  const [recentActivity, setRecentActivity] =
-    useState<RecentActivity>("resting");
-  const [stressState, setStressState] = useState<StressState>("calm");
-  const [medicationFlags, setMedicationFlags] = useState<Set<MedicationFlag>>(
-    new Set(),
-  );
-  const [isPregnant, setIsPregnant] = useState(false);
-  const [activeViewPhase, setActiveViewPhase] = useState<
-    "row1" | "row2" | "row3" | null
-  >("row1");
-  const [workflowTab, setWorkflowTab] = useState<WorkflowTab>("triage");
-  const [manualMedicationNotes, setManualMedicationNotes] = useState<
-    Record<string, string>
-  >({});
+  const [patientAge, setPatientAge] = useState<number>(35)
+  const [patientGender, setPatientGender] = useState<'L' | 'P'>('L')
+  const [bodyWeightKg, setBodyWeightKg] = useState('')
+  const [recentActivity, setRecentActivity] = useState<RecentActivity>('resting')
+  const [stressState, setStressState] = useState<StressState>('calm')
+  const [medicationFlags, setMedicationFlags] = useState<Set<MedicationFlag>>(new Set())
+  const [isPregnant, setIsPregnant] = useState(false)
+  const [activeViewPhase, setActiveViewPhase] = useState<'row1' | 'row2' | 'row3' | null>('row1')
+  const [workflowTab, setWorkflowTab] = useState<WorkflowTab>('triage')
+  const [manualMedicationNotes, setManualMedicationNotes] = useState<Record<string, string>>({})
 
-  const [labOpen, setLabOpen] = useState(false);
-  const [labSelected, setLabSelected] = useState([false, false, false]);
-  const [examOpen, setExamOpen] = useState(false);
+  const [labOpen, setLabOpen] = useState(false)
+  const [labSelected, setLabSelected] = useState([false, false, false])
+  const [examOpen, setExamOpen] = useState(false)
 
   // ── Doctor Online Status (Ghost Protocols) ────────────────────────────────
-  const [isDoctor, setIsDoctor] = useState(false);
-  const [isOnline, setIsOnline] = useState(false);
-  const [togglingOnline, setTogglingOnline] = useState(false);
+  const [isDoctor, setIsDoctor] = useState(false)
+  const [isOnline, setIsOnline] = useState(false)
+  const [togglingOnline, setTogglingOnline] = useState(false)
 
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/auth/session");
-        const data = (await res.json()) as { user?: { profession?: string } };
-        const profession = data.user?.profession ?? "";
-        if (profession === "Dokter" || profession === "Dokter Gigi") {
-          setIsDoctor(true);
-          const statusRes = await fetch("/api/telemedicine/doctor-status");
+        const res = await fetch('/api/auth/session')
+        const data = (await res.json()) as { user?: { profession?: string } }
+        const profession = data.user?.profession ?? ''
+        if (profession === 'Dokter' || profession === 'Dokter Gigi') {
+          setIsDoctor(true)
+          const statusRes = await fetch('/api/telemedicine/doctor-status')
           const statusData = (await statusRes.json()) as {
-            doctors?: { doctorName: string }[];
-          };
-          const sessionRes = await fetch("/api/auth/session");
+            doctors?: { doctorName: string }[]
+          }
+          const sessionRes = await fetch('/api/auth/session')
           const sessionData = (await sessionRes.json()) as {
-            user?: { displayName?: string };
-          };
-          const name = sessionData.user?.displayName ?? "";
-          setIsOnline(
-            (statusData.doctors ?? []).some((d) => d.doctorName === name),
-          );
+            user?: { displayName?: string }
+          }
+          const name = sessionData.user?.displayName ?? ''
+          setIsOnline((statusData.doctors ?? []).some(d => d.doctorName === name))
         }
       } catch {
         /* silent */
       }
-    })();
-  }, []);
+    })()
+  }, [])
 
   const handleToggleDoctorOnline = async () => {
-    setTogglingOnline(true);
+    setTogglingOnline(true)
     try {
-      const res = await fetch("/api/telemedicine/doctor-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/telemedicine/doctor-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isOnline: !isOnline }),
-      });
-      const data = (await res.json()) as { ok: boolean; isOnline?: boolean };
-      if (data.ok) setIsOnline(data.isOnline ?? false);
+      })
+      const data = (await res.json()) as { ok: boolean; isOnline?: boolean }
+      if (data.ok) setIsOnline(data.isOnline ?? false)
     } catch {
       /* silent */
     } finally {
-      setTogglingOnline(false);
+      setTogglingOnline(false)
     }
-  };
-  const row1SectionRef = useRef<HTMLElement | null>(null);
-  const row2SectionRef = useRef<HTMLElement | null>(null);
-  const row3SectionRef = useRef<HTMLElement | null>(null);
-  const assessmentEntryPanelRef = useRef<HTMLDivElement | null>(null);
-  const finalizeAnchorRef = useRef<HTMLDivElement | null>(null);
-  const reviewHandoffRef = useRef<HTMLDivElement | null>(null);
-  const cdssPanelRef = useRef<HTMLDivElement | null>(null);
-  const selectedDiagnosisPanelRef = useRef<HTMLDivElement | null>(null);
-  const prognosisStageRef = useRef<HTMLDivElement | null>(null);
-  const assessmentConclusionInputRef = useRef<HTMLInputElement | null>(null);
-  const workflowScrollInitializedRef = useRef(false);
-  const [row3Spotlight, setRow3Spotlight] = useState<"entry" | "prognosis">(
-    "entry",
-  );
+  }
+  const row1SectionRef = useRef<HTMLElement | null>(null)
+  const row2SectionRef = useRef<HTMLElement | null>(null)
+  const row3SectionRef = useRef<HTMLElement | null>(null)
+  const assessmentEntryPanelRef = useRef<HTMLDivElement | null>(null)
+  const finalizeAnchorRef = useRef<HTMLDivElement | null>(null)
+  const reviewHandoffRef = useRef<HTMLDivElement | null>(null)
+  const cdssPanelRef = useRef<HTMLDivElement | null>(null)
+  const selectedDiagnosisPanelRef = useRef<HTMLDivElement | null>(null)
+  const prognosisStageRef = useRef<HTMLDivElement | null>(null)
+  const assessmentConclusionInputRef = useRef<HTMLInputElement | null>(null)
+  const workflowScrollInitializedRef = useRef(false)
+  const [row3Spotlight, setRow3Spotlight] = useState<'entry' | 'prognosis'>('entry')
 
-  const [trajectoryActive, setTrajectoryActive] = useState(false);
-  const [trajectoryOpen, setTrajectoryOpen] = useState(false);
-  const [receivedVisitHistory, setReceivedVisitHistory] = useState<
-    ScrapedVisit[]
-  >([]);
-  const [showInsight, setShowInsight] = useState(false);
-  const insightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keluhanRef = useRef({ utama: "", tambahan: "" });
-  const bridgeEntryIdRef = useRef<string | null>(null);
-  const cdssRunStartedAtRef = useRef<number | null>(null);
+  const [trajectoryActive, setTrajectoryActive] = useState(false)
+  const [trajectoryOpen, setTrajectoryOpen] = useState(false)
+  const [receivedVisitHistory, setReceivedVisitHistory] = useState<ScrapedVisit[]>([])
+  const [encounterMeasurements, setEncounterMeasurements] = useState<CompositeVitalSnapshot[]>([])
+  const [showInsight, setShowInsight] = useState(false)
+  const insightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const keluhanRef = useRef({ utama: '', tambahan: '' })
+  const bridgeEntryIdRef = useRef<string | null>(null)
+  const cdssRunStartedAtRef = useRef<number | null>(null)
+  const latestEncounterMeasurementSignatureRef = useRef<string>('')
 
-  const [cdssResult, setCdssResult] = useState<CDSSResult | null>(null);
-  const [cdssLoading, setCdssLoading] = useState(false);
-  const [cdssError, setCdssError] = useState("");
-  const [cdssBranchRunId, setCdssBranchRunId] = useState(0);
-  const [selectedSuggestionKey, setSelectedSuggestionKey] = useState<
-    string | null
-  >(null);
-  const [selectionSavingKey, setSelectionSavingKey] = useState<string | null>(
-    null,
-  );
-  const [selectedDiagnosisDraft, setSelectedDiagnosisDraft] =
-    useState<CDSSSuggestion | null>(null);
-  const [consideredMustNotMissKeys, setConsideredMustNotMissKeys] = useState<
-    string[]
-  >([]);
-  const [assessmentConclusion, setAssessmentConclusion] = useState("");
+  const [cdssResult, setCdssResult] = useState<CDSSResult | null>(null)
+  const [cdssLoading, setCdssLoading] = useState(false)
+  const [cdssError, setCdssError] = useState('')
+  const [cdssBranchRunId, setCdssBranchRunId] = useState(0)
+  const [selectedSuggestionKey, setSelectedSuggestionKey] = useState<string | null>(null)
+  const [selectionSavingKey, setSelectionSavingKey] = useState<string | null>(null)
+  const [selectedDiagnosisDraft, setSelectedDiagnosisDraft] = useState<CDSSSuggestion | null>(null)
+  const [consideredMustNotMissKeys, setConsideredMustNotMissKeys] = useState<string[]>([])
+  const [assessmentConclusion, setAssessmentConclusion] = useState('')
   const [assessmentConclusionMeta, setAssessmentConclusionMeta] = useState<{
-    mode: "idle" | "auto" | "edited";
-    signature: string;
-  }>({ mode: "idle", signature: "" });
-  const [emergencyAcknowledged, setEmergencyAcknowledged] = useState(false);
-  const [ackSaving, setAckSaving] = useState(false);
-  const [safetyChecklist, setSafetyChecklist] = useState<
-    Record<string, boolean>
-  >({});
-  const [feedbackSaving, setFeedbackSaving] = useState(false);
-  const [feedbackFinalIcd, setFeedbackFinalIcd] = useState("");
-  const [reviewAcceptanceReason, setReviewAcceptanceReason] = useState("");
-  const [feedbackOverrideReason, setFeedbackOverrideReason] = useState("");
-  const [feedbackOutcomeConfirmed, setFeedbackOutcomeConfirmed] = useState<
-    boolean | null
-  >(null);
-  const [feedbackFollowUpNote, setFeedbackFollowUpNote] = useState("");
-  const [screeningAlerts, setScreeningAlerts] = useState<ScreeningAlert[]>([]);
+    mode: 'idle' | 'auto' | 'edited'
+    signature: string
+  }>({ mode: 'idle', signature: '' })
+  const [emergencyAcknowledged, setEmergencyAcknowledged] = useState(false)
+  const [ackSaving, setAckSaving] = useState(false)
+  const [safetyChecklist, setSafetyChecklist] = useState<Record<string, boolean>>({})
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
+  const [feedbackFinalIcd, setFeedbackFinalIcd] = useState('')
+  const [reviewAcceptanceReason, setReviewAcceptanceReason] = useState('')
+  const [feedbackOverrideReason, setFeedbackOverrideReason] = useState('')
+  const [feedbackOutcomeConfirmed, setFeedbackOutcomeConfirmed] = useState<boolean | null>(null)
+  const [feedbackFollowUpNote, setFeedbackFollowUpNote] = useState('')
+  const [screeningAlerts, setScreeningAlerts] = useState<ScreeningAlert[]>([])
+  const [compositeDeterioration, setCompositeDeterioration] =
+    useState<CompositeDeteriorationState>(null)
+  const [triageSignalContext, setTriageSignalContext] = useState<TriageSignalContext>({})
+  const [structuredSignsDraft, setStructuredSignsDraft] = useState<StructuredTriageSigns>(
+    createInitialStructuredSigns()
+  )
 
   // Manual diagnosis & medication (dokter override)
-  const [manualDiagnosis, setManualDiagnosis] = useState("");
-  const [manualIcd10, setManualIcd10] = useState("");
-  const [manualMedications, setManualMedications] = useState<
-    ManualMedicationEntry[]
-  >([]);
-  const [selectedAIMedicationKeys, setSelectedAIMedicationKeys] = useState<
-    string[]
-  >([]);
-  const [showSelectedAIMedicationsOnly, setShowSelectedAIMedicationsOnly] =
-    useState(false);
-  const [medInput, setMedInput] = useState("");
-  const [activeMedicationSuggestionIndex, setActiveMedicationSuggestionIndex] =
-    useState(0);
+  const [manualDiagnosis, setManualDiagnosis] = useState('')
+  const [manualIcd10, setManualIcd10] = useState('')
+  const [manualMedications, setManualMedications] = useState<ManualMedicationEntry[]>([])
+  const [selectedAIMedicationKeys, setSelectedAIMedicationKeys] = useState<string[]>([])
+  const [showSelectedAIMedicationsOnly, setShowSelectedAIMedicationsOnly] = useState(false)
+  const [medInput, setMedInput] = useState('')
+  const [activeMedicationSuggestionIndex, setActiveMedicationSuggestionIndex] = useState(0)
 
   // Editable vitals state
   const [vitals, setVitals] = useState({
-    gcs: "",
-    td: "",
-    nadi: "",
-    napas: "",
-    suhu: "",
-    spo2: "",
-    map: "",
-  });
-  const [vitalMeta, setVitalMeta] = useState<
-    Record<EmrVitalKey, VitalEntryMeta>
-  >(createInitialVitalMeta);
+    gcs: '',
+    td: '',
+    nadi: '',
+    napas: '',
+    suhu: '',
+    spo2: '',
+    map: '',
+  })
+  const [vitalMeta, setVitalMeta] =
+    useState<Record<EmrVitalKey, VitalEntryMeta>>(createInitialVitalMeta)
   const [gulaDarah, setGulaDarah] = useState({
-    nilai: "",
-    tipe: "GDS" as "GDS" | "GDP" | "2JPP",
-  });
+    nilai: '',
+    tipe: 'GDS' as 'GDS' | 'GDP' | '2JPP',
+  })
   const trajectoryCurrentVitals = useMemo(() => {
-    if (!vitals.td) return undefined;
+    if (!vitals.td) return undefined
 
     return {
-      sbp: Number.parseInt(vitals.td.split("/")[0] ?? "", 10) || 0,
-      dbp: Number.parseInt(vitals.td.split("/")[1] ?? "", 10) || 0,
+      sbp: Number.parseInt(vitals.td.split('/')[0] ?? '', 10) || 0,
+      dbp: Number.parseInt(vitals.td.split('/')[1] ?? '', 10) || 0,
       hr: Number.parseFloat(vitals.nadi) || 0,
       rr: Number.parseFloat(vitals.napas) || 0,
       temp: Number.parseFloat(vitals.suhu) || 0,
       glucose: Number.parseFloat(gulaDarah.nilai) || 0,
-    };
-  }, [gulaDarah.nilai, vitals.nadi, vitals.napas, vitals.suhu, vitals.td]);
+      spo2: Number.parseFloat(vitals.spo2) || 0,
+    }
+  }, [gulaDarah.nilai, vitals.nadi, vitals.napas, vitals.spo2, vitals.suhu, vitals.td])
   const trajectoryVisitHistory = useMemo(
-    () =>
-      getTrajectoryHistoryWindow(
-        receivedVisitHistory,
-        Boolean(trajectoryCurrentVitals),
-      ),
-    [receivedVisitHistory, trajectoryCurrentVitals],
-  );
-  const occultShockBaselineVisits = useMemo(
-    () => getOccultShockHistoryWindow(receivedVisitHistory),
-    [receivedVisitHistory],
-  );
+    () => getTrajectoryHistoryWindow(receivedVisitHistory, Boolean(trajectoryCurrentVitals)),
+    [receivedVisitHistory, trajectoryCurrentVitals]
+  )
+  const currentEncounterMeasurement = useMemo<CompositeVitalSnapshot | null>(() => {
+    if (!vitals.td) return null
+    const [sbpStr, dbpStr] = vitals.td.split('/')
+    const snapshot = parseEncounterMeasurement({
+      sbp: Number.parseInt(sbpStr ?? '', 10) || undefined,
+      dbp: Number.parseInt(dbpStr ?? '', 10) || undefined,
+      hr: Number.parseFloat(vitals.nadi) || undefined,
+      rr: Number.parseFloat(vitals.napas) || undefined,
+      temp: Number.parseFloat(vitals.suhu) || undefined,
+      spo2: Number.parseFloat(vitals.spo2) || undefined,
+      avpu: triageSignalContext.avpu,
+      supplementalO2: triageSignalContext.supplementalO2,
+      glucose: Number.parseFloat(gulaDarah.nilai) || undefined,
+      capillaryRefillSec:
+        normalizeStructuredSignsDraft(structuredSignsDraft).perfusionShock?.capillaryRefillSec ??
+        triageSignalContext.structuredSigns?.perfusionShock?.capillaryRefillSec,
+      measuredAt: new Date().toISOString(),
+    })
+    return snapshot
+  }, [
+    gulaDarah.nilai,
+    triageSignalContext.avpu,
+    triageSignalContext.supplementalO2,
+    vitals.nadi,
+    vitals.napas,
+    vitals.spo2,
+    vitals.suhu,
+    vitals.td,
+    structuredSignsDraft,
+  ])
 
   // Editable anamnesa
-  const [keluhanUtama, setKeluhanUtama] = useState("");
-  const [keluhanTambahan, setKeluhanTambahan] = useState("");
-  const [pemeriksaanPenunjang, setPemeriksaanPenunjang] = useState("");
-  const [hasilLab, setHasilLab] = useState("");
-  const [pemeriksaanFisikUsulan, setPemeriksaanFisikUsulan] = useState("");
-  const [expandedPemItem, setExpandedPemItem] = useState<string | null>(null);
+  const [keluhanUtama, setKeluhanUtama] = useState('')
+  const [keluhanTambahan, setKeluhanTambahan] = useState('')
+  const [sttInterimPreview, setSttInterimPreview] = useState('')
+  const [pemeriksaanPenunjang, setPemeriksaanPenunjang] = useState('')
+  const [hasilLab, setHasilLab] = useState('')
+  const [pemeriksaanFisikUsulan, setPemeriksaanFisikUsulan] = useState('')
+  const [expandedPemItem, setExpandedPemItem] = useState<string | null>(null)
+
+  // ── Audrey STT (voice dictation for keluhan utama) ──
+  const audreySTT = useAudreySTT({
+    onInterim: (text) => setSttInterimPreview(text),
+    onTranscript: (text) => {
+      if (text.trim()) {
+        setKeluhanUtama(prev => {
+          const next = prev ? `${prev}. ${text}` : text
+          keluhanRef.current.utama = next
+          return next
+        })
+      }
+      setSttInterimPreview('')
+    },
+  })
 
   // ── Socket.IO presence & triage transfer ──
   type OnlineUser = {
-    userId: string;
-    name: string;
-    role: string;
-    socketId: string;
-  };
-  const socketRef = useRef<Socket | null>(null);
-  const [onlineDoctors, setOnlineDoctors] = useState<OnlineUser[]>([]);
-  const [selectedDoctor, setSelectedDoctor] = useState<string>("");
+    userId: string
+    name: string
+    role: string
+    socketId: string
+  }
+  const socketRef = useRef<Socket | null>(null)
+  const [onlineDoctors, setOnlineDoctors] = useState<OnlineUser[]>([])
+  const [selectedDoctor, setSelectedDoctor] = useState<string>('')
   const [currentUser, setCurrentUser] = useState<{
-    username: string;
-    displayName: string;
-    role: string;
-  } | null>(null);
-  const [triageReceived, setTriageReceived] = useState(false);
+    username: string
+    displayName: string
+    role: string
+  } | null>(null)
+  const [triageReceived, setTriageReceived] = useState(false)
 
-  const [keluhanAsli, setKeluhanAsli] = useState(""); // teks asli sebelum SenAuto transform
+  const [keluhanAsli, setKeluhanAsli] = useState('') // teks asli sebelum SenAuto transform
   const [anamnesaEntities, setAnamnesaEntities] = useState({
-    utama: "",
-    onset: "",
-    faktor: "",
-  });
+    utama: '',
+    onset: '',
+    faktor: '',
+  })
   const [rpsDraftState, setRpsDraftState] = useState<{
-    sourceKeluhan: string;
-    mode: "idle" | "auto" | "edited";
-    stale: boolean;
-  }>({ sourceKeluhan: "", mode: "idle", stale: false });
+    sourceKeluhan: string
+    mode: 'idle' | 'auto' | 'edited'
+    stale: boolean
+  }>({ sourceKeluhan: '', mode: 'idle', stale: false })
 
   // Autocomplete — Clinical Chain
   const [clinicalChain, setClinicalChain] = useState<{
-    sifat: { formal: string[]; klinis: string[]; narasi: string[] };
-    lokasi: string[];
-    durasi: string[];
-    logical_chain: string[];
-    red_flags: string[];
-    templates: string[];
-    pemeriksaan: { fisik: string[]; lab: string[]; penunjang: string[] };
-  } | null>(null);
-  const [activeSifatTab, setActiveSifatTab] = useState<
-    "formal" | "klinis" | "narasi"
-  >("narasi");
-  const [activeChainTab, setActiveChainTab] = useState<"penyerta" | "bahaya">(
-    "penyerta",
-  );
-  const [sifatOpen, setSifatOpen] = useState(true);
-  const [lokasiOpen, setLokasiOpen] = useState(true);
-  const [penyertaOpen, setPenyertaOpen] = useState(true);
-  const [usulanFisikOpen, setUsulanFisikOpen] = useState(true);
-  const [usulanLabOpen, setUsulanLabOpen] = useState(true);
-  const [usulanPenunjangOpen, setUsulanPenunjangOpen] = useState(true);
-  const [autoOpenUsulanPending, setAutoOpenUsulanPending] = useState(false);
+    sifat: { formal: string[]; klinis: string[]; narasi: string[] }
+    lokasi: string[]
+    durasi: string[]
+    logical_chain: string[]
+    red_flags: string[]
+    templates: string[]
+    pemeriksaan: { fisik: string[]; lab: string[]; penunjang: string[] }
+  } | null>(null)
+  const [activeSifatTab, setActiveSifatTab] = useState<'formal' | 'klinis' | 'narasi'>('narasi')
+  const [activeChainTab, setActiveChainTab] = useState<'penyerta' | 'bahaya'>('penyerta')
+  const [sifatOpen, setSifatOpen] = useState(true)
+  const [lokasiOpen, setLokasiOpen] = useState(true)
+  const [penyertaOpen, setPenyertaOpen] = useState(true)
+  const [usulanFisikOpen, setUsulanFisikOpen] = useState(true)
+  const [usulanLabOpen, setUsulanLabOpen] = useState(true)
+  const [usulanPenunjangOpen, setUsulanPenunjangOpen] = useState(true)
+  const [autoOpenUsulanPending, setAutoOpenUsulanPending] = useState(false)
   const [medTooltip, setMedTooltip] = useState<{
-    text: string;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [selectedPemeriksaan, setSelectedPemeriksaan] = useState<Set<string>>(
-    new Set(),
-  );
-  const [isAutocompleteLoading, setIsAutocompleteLoading] = useState(false);
-  const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const synthTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const synthRunIdRef = useRef(0);
-  const pendingSynthResultRef = useRef<ReturnType<
-    typeof generateNarrative
-  > | null>(null);
+    text: string
+    x: number
+    y: number
+  } | null>(null)
+  const [selectedPemeriksaan, setSelectedPemeriksaan] = useState<Set<string>>(new Set())
+  const [isAutocompleteLoading, setIsAutocompleteLoading] = useState(false)
+  const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const synthTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const synthRunIdRef = useRef(0)
+  const pendingSynthResultRef = useRef<ReturnType<typeof generateNarrative> | null>(null)
 
   // Editable exam
   const [exam, setExam] = useState<ExamState>({
-    kepala: "",
-    dada: "",
-    perut: "",
-    ekstremitas: "",
-    kulit: "",
-    genitalia: "",
-  });
-  const [examAutofillKeys, setExamAutofillKeys] = useState<
-    Array<keyof ExamState>
-  >([]);
-  const examAutofillTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+    kepala: '',
+    dada: '',
+    perut: '',
+    ekstremitas: '',
+    kulit: '',
+    genitalia: '',
+  })
+  const [examAutofillKeys, setExamAutofillKeys] = useState<Array<keyof ExamState>>([])
+  const examAutofillTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Riwayat penyakit & alergi
-  const [riwayat, setRiwayat] = useState({ rps: "", rpk: "" });
-  const [rpdSelected, setRpdSelected] = useState<Set<string>>(new Set());
-  const [alergiSelected, setAlergiSelected] = useState<Set<string>>(new Set());
+  const [riwayat, setRiwayat] = useState({ rps: '', rpk: '' })
+  const [rpdSelected, setRpdSelected] = useState<Set<string>>(new Set())
+  const [alergiSelected, setAlergiSelected] = useState<Set<string>>(new Set())
   const cdssSessionIdRef = useRef(
-    `cdss-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`,
-  );
+    `cdss-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`}`
+  )
 
   // ── Bridge to ePuskesmas state ──
-  const [bridgeStatus, setBridgeStatus] = useState<EmrBridgeStatus>("idle");
-  const [bridgeEntryId, setBridgeEntryId] = useState<string | null>(null);
-  const [bridgeError, setBridgeError] = useState("");
+  const [bridgeStatus, setBridgeStatus] = useState<EmrBridgeStatus>('idle')
+  const [bridgeEntryId, setBridgeEntryId] = useState<string | null>(null)
+  const [bridgeError, setBridgeError] = useState('')
   useEffect(() => {
-    bridgeEntryIdRef.current = bridgeEntryId;
-  }, [bridgeEntryId]);
+    bridgeEntryIdRef.current = bridgeEntryId
+  }, [bridgeEntryId])
   useEffect(() => {
     if (sourceBridgeEntryId && !bridgeEntryId) {
-      bridgeEntryIdRef.current = sourceBridgeEntryId;
-      setBridgeEntryId(sourceBridgeEntryId);
-      setBridgeStatus((current) => (current === "idle" ? "pending" : current));
+      bridgeEntryIdRef.current = sourceBridgeEntryId
+      setBridgeEntryId(sourceBridgeEntryId)
+      setBridgeStatus(current => (current === 'idle' ? 'pending' : current))
     }
-  }, [bridgeEntryId, sourceBridgeEntryId]);
+  }, [bridgeEntryId, sourceBridgeEntryId])
   useEffect(() => {
-    if (!sourceBridgeEntryId) return;
+    if (!sourceBridgeEntryId) return
 
-    let cancelled = false;
+    let cancelled = false
 
     const syncBridgeEntry = async () => {
       try {
-        const res = await fetch(
-          `/api/emr/bridge/${encodeURIComponent(sourceBridgeEntryId)}`,
-          {
-            credentials: "same-origin",
-          },
-        );
+        const res = await fetch(`/api/emr/bridge/${encodeURIComponent(sourceBridgeEntryId)}`, {
+          credentials: 'same-origin',
+        })
         const data = (await res.json()) as {
-          ok?: boolean;
+          ok?: boolean
           entry?: {
-            id?: string;
-            status?:
-              | "pending"
-              | "claimed"
-              | "processing"
-              | "completed"
-              | "failed"
-              | "expired";
-            error?: string;
-          };
-          error?: string;
-        };
-        if (cancelled) return;
+            id?: string
+            status?: 'pending' | 'claimed' | 'processing' | 'completed' | 'failed' | 'expired'
+            error?: string
+          }
+          error?: string
+        }
+        if (cancelled) return
 
         if (res.ok && data.ok && data.entry?.id) {
-          setBridgeEntryId(data.entry.id);
-          setBridgeStatus(mapBridgeQueueStatusToEmrStatus(data.entry.status));
-          setBridgeError(data.entry.error ?? "");
-          return;
+          setBridgeEntryId(data.entry.id)
+          setBridgeStatus(mapBridgeQueueStatusToEmrStatus(data.entry.status))
+          setBridgeError(data.entry.error ?? '')
+          return
         }
 
         if (res.status === 404) {
-          setBridgeStatus("failed");
+          setBridgeStatus('failed')
           setBridgeError(
-            data.error?.trim() ||
-              "Entry bridge tidak ditemukan atau sudah tidak valid.",
-          );
-          return;
+            data.error?.trim() || 'Entry bridge tidak ditemukan atau sudah tidak valid.'
+          )
+          return
         }
 
         setBridgeError(
-          data.error?.trim() ||
-            "Status bridge belum bisa dimuat. Coba refresh halaman.",
-        );
+          data.error?.trim() || 'Status bridge belum bisa dimuat. Coba refresh halaman.'
+        )
       } catch {
-        if (cancelled) return;
-        setBridgeError(
-          "Status bridge belum bisa dimuat. Coba refresh halaman.",
-        );
+        if (cancelled) return
+        setBridgeError('Status bridge belum bisa dimuat. Coba refresh halaman.')
       }
-    };
+    }
 
-    void syncBridgeEntry();
+    void syncBridgeEntry()
 
     return () => {
-      cancelled = true;
-    };
-  }, [sourceBridgeEntryId]);
+      cancelled = true
+    }
+  }, [sourceBridgeEntryId])
 
   const RPD_OPTIONS = [
-    "Hipertensi",
-    "Diabetes Mellitus Tipe 2",
-    "Tuberkulosis Paru",
-    "Asma Bronkial",
-    "Gastritis / GERD",
-    "Stroke",
-    "Penyakit Jantung Koroner",
-    "Gagal Ginjal Kronis",
-    "Hepatitis B",
-    "Dislipidemia",
-  ];
+    'Hipertensi',
+    'Diabetes Mellitus Tipe 2',
+    'Tuberkulosis Paru',
+    'Asma Bronkial',
+    'Gastritis / GERD',
+    'Stroke',
+    'Penyakit Jantung Koroner',
+    'Gagal Ginjal Kronis',
+    'Hepatitis B',
+    'Dislipidemia',
+  ]
   const ALERGI_OPTIONS = [
-    "Penisilin / Antibiotik",
-    "Seafood / Kacang",
-    "Debu / Serbuk Sari",
-    "NSAID / Aspirin",
-  ];
+    'Penisilin / Antibiotik',
+    'Seafood / Kacang',
+    'Debu / Serbuk Sari',
+    'NSAID / Aspirin',
+  ]
+
+  function inferRpdFromMedicalHistory(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+
+    const text = value
+      .map(item => {
+        if (typeof item === 'string') return item
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>
+          return String(record.name ?? record.label ?? record.condition ?? '')
+        }
+        return ''
+      })
+      .join(' ')
+      .toLowerCase()
+
+    const inferred: string[] = []
+    if (/hipertensi|ht\b|darah tinggi/.test(text)) inferred.push('Hipertensi')
+    if (/diabetes|dm\b|kencing manis/.test(text)) inferred.push('Diabetes Mellitus Tipe 2')
+    if (/tuberkulosis|tb\b/.test(text)) inferred.push('Tuberkulosis Paru')
+    if (/asma/.test(text)) inferred.push('Asma Bronkial')
+    if (/gerd|gastritis/.test(text)) inferred.push('Gastritis / GERD')
+    if (/stroke/.test(text)) inferred.push('Stroke')
+    if (/jantung koroner|cad|penyakit jantung/.test(text)) inferred.push('Penyakit Jantung Koroner')
+    if (/gagal ginjal|ckd|ginjal kronis/.test(text)) inferred.push('Gagal Ginjal Kronis')
+    if (/hepatitis b/.test(text)) inferred.push('Hepatitis B')
+    if (/dislipidemia|kolesterol/.test(text)) inferred.push('Dislipidemia')
+    return inferred.filter(option => RPD_OPTIONS.includes(option))
+  }
+
+  function updateStructuredBoolean<
+    TSection extends StructuredSignSection,
+    TKey extends keyof NonNullable<StructuredTriageSigns[TSection]>,
+  >(section: TSection, key: TKey, checked: boolean) {
+    setStructuredSignsDraft(prev => ({
+      ...prev,
+      [section]: {
+        ...(prev[section] ?? {}),
+        [key]: checked,
+      },
+    }))
+  }
+
+  function updateStructuredCapillaryRefill(value: string) {
+    const cleaned = value.replace(/[^0-9.]/g, '')
+    setStructuredSignsDraft(prev => ({
+      ...prev,
+      perfusionShock: {
+        ...(prev.perfusionShock ?? {}),
+        capillaryRefillSec: cleaned ? Number.parseFloat(cleaned) : undefined,
+      },
+    }))
+  }
+
+  function renderStructuredSection<TSection extends StructuredSignSection>(
+    sectionKey: TSection,
+    sectionLabel: string,
+    items: readonly {
+      key: keyof NonNullable<StructuredTriageSigns[TSection]>
+      label: string
+    }[]
+  ) {
+    const sectionState = (structuredSignsDraft[sectionKey] ?? {}) as Record<
+      string,
+      boolean | number | undefined
+    >
+
+    return (
+      <div
+        key={sectionKey}
+        style={{
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.03)',
+          borderRadius: 4,
+          padding: '10px 12px',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'var(--text-main)',
+            marginBottom: 8,
+          }}
+        >
+          {sectionLabel}
+        </div>
+        <div style={{ display: 'grid', gap: 7 }}>
+          {items.map(({ key, label }) => (
+            <label
+              key={String(key)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 12,
+                color: 'var(--text-soft)',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={Boolean(sectionState[String(key)])}
+                onChange={e => updateStructuredBoolean(sectionKey, key, e.target.checked)}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+          {sectionKey === 'perfusionShock' && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 12,
+                color: 'var(--text-soft)',
+                marginTop: 4,
+              }}
+            >
+              <span style={{ minWidth: 98 }}>CRT (detik)</span>
+              <input
+                type="text"
+                value={structuredSignsDraft.perfusionShock?.capillaryRefillSec ?? ''}
+                onChange={e => updateStructuredCapillaryRefill(e.target.value)}
+                placeholder="opsional"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--line-base)',
+                  color: 'var(--text-main)',
+                  borderRadius: 3,
+                  padding: '5px 8px',
+                  width: 90,
+                }}
+              />
+            </label>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  function buildStructuredSignsPayload(): StructuredTriageSigns {
+    const complaintText = `${keluhanUtama} ${keluhanTambahan}`.toLowerCase()
+    const rr = Number.parseFloat(vitals.napas) || 0
+    const spo2 = Number.parseFloat(vitals.spo2) || 0
+    const glucose = Number.parseFloat(gulaDarah.nilai) || 0
+    const source = normalizeStructuredSignsDraft(structuredSignsDraft)
+
+    return {
+      respiratoryDistress: {
+        accessoryMuscleUse:
+          source.respiratoryDistress?.accessoryMuscleUse ??
+          triageSignalContext.structuredSigns?.respiratoryDistress?.accessoryMuscleUse ??
+          /otot bantu|aksesori/i.test(complaintText),
+        retractions:
+          source.respiratoryDistress?.retractions ??
+          triageSignalContext.structuredSigns?.respiratoryDistress?.retractions ??
+          /retraksi/i.test(complaintText),
+        unableToSpeakFullSentences:
+          source.respiratoryDistress?.unableToSpeakFullSentences ??
+          triageSignalContext.structuredSigns?.respiratoryDistress?.unableToSpeakFullSentences ??
+          /tidak bisa bicara|kalimat pendek|sepatah/i.test(complaintText),
+        cyanosis:
+          source.respiratoryDistress?.cyanosis ??
+          triageSignalContext.structuredSigns?.respiratoryDistress?.cyanosis ??
+          /sianosis|kebiruan/i.test(complaintText),
+        distressObserved:
+          source.respiratoryDistress?.distressObserved ??
+          triageSignalContext.structuredSigns?.respiratoryDistress?.distressObserved ??
+          (hasRespiratoryComplaint(keluhanUtama) && (rr > 22 || (spo2 > 0 && spo2 < 94))),
+      },
+      hmod: {
+        chest_pain:
+          source.hmod?.chest_pain ??
+          triageSignalContext.structuredSigns?.hmod?.chest_pain ??
+          /nyeri dada|chest pain|angina/i.test(complaintText),
+        pulmonary_edema:
+          source.hmod?.pulmonary_edema ??
+          triageSignalContext.structuredSigns?.hmod?.pulmonary_edema ??
+          /edema paru|orthopnea|pink frothy|sesak berat/i.test(complaintText),
+        neurological_deficit:
+          source.hmod?.neurological_deficit ??
+          triageSignalContext.structuredSigns?.hmod?.neurological_deficit ??
+          /pelo|hemiparesis|stroke|defisit neurologis/i.test(complaintText),
+        vision_changes:
+          source.hmod?.vision_changes ??
+          triageSignalContext.structuredSigns?.hmod?.vision_changes ??
+          /pandangan kabur|mata berkunang|visus/i.test(complaintText),
+        severe_headache:
+          source.hmod?.severe_headache ??
+          triageSignalContext.structuredSigns?.hmod?.severe_headache ??
+          /sakit kepala hebat|nyeri kepala hebat/i.test(complaintText),
+        oliguria: source.hmod?.oliguria ?? triageSignalContext.structuredSigns?.hmod?.oliguria,
+        altered_mental_status:
+          source.hmod?.altered_mental_status ??
+          triageSignalContext.structuredSigns?.hmod?.altered_mental_status ??
+          ((Number.parseFloat(vitals.gcs) || 15) < 15),
+      },
+      dkaHhs: {
+        kussmaul_breathing:
+          source.dkaHhs?.kussmaul_breathing ??
+          triageSignalContext.structuredSigns?.dkaHhs?.kussmaul_breathing ??
+          /kussmaul|napas dalam cepat/i.test(complaintText),
+        acetone_breath:
+          source.dkaHhs?.acetone_breath ??
+          triageSignalContext.structuredSigns?.dkaHhs?.acetone_breath ??
+          /aseton|bau buah/i.test(complaintText),
+        nausea_vomiting:
+          source.dkaHhs?.nausea_vomiting ??
+          triageSignalContext.structuredSigns?.dkaHhs?.nausea_vomiting ??
+          /mual|muntah/i.test(complaintText),
+        abdominal_pain:
+          source.dkaHhs?.abdominal_pain ??
+          triageSignalContext.structuredSigns?.dkaHhs?.abdominal_pain ??
+          /nyeri perut|abdominal pain/i.test(complaintText),
+        altered_mental_status:
+          source.dkaHhs?.altered_mental_status ??
+          triageSignalContext.structuredSigns?.dkaHhs?.altered_mental_status ??
+          ((Number.parseFloat(vitals.gcs) || 15) < 15),
+        severe_dehydration:
+          source.dkaHhs?.severe_dehydration ??
+          triageSignalContext.structuredSigns?.dkaHhs?.severe_dehydration ??
+          /dehidrasi|sangat haus|mulut kering/i.test(complaintText),
+        extreme_hyperglycemia:
+          source.dkaHhs?.extreme_hyperglycemia ??
+          triageSignalContext.structuredSigns?.dkaHhs?.extreme_hyperglycemia ??
+          glucose >= 600,
+        seizures:
+          source.dkaHhs?.seizures ??
+          triageSignalContext.structuredSigns?.dkaHhs?.seizures ??
+          /kejang|seizure/i.test(complaintText),
+      },
+      perfusionShock: {
+        dizziness:
+          source.perfusionShock?.dizziness ??
+          triageSignalContext.structuredSigns?.perfusionShock?.dizziness ??
+          /pusing|melayang|dizziness/i.test(complaintText),
+        presyncope:
+          source.perfusionShock?.presyncope ??
+          triageSignalContext.structuredSigns?.perfusionShock?.presyncope ??
+          /mau pingsan|presinkop/i.test(complaintText),
+        syncope:
+          source.perfusionShock?.syncope ??
+          triageSignalContext.structuredSigns?.perfusionShock?.syncope ??
+          /pingsan|sinkop/i.test(complaintText),
+        weakness:
+          source.perfusionShock?.weakness ??
+          triageSignalContext.structuredSigns?.perfusionShock?.weakness ??
+          /lemas|weakness|malaise/i.test(complaintText),
+        clammySkin:
+          source.perfusionShock?.clammySkin ??
+          triageSignalContext.structuredSigns?.perfusionShock?.clammySkin ??
+          /keringat dingin|clammy/i.test(complaintText),
+        coldExtremities:
+          source.perfusionShock?.coldExtremities ??
+          triageSignalContext.structuredSigns?.perfusionShock?.coldExtremities ??
+          /ekstremitas dingin|tangan dingin|kaki dingin/i.test(complaintText),
+        oliguria:
+          source.perfusionShock?.oliguria ??
+          triageSignalContext.structuredSigns?.perfusionShock?.oliguria,
+        capillaryRefillSec:
+          source.perfusionShock?.capillaryRefillSec ??
+          triageSignalContext.structuredSigns?.perfusionShock?.capillaryRefillSec,
+      },
+    }
+  }
+
+  function buildRealtimeAlertPayload(): Record<string, unknown> {
+    const structuredSigns = buildStructuredSignsPayload()
+    return {
+      keluhanUtama,
+      keluhanTambahan,
+      vitals,
+      gulaDarah,
+      patientAge,
+      patientGender,
+      medicalHistory: Array.from(rpdSelected),
+      visitHistory: receivedVisitHistory,
+      triageContext: {
+        ...triageSignalContext,
+        structuredSigns,
+      },
+      encounterBaseline:
+        encounterMeasurements.length > 0
+          ? {
+              computedAt: new Date().toISOString(),
+              windowMinutes: ENCOUNTER_BASELINE_WINDOW_MINUTES,
+              measurements: encounterMeasurements,
+            }
+          : undefined,
+      structuredSigns,
+      isPregnant: patientGender === 'P' ? isPregnant : false,
+    }
+  }
 
   function toggleRpd(val: string) {
-    setRpdSelected((prev) => {
-      const s = new Set(prev);
-      s.has(val) ? s.delete(val) : s.add(val);
-      return s;
-    });
+    setRpdSelected(prev => {
+      const s = new Set(prev)
+      s.has(val) ? s.delete(val) : s.add(val)
+      return s
+    })
   }
   function toggleAlergi(val: string) {
-    setAlergiSelected((prev) => {
-      const s = new Set(prev);
-      s.has(val) ? s.delete(val) : s.add(val);
-      return s;
-    });
+    setAlergiSelected(prev => {
+      const s = new Set(prev)
+      s.has(val) ? s.delete(val) : s.add(val)
+      return s
+    })
   }
   // ── Bridge: send encounter to ePuskesmas ──
   async function sendToEpuskesmas() {
-    if (isBridgeActionLocked(bridgeStatus)) return;
+    if (isBridgeActionLocked(bridgeStatus)) return
     if (!keluhanUtama.trim()) {
-      setBridgeError("Keluhan utama wajib diisi.");
-      return;
+      setBridgeError('Keluhan utama wajib diisi.')
+      return
     }
-    setBridgeStatus("sending");
-    setBridgeError("");
+    setBridgeStatus('sending')
+    setBridgeError('')
     try {
       const encounterData: DashboardEncounterData = {
         pelayananId: `pel-${Date.now()}`,
@@ -1833,114 +2130,112 @@ export default function EMRPage() {
         bodyWeightKg,
         diagnosa: selectedDiagnosisDraft
           ? {
-              icdCode: selectedDiagnosisDraft.icd10_code || "",
-              icdName: selectedDiagnosisDraft.diagnosis_name || "",
-              jenis: "PRIMER",
-              kasus: "BARU",
+              icdCode: selectedDiagnosisDraft.icd10_code || '',
+              icdName: selectedDiagnosisDraft.diagnosis_name || '',
+              jenis: 'PRIMER',
+              kasus: 'BARU',
             }
           : undefined,
-        prognosa: "Baik",
-        dokterNama: "dr. Ferdi Iskandar",
-        perawatNama: "Joseph Arianto",
-      };
-      const payload = mapDashboardToTransferPayload(encounterData);
-      const res = await fetch("/api/emr/bridge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        prognosa: 'Baik',
+        dokterNama: 'dr. Ferdi Iskandar',
+        perawatNama: 'Joseph Arianto',
+      }
+      const payload = mapDashboardToTransferPayload(encounterData)
+      const res = await fetch('/api/emr/bridge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pelayananId: encounterData.pelayananId,
           patientName: encounterData.patientName,
           payload,
         }),
-      });
-      const data = await res.json();
+      })
+      const data = await res.json()
       if (data.ok) {
-        bridgeEntryIdRef.current = data.entry.id;
-        setBridgeEntryId(data.entry.id);
-        setBridgeStatus("pending");
+        bridgeEntryIdRef.current = data.entry.id
+        setBridgeEntryId(data.entry.id)
+        setBridgeStatus('pending')
       } else {
-        setBridgeError(data.error || "Gagal mengirim.");
-        setBridgeStatus("failed");
+        setBridgeError(data.error || 'Gagal mengirim.')
+        setBridgeStatus('failed')
       }
     } catch (err) {
-      setBridgeError(err instanceof Error ? err.message : "Network error");
-      setBridgeStatus("failed");
+      setBridgeError(err instanceof Error ? err.message : 'Network error')
+      setBridgeStatus('failed')
     }
   }
 
   // ── Generate Clinical Report ──
-  const [generatingReport, setGeneratingReport] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false)
 
   async function generateClinicalReport() {
-    setGeneratingReport(true);
+    setGeneratingReport(true)
     try {
       // Parse TD
-      const tdParts = vitals.td.split("/");
-      const tdSistolik = tdParts[0]?.trim() || "";
-      const tdDiastolik = tdParts[1]?.trim() || "";
+      const tdParts = vitals.td.split('/')
+      const tdSistolik = tdParts[0]?.trim() || ''
+      const tdDiastolik = tdParts[1]?.trim() || ''
 
       // Format exam fields
-      const examParts: string[] = [];
-      if (exam.kepala) examParts.push(`Kepala: ${exam.kepala}`);
-      if (exam.dada) examParts.push(`Dada: ${exam.dada}`);
-      if (exam.perut) examParts.push(`Perut: ${exam.perut}`);
-      if (exam.ekstremitas) examParts.push(`Ekstremitas: ${exam.ekstremitas}`);
-      if (exam.kulit) examParts.push(`Kulit: ${exam.kulit}`);
-      if (exam.genitalia) examParts.push(`Genitalia: ${exam.genitalia}`);
+      const examParts: string[] = []
+      if (exam.kepala) examParts.push(`Kepala: ${exam.kepala}`)
+      if (exam.dada) examParts.push(`Dada: ${exam.dada}`)
+      if (exam.perut) examParts.push(`Perut: ${exam.perut}`)
+      if (exam.ekstremitas) examParts.push(`Ekstremitas: ${exam.ekstremitas}`)
+      if (exam.kulit) examParts.push(`Kulit: ${exam.kulit}`)
+      if (exam.genitalia) examParts.push(`Genitalia: ${exam.genitalia}`)
 
       // Format medications from therapy plan
-      const terapiLines: string[] = [];
+      const terapiLines: string[] = []
       const slotConfig = [
-        { key: "utama", label: "R/ 1. OBAT UTAMA" },
-        { key: "adjuvant", label: "R/ 2. OBAT ADJUVANT" },
-        { key: "vitamin", label: "R/ 3. VITAMIN" },
-      ] as const;
+        { key: 'utama', label: 'R/ 1. OBAT UTAMA' },
+        { key: 'adjuvant', label: 'R/ 2. OBAT ADJUVANT' },
+        { key: 'vitamin', label: 'R/ 3. VITAMIN' },
+      ] as const
       slotConfig.forEach(({ key, label }) => {
-        const slotMeds = selectedFinalizationMedications.filter(
-          (m) => m.prescriptionSlot === key,
-        );
-        if (slotMeds.length === 0) return;
-        terapiLines.push(`${label}:`);
-        slotMeds.forEach((m) => {
-          const medicationKey = getFinalizationMedicationKey(m);
-          const note = manualMedicationNotes[medicationKey]?.trim();
+        const slotMeds = selectedFinalizationMedications.filter(m => m.prescriptionSlot === key)
+        if (slotMeds.length === 0) return
+        terapiLines.push(`${label}:`)
+        slotMeds.forEach(m => {
+          const medicationKey = getFinalizationMedicationKey(m)
+          const note = manualMedicationNotes[medicationKey]?.trim()
           terapiLines.push(
-            `   ${m.name} ${m.dose} ${m.frequency} (${m.route || "oral"})${note ? ` — Catatan: ${note}` : ""}`,
-          );
-        });
-      });
+            `   ${m.name} ${m.dose} ${m.frequency} (${m.route || 'oral'})${note ? ` — Catatan: ${note}` : ''}`
+          )
+        })
+      })
 
       // Derive kesadaran from GCS
-      const gcsNum = parseInt(vitals.gcs) || 15;
+      const gcsNum = Number.parseInt(vitals.gcs) || 15
       const kesadaran =
         gcsNum >= 14
-          ? "Compos Mentis"
+          ? 'Compos Mentis'
           : gcsNum >= 12
-            ? "Apatis"
+            ? 'Apatis'
             : gcsNum >= 9
-              ? "Somnolen"
+              ? 'Somnolen'
               : gcsNum >= 6
-                ? "Sopor"
-                : "Koma";
+                ? 'Sopor'
+                : 'Koma'
 
       // Derive prognosis from care mode
-      const careLabel = finalizationTherapyPlan.careMode.label.toLowerCase();
-      const prognosis = careLabel.includes("rujuk")
-        ? "Dubia ad malam"
-        : careLabel.includes("inap")
-          ? "Dubia ad bonam"
-          : "Bonam";
-      const generatedAt = new Date();
+      const careLabel = finalizationTherapyPlan.careMode.label.toLowerCase()
+      const prognosis = careLabel.includes('rujuk')
+        ? 'Dubia ad malam'
+        : careLabel.includes('inap')
+          ? 'Dubia ad bonam'
+          : 'Bonam'
+      const generatedAt = new Date()
       const payload = {
         sourceRefs: {
           appointmentId: sourceAppointmentId || undefined,
           consultId: sourceConsultId || undefined,
           origin: resolvedSourceOrigin,
-          actorUserId: currentUser?.username || "",
-          actorName: currentUser?.displayName || "",
+          actorUserId: currentUser?.username || '',
+          actorName: currentUser?.displayName || '',
         },
         auditTrail: {
-          phase: "emr-finalize",
+          phase: 'emr-finalize',
           trialMode: true,
           savedForAudit: true,
           generatedAt: generatedAt.toISOString(),
@@ -1951,23 +2246,8 @@ export default function EMRPage() {
           diagnosisSource: finalizationTherapyPlan.sourceLabel,
           careMode: finalizationTherapyPlan.careMode.label,
           referralDiagnoses: finalizationTherapyPlan.referralDiagnoses,
-          aiMedicationRecommendations: finalizationTherapyPlan.medications.map(
-            (item) => {
-              const medicationKey = getFinalizationMedicationKey(item);
-              return {
-                key: medicationKey,
-                name: item.name,
-                slot: item.prescriptionSlot,
-                dose: item.dose,
-                frequency: item.frequency,
-                route: item.route,
-                selected: selectedAIMedicationKeys.includes(medicationKey),
-                doctorNote: manualMedicationNotes[medicationKey] ?? "",
-              };
-            },
-          ),
-          selectedAIMedications: selectedFinalizationMedications.map((item) => {
-            const medicationKey = getFinalizationMedicationKey(item);
+          aiMedicationRecommendations: finalizationTherapyPlan.medications.map(item => {
+            const medicationKey = getFinalizationMedicationKey(item)
             return {
               key: medicationKey,
               name: item.name,
@@ -1975,10 +2255,23 @@ export default function EMRPage() {
               dose: item.dose,
               frequency: item.frequency,
               route: item.route,
-              doctorNote: manualMedicationNotes[medicationKey] ?? "",
-            };
+              selected: selectedAIMedicationKeys.includes(medicationKey),
+              doctorNote: manualMedicationNotes[medicationKey] ?? '',
+            }
           }),
-          manualMedicationEntries: manualMedications.map((entry) => ({
+          selectedAIMedications: selectedFinalizationMedications.map(item => {
+            const medicationKey = getFinalizationMedicationKey(item)
+            return {
+              key: medicationKey,
+              name: item.name,
+              slot: item.prescriptionSlot,
+              dose: item.dose,
+              frequency: item.frequency,
+              route: item.route,
+              doctorNote: manualMedicationNotes[medicationKey] ?? '',
+            }
+          }),
+          manualMedicationEntries: manualMedications.map(entry => ({
             name: entry.name,
             dose: entry.dose,
             frequency: entry.frequency,
@@ -1989,14 +2282,14 @@ export default function EMRPage() {
         pasien: {
           umur: `${patientAge} tahun`,
           jenisKelamin: patientGender,
-          alamat: "",
+          alamat: '',
         },
         anamnesa: {
           keluhanUtama,
           rps: riwayat.rps,
-          rpd: Array.from(rpdSelected).join(", ") || "-",
-          rpk: riwayat.rpk || "-",
-          alergi: Array.from(alergiSelected).join(", ") || "NKDA",
+          rpd: Array.from(rpdSelected).join(', ') || '-',
+          rpk: riwayat.rpk || '-',
+          alergi: Array.from(alergiSelected).join(', ') || 'NKDA',
         },
         pemeriksaanFisik: {
           tdSistolik,
@@ -2006,952 +2299,911 @@ export default function EMRPage() {
           napas: vitals.napas,
           spo2: vitals.spo2,
           bb: bodyWeightKg,
-          tb: "",
-          keadaanUmum: "Baik",
+          tb: '',
+          keadaanUmum: 'Baik',
           kesadaran,
-          pemeriksaanLain: examParts.join("\n") || "-",
+          pemeriksaanLain: examParts.join('\n') || '-',
         },
         asesmen: {
-          diagnosisKerja:
-            manualDiagnosis || selectedDiagnosisDraft?.diagnosis_name || "",
-          icd10: manualIcd10 || selectedDiagnosisDraft?.icd10_code || "",
-          diagnosisBanding: "",
+          diagnosisKerja: manualDiagnosis || selectedDiagnosisDraft?.diagnosis_name || '',
+          icd10: manualIcd10 || selectedDiagnosisDraft?.icd10_code || '',
+          diagnosisBanding: '',
           prognosis,
         },
         tataLaksana: {
           terapi:
             [
               ...terapiLines,
-              ...manualMedications.map(
-                (entry) => `R/ ${formatManualMedicationInline(entry)}`,
-              ),
-            ].join("\n") || "-",
-          tindakan: finalizationTherapyPlan.immediateActions.join("\n") || "-",
-          edukasi: finalizationTherapyPlan.supportive.join("\n") || "-",
+              ...manualMedications.map(entry => `R/ ${formatManualMedicationInline(entry)}`),
+            ].join('\n') || '-',
+          tindakan: finalizationTherapyPlan.immediateActions.join('\n') || '-',
+          edukasi: finalizationTherapyPlan.supportive.join('\n') || '-',
           tindakLanjut:
             [
               ...finalizationTherapyPlan.monitoring,
-              `Diagnosis rujukan prioritas: ${finalizationTherapyPlan.referralDiagnoses.join("; ")}`,
-            ].join("\n") || "-",
+              `Diagnosis rujukan prioritas: ${finalizationTherapyPlan.referralDiagnoses.join('; ')}`,
+            ].join('\n') || '-',
         },
         penutup: {
-          dokter: "dr. Ferdi Iskandar",
-          perawat: "Joseph Arianto",
+          dokter: 'dr. Ferdi Iskandar',
+          perawat: 'Joseph Arianto',
           tanggalPemeriksaan: generatedAt.toISOString().slice(0, 10),
-          jamPemeriksaan: generatedAt.toLocaleTimeString("id-ID", {
-            hour: "2-digit",
-            minute: "2-digit",
+          jamPemeriksaan: generatedAt.toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
           }),
         },
-      };
+      }
 
-      const res = await fetch("/api/report/clinical", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/report/clinical', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      });
+      })
       const data = (await res.json()) as {
-        ok: boolean;
-        report: { id: string };
-      };
+        ok: boolean
+        report: { id: string }
+      }
       if (data.ok) {
-        router.push(`/report/clinical?id=${data.report.id}`);
+        router.push(`/report/clinical?id=${data.report.id}`)
       }
     } catch {
       /* ignore */
     } finally {
-      setGeneratingReport(false);
+      setGeneratingReport(false)
     }
   }
 
   function toggleMedicationFlag(flag: MedicationFlag) {
-    setMedicationFlags((prev) => {
-      const next = new Set(prev);
-      if (next.has(flag)) next.delete(flag);
-      else next.add(flag);
-      return next;
-    });
+    setMedicationFlags(prev => {
+      const next = new Set(prev)
+      if (next.has(flag)) next.delete(flag)
+      else next.add(flag)
+      return next
+    })
   }
 
   function setupEmergencyProtocol(result: CDSSResult) {
-    const emergencyFlags = result.red_flags.filter(
-      (rf) => rf.severity === "emergency",
-    );
+    const emergencyFlags = result.red_flags.filter(rf => rf.severity === 'emergency')
     if (emergencyFlags.length === 0) {
-      setEmergencyAcknowledged(true);
-      setSafetyChecklist({});
-      return;
+      setEmergencyAcknowledged(true)
+      setSafetyChecklist({})
+      return
     }
-    const checklistItems: Record<string, boolean> = {};
-    emergencyFlags.slice(0, 3).forEach((rf) => {
-      checklistItems[rf.action] = false;
-    });
-    setSafetyChecklist(checklistItems);
-    setEmergencyAcknowledged(false);
+    const checklistItems: Record<string, boolean> = {}
+    emergencyFlags.slice(0, 3).forEach(rf => {
+      checklistItems[rf.action] = false
+    })
+    setSafetyChecklist(checklistItems)
+    setEmergencyAcknowledged(false)
   }
 
   function allSafetyChecklistChecked(): boolean {
-    const values = Object.values(safetyChecklist);
-    if (values.length === 0) return true;
-    return values.every(Boolean);
+    const values = Object.values(safetyChecklist)
+    if (values.length === 0) return true
+    return values.every(Boolean)
   }
 
   async function acknowledgeEmergencyProtocol() {
-    if (!cdssResult) return;
-    const emergencyFlags = cdssResult.red_flags.filter(
-      (rf) => rf.severity === "emergency",
-    );
-    if (emergencyFlags.length === 0) return;
-    if (!allSafetyChecklistChecked()) return;
+    if (!cdssResult) return
+    const emergencyFlags = cdssResult.red_flags.filter(rf => rf.severity === 'emergency')
+    if (emergencyFlags.length === 0) return
+    if (!allSafetyChecklistChecked()) return
 
-    setAckSaving(true);
+    setAckSaving(true)
     try {
-      const response = await fetch("/api/cdss/red-flag-ack", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/cdss/red-flag-ack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: cdssSessionIdRef.current,
-          red_flags: emergencyFlags.map((rf) => rf.condition),
+          red_flags: emergencyFlags.map(rf => rf.condition),
         }),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      setEmergencyAcknowledged(true);
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      setEmergencyAcknowledged(true)
     } catch (error) {
-      console.error("[CDSS Red Flag Ack]", error);
+      console.error('[CDSS Red Flag Ack]', error)
     } finally {
-      setAckSaving(false);
+      setAckSaving(false)
     }
   }
 
   function handleMedContext(e: React.MouseEvent, term: string) {
-    e.preventDefault();
-    e.stopPropagation();
-    const desc = lookupMedTerm(term);
+    e.preventDefault()
+    e.stopPropagation()
+    const desc = lookupMedTerm(term)
     if (desc) {
-      setMedTooltip({ text: `${term}: ${desc}`, x: e.clientX, y: e.clientY });
+      setMedTooltip({ text: `${term}: ${desc}`, x: e.clientX, y: e.clientY })
     } else {
-      setMedTooltip({ text: term, x: e.clientX, y: e.clientY });
+      setMedTooltip({ text: term, x: e.clientX, y: e.clientY })
     }
   }
 
   // Dismiss tooltip on click anywhere (delayed to avoid immediate self-dismiss)
   useEffect(() => {
-    if (!medTooltip) return;
-    const dismiss = () => setMedTooltip(null);
+    if (!medTooltip) return
+    const dismiss = () => setMedTooltip(null)
     const timer = setTimeout(() => {
-      window.addEventListener("click", dismiss);
-      window.addEventListener("contextmenu", dismiss);
-    }, 50);
+      window.addEventListener('click', dismiss)
+      window.addEventListener('contextmenu', dismiss)
+    }, 50)
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener("click", dismiss);
-      window.removeEventListener("contextmenu", dismiss);
-    };
-  }, [medTooltip]);
+      clearTimeout(timer)
+      window.removeEventListener('click', dismiss)
+      window.removeEventListener('contextmenu', dismiss)
+    }
+  }, [medTooltip])
 
   // ── Socket.IO: fetch session, connect, presence, triage relay ──
   useEffect(() => {
-    let mounted = true;
-    (async () => {
+    let mounted = true
+    ;(async () => {
       try {
-        const res = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!res.ok || !mounted) return;
-        const json = await res.json();
+        const res = await fetch('/api/auth/session', { cache: 'no-store' })
+        if (!res.ok || !mounted) return
+        const json = await res.json()
         const u = json.user as {
-          username: string;
-          displayName: string;
-          role: string;
-        };
-        setCurrentUser(u);
+          username: string
+          displayName: string
+          role: string
+        }
+        setCurrentUser(u)
 
         // Track EMR Clinical usage
-        void fetch("/api/track-usage", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "emr-clinical" }),
+        void fetch('/api/track-usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'emr-clinical' }),
         }).catch(() => {
           // Silent fail
-        });
+        })
 
-        const socket = socketIO({ transports: ["websocket"] });
-        socketRef.current = socket;
+        const { io: socketIO } = await import('socket.io-client')
+        const socket = socketIO({ transports: ['websocket'] })
+        socketRef.current = socket
 
-        socket.on("connect", () => {
-          socket.emit("user:join", {
+        socket.on('connect', () => {
+          socket.emit('user:join', {
             userId: u.username,
             name: u.displayName,
             role: u.role,
-          });
-        });
+          })
+        })
 
-        socket.on("users:online", (users: OnlineUser[]) => {
-          if (!mounted) return;
+        socket.on('users:online', (users: OnlineUser[]) => {
+          if (!mounted) return
           setOnlineDoctors(
             users.filter(
-              (x) =>
-                (x.role === "DOCTOR" || x.role === "DOKTER") &&
-                x.userId !== u.username,
-            ),
-          );
-        });
+              x => (x.role === 'DOCTOR' || x.role === 'DOKTER') && x.userId !== u.username
+            )
+          )
+        })
 
         // Bridge progress events from Assist → ePuskesmas
         socket.on(
-          "emr:progress",
-          (event: {
-            transferId: string;
-            step: string;
-            status: string;
-            message: string;
-          }) => {
-            if (!mounted) return;
-            if (
-              bridgeEntryIdRef.current &&
-              event.transferId === bridgeEntryIdRef.current
-            ) {
-              if (event.status === "success") setBridgeStatus("completed");
-              else if (event.status === "failed") {
-                setBridgeStatus("failed");
-                setBridgeError(event.message);
-              } else if (event.step === "init" && event.status === "running")
-                setBridgeStatus("claimed");
-              else setBridgeStatus("processing");
+          'emr:progress',
+          (event: { transferId: string; step: string; status: string; message: string }) => {
+            if (!mounted) return
+            if (bridgeEntryIdRef.current && event.transferId === bridgeEntryIdRef.current) {
+              if (event.status === 'success') setBridgeStatus('completed')
+              else if (event.status === 'failed') {
+                setBridgeStatus('failed')
+                setBridgeError(event.message)
+              } else if (event.step === 'init' && event.status === 'running')
+                setBridgeStatus('claimed')
+              else setBridgeStatus('processing')
             }
-          },
-        );
+          }
+        )
 
         // Doctor receives triage data from nurse
-        socket.on("emr:triage-receive", (data: Record<string, unknown>) => {
-          if (!mounted) return;
-          if (data.keluhanUtama) setKeluhanUtama(data.keluhanUtama as string);
-          if (data.keluhanTambahan)
-            setKeluhanTambahan(data.keluhanTambahan as string);
-          if (data.vitals) setVitals(data.vitals as typeof vitals);
-          if (data.gulaDarah) setGulaDarah(data.gulaDarah as typeof gulaDarah);
-          if (data.patientAge) setPatientAge(data.patientAge as number);
-          if (data.patientGender)
-            setPatientGender(data.patientGender as "L" | "P");
-          setReceivedVisitHistory(
-            normalizeScrapedVisitHistory(data.visitHistory),
-          );
-          setTriageReceived(true);
-          setWorkflowTab("review");
+        socket.on('emr:triage-receive', (data: Record<string, unknown>) => {
+          if (!mounted) return
+          if (data.keluhanUtama) setKeluhanUtama(data.keluhanUtama as string)
+          if (data.keluhanTambahan) setKeluhanTambahan(data.keluhanTambahan as string)
+          if (data.vitals) setVitals(data.vitals as typeof vitals)
+          if (data.gulaDarah) setGulaDarah(data.gulaDarah as typeof gulaDarah)
+          if (data.patientAge) setPatientAge(data.patientAge as number)
+          if (data.patientGender) setPatientGender(data.patientGender as 'L' | 'P')
+          const nextTriageContext = extractTriageSignalContext(data)
+          setTriageSignalContext(nextTriageContext)
+          setStructuredSignsDraft(
+            normalizeStructuredSignsDraft(nextTriageContext.structuredSigns)
+          )
+          if (nextTriageContext.isPregnant !== undefined) {
+            setIsPregnant(Boolean(nextTriageContext.isPregnant))
+          }
+          const inferredRpd = inferRpdFromMedicalHistory(data.medicalHistory)
+          if (inferredRpd.length > 0) {
+            setRpdSelected(prev => new Set([...prev, ...inferredRpd]))
+          }
+          if (Array.isArray(data.screeningAlerts)) {
+            setScreeningAlerts(data.screeningAlerts as ScreeningAlert[])
+          }
+          if (data.compositeDeterioration && typeof data.compositeDeterioration === 'object') {
+            setCompositeDeterioration(
+              data.compositeDeterioration as SharedCompositeDeteriorationResult
+            )
+          }
+          const incomingMeasurements = trimEncounterMeasurements(
+            normalizeEncounterMeasurements(
+              readObjectRecord(data.encounterBaseline).measurements ?? data.encounterMeasurements
+            )
+          )
+          setEncounterMeasurements(incomingMeasurements)
+          latestEncounterMeasurementSignatureRef.current =
+            incomingMeasurements.length > 0
+              ? buildEncounterMeasurementSignature(
+                  incomingMeasurements[incomingMeasurements.length - 1]
+                )
+              : ''
+          setReceivedVisitHistory(normalizeScrapedVisitHistory(data.visitHistory))
+          setTriageReceived(true)
+          setWorkflowTab('review')
           // Play notification sound
           try {
-            new Audio("/sounds/notif.mp3").play();
+            new Audio('/sounds/notif.mp3').play()
           } catch {
             /* silent */
           }
-        });
+        })
       } catch {
         /* no session */
       }
-    })();
+    })()
     return () => {
-      mounted = false;
-      socketRef.current?.disconnect();
-    };
+      mounted = false
+      socketRef.current?.disconnect()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   // Auto-resize pemeriksaan textareas when values change programmatically (via item click)
   useEffect(() => {
-    for (const id of [
-      "pemeriksaan-fisik-usulan",
-      "hasil-lab",
-      "pemeriksaan-penunjang",
-    ]) {
-      const el = document.getElementById(id) as HTMLTextAreaElement | null;
+    for (const id of ['pemeriksaan-fisik-usulan', 'hasil-lab', 'pemeriksaan-penunjang']) {
+      const el = document.getElementById(id) as HTMLTextAreaElement | null
       if (el) {
-        el.style.height = "auto";
-        el.style.height = el.scrollHeight + "px";
+        el.style.height = 'auto'
+        el.style.height = el.scrollHeight + 'px'
       }
     }
-  }, [pemeriksaanFisikUsulan, hasilLab, pemeriksaanPenunjang]);
+  }, [pemeriksaanFisikUsulan, hasilLab, pemeriksaanPenunjang])
 
   useEffect(() => {
-    if (!autoOpenUsulanPending || !clinicalChain?.pemeriksaan) return;
+    if (!autoOpenUsulanPending || !clinicalChain?.pemeriksaan) return
 
     const hasUsulanItems =
       clinicalChain.pemeriksaan.fisik.length > 0 ||
       clinicalChain.pemeriksaan.lab.length > 0 ||
-      clinicalChain.pemeriksaan.penunjang.length > 0;
+      clinicalChain.pemeriksaan.penunjang.length > 0
 
-    if (!hasUsulanItems) return;
+    if (!hasUsulanItems) return
 
     const timer = setTimeout(() => {
-      setUsulanFisikOpen(clinicalChain.pemeriksaan.fisik.length > 0);
-      setUsulanLabOpen(clinicalChain.pemeriksaan.lab.length > 0);
-      setUsulanPenunjangOpen(clinicalChain.pemeriksaan.penunjang.length > 0);
-      setAutoOpenUsulanPending(false);
-    }, 620);
+      setUsulanFisikOpen(clinicalChain.pemeriksaan.fisik.length > 0)
+      setUsulanLabOpen(clinicalChain.pemeriksaan.lab.length > 0)
+      setUsulanPenunjangOpen(clinicalChain.pemeriksaan.penunjang.length > 0)
+      setAutoOpenUsulanPending(false)
+    }, 620)
 
-    return () => clearTimeout(timer);
-  }, [autoOpenUsulanPending, clinicalChain]);
+    return () => clearTimeout(timer)
+  }, [autoOpenUsulanPending, clinicalChain])
 
   useEffect(() => {
-    const normalizedKeluhan = normalizeDraftToken(keluhanUtama);
-    setRpsDraftState((prev) => {
-      const normalizedSource = normalizeDraftToken(prev.sourceKeluhan);
+    const normalizedKeluhan = normalizeDraftToken(keluhanUtama)
+    setRpsDraftState(prev => {
+      const normalizedSource = normalizeDraftToken(prev.sourceKeluhan)
       const nextStale = Boolean(
-        normalizedKeluhan &&
-        normalizedSource &&
-        normalizedKeluhan !== normalizedSource,
-      );
-      if (prev.stale === nextStale) return prev;
-      return { ...prev, stale: nextStale };
-    });
-  }, [keluhanUtama]);
+        normalizedKeluhan && normalizedSource && normalizedKeluhan !== normalizedSource
+      )
+      if (prev.stale === nextStale) return prev
+      return { ...prev, stale: nextStale }
+    })
+  }, [keluhanUtama])
 
   // Auto-fill Audrey entities saat user mengetik di Keluhan Utama / RPS
   useEffect(() => {
     if (!keluhanUtama.trim()) {
-      setAnamnesaEntities({ utama: "", onset: "", faktor: "" });
-      setAnamnesaVisible([false, false, false]);
-      return;
+      setAnamnesaEntities({ utama: '', onset: '', faktor: '' })
+      setAnamnesaVisible([false, false, false])
+      return
     }
-    const combined = `${keluhanUtama} ${riwayat.rps}`.toLowerCase();
+    const combined = `${keluhanUtama} ${riwayat.rps}`.toLowerCase()
     const onsetMatch =
       combined.match(/sejak\s+([\w\s]+?)(?=[,.\n]|$)/i) ??
-      combined.match(
-        /(\d+)\s*(jam|hari|minggu|bulan|tahun)(?:\s+(?:yang\s+lalu|lalu))?/i,
-      ) ??
-      combined.match(/sudah\s+([\w\s]+?)(?=[,.\n]|$)/i);
-    const onset = onsetMatch
-      ? onsetMatch[0].trim().slice(0, 42)
-      : "Perlu eksplorasi";
+      combined.match(/(\d+)\s*(jam|hari|minggu|bulan|tahun)(?:\s+(?:yang\s+lalu|lalu))?/i) ??
+      combined.match(/sudah\s+([\w\s]+?)(?=[,.\n]|$)/i)
+    const onset = onsetMatch ? onsetMatch[0].trim().slice(0, 42) : 'Perlu eksplorasi'
     const faktorMatch =
-      combined.match(
-        /(memberat|diperberat|memburuk|makin|tambah parah)[\w\s,]+?(?=[.;\n]|$)/i,
-      ) ??
-      combined.match(
-        /(berkurang|membaik|hilang)\s+(saat|ketika|jika)[\w\s]+?(?=[.;\n]|$)/i,
-      );
-    const faktor = faktorMatch
-      ? faktorMatch[0].trim().slice(0, 42)
-      : "Belum teridentifikasi";
+      combined.match(/(memberat|diperberat|memburuk|makin|tambah parah)[\w\s,]+?(?=[.;\n]|$)/i) ??
+      combined.match(/(berkurang|membaik|hilang)\s+(saat|ketika|jika)[\w\s]+?(?=[.;\n]|$)/i)
+    const faktor = faktorMatch ? faktorMatch[0].trim().slice(0, 42) : 'Belum teridentifikasi'
     setAnamnesaEntities({
       utama: keluhanUtama.trim().slice(0, 60),
       onset,
       faktor,
-    });
-    setAnamnesaVisible([true, true, true]);
-  }, [keluhanUtama, riwayat.rps]);
+    })
+    setAnamnesaVisible([true, true, true])
+  }, [keluhanUtama, riwayat.rps])
 
-  useEffect(() => () => clearSynthTimers(), []);
+  useEffect(() => () => clearSynthTimers(), [])
 
   function updateRpsDraft(
     nextRps: string,
     options?: {
-      mode?: "idle" | "auto" | "edited";
-      sourceKeluhan?: string;
-      stale?: boolean;
-    },
+      mode?: 'idle' | 'auto' | 'edited'
+      sourceKeluhan?: string
+      stale?: boolean
+    }
   ) {
-    setRiwayat((prev) => ({ ...prev, rps: nextRps }));
-    if (!options) return;
-    setRpsDraftState((prev) => ({
+    setRiwayat(prev => ({ ...prev, rps: nextRps }))
+    if (!options) return
+    setRpsDraftState(prev => ({
       sourceKeluhan: options.sourceKeluhan ?? prev.sourceKeluhan,
       mode: options.mode ?? prev.mode,
       stale: options.stale ?? prev.stale,
-    }));
+    }))
   }
 
   function appendToClinicalField(
     setter: React.Dispatch<React.SetStateAction<string>>,
     value: string,
-    joiner = ", ",
+    joiner = ', '
   ) {
-    setter((prev) => appendUniqueDelimitedValue(prev, value, joiner));
+    setter(prev => appendUniqueDelimitedValue(prev, value, joiner))
   }
 
   function applyExamAutoSentra() {
     const suggestions = [
       ...pemeriksaanFisikUsulan
-        .split(";")
-        .map((item) => item.trim())
+        .split(';')
+        .map(item => item.trim())
         .filter(Boolean),
       ...(clinicalChain?.pemeriksaan.fisik ?? []),
-    ];
+    ]
 
     const uniqueSuggestions = suggestions.filter((item, index, source) => {
-      const normalized = normalizeDraftToken(item);
+      const normalized = normalizeDraftToken(item)
       return (
         normalized &&
-        source.findIndex(
-          (candidate) => normalizeDraftToken(candidate) === normalized,
-        ) === index
-      );
-    });
-
-    const keluhanLower = `${keluhanUtama} ${keluhanTambahan}`.toLowerCase();
-    if (/(sesak|batuk|nyeri dada)/.test(keluhanLower)) {
-      uniqueSuggestions.push(
-        "Auskultasi cor/pulmo, inspeksi retraksi, evaluasi kerja napas",
-      );
-    }
-    if (
-      /(nyeri pinggang|pinggang|perut|mual|muntah|diare|anyang|disuria)/.test(
-        keluhanLower,
+        source.findIndex(candidate => normalizeDraftToken(candidate) === normalized) === index
       )
-    ) {
-      uniqueSuggestions.push("Palpasi abdomen, ketok CVA, status hidrasi");
+    })
+
+    const keluhanLower = `${keluhanUtama} ${keluhanTambahan}`.toLowerCase()
+    if (/(sesak|batuk|nyeri dada)/.test(keluhanLower)) {
+      uniqueSuggestions.push('Auskultasi cor/pulmo, inspeksi retraksi, evaluasi kerja napas')
+    }
+    if (/(nyeri pinggang|pinggang|perut|mual|muntah|diare|anyang|disuria)/.test(keluhanLower)) {
+      uniqueSuggestions.push('Palpasi abdomen, ketok CVA, status hidrasi')
     }
     if (/(demam|ruam|gatal)/.test(keluhanLower)) {
-      uniqueSuggestions.push("Inspeksi kulit dan turgor");
+      uniqueSuggestions.push('Inspeksi kulit dan turgor')
     }
     if (/(sakit kepala|vertigo|mata|telinga|tenggorokan)/.test(keluhanLower)) {
-      uniqueSuggestions.push(
-        "Inspeksi kepala-leher, konjungtiva, faring, KGB servikal",
-      );
+      uniqueSuggestions.push('Inspeksi kepala-leher, konjungtiva, faring, KGB servikal')
     }
 
-    const dedupedSuggestions = uniqueSuggestions.filter(
-      (item, index, source) => {
-        const normalized = normalizeDraftToken(item);
-        return (
-          normalized &&
-          source.findIndex(
-            (candidate) => normalizeDraftToken(candidate) === normalized,
-          ) === index
-        );
-      },
-    );
+    const dedupedSuggestions = uniqueSuggestions.filter((item, index, source) => {
+      const normalized = normalizeDraftToken(item)
+      return (
+        normalized &&
+        source.findIndex(candidate => normalizeDraftToken(candidate) === normalized) === index
+      )
+    })
 
-    if (dedupedSuggestions.length === 0) return;
+    if (dedupedSuggestions.length === 0) return
 
-    const examFocusDraft = deriveExamFocusDraft(
-      keluhanUtama,
-      keluhanTambahan,
-      dedupedSuggestions,
-    );
-    const examTemplates = createNormalExamTemplate(vitals);
+    const examFocusDraft = deriveExamFocusDraft(keluhanUtama, keluhanTambahan, dedupedSuggestions)
+    const examTemplates = createNormalExamTemplate(vitals)
 
-    setExamOpen(true);
+    setExamOpen(true)
     setExam({
       kepala: buildExamNarrative(examTemplates.kepala, examFocusDraft.kepala),
       dada: buildExamNarrative(examTemplates.dada, examFocusDraft.dada),
       perut: buildExamNarrative(examTemplates.perut, examFocusDraft.perut),
-      ekstremitas: buildExamNarrative(
-        examTemplates.ekstremitas,
-        examFocusDraft.ekstremitas,
-      ),
+      ekstremitas: buildExamNarrative(examTemplates.ekstremitas, examFocusDraft.ekstremitas),
       kulit: buildExamNarrative(examTemplates.kulit, examFocusDraft.kulit),
-      genitalia: buildExamNarrative(
-        examTemplates.genitalia,
-        examFocusDraft.genitalia,
-      ),
-    });
-    setExamAutofillKeys([
-      "kepala",
-      "dada",
-      "perut",
-      "ekstremitas",
-      "kulit",
-      "genitalia",
-    ]);
-    if (examAutofillTimerRef.current)
-      clearTimeout(examAutofillTimerRef.current);
-    examAutofillTimerRef.current = setTimeout(
-      () => setExamAutofillKeys([]),
-      1800,
-    );
-    setPemeriksaanFisikUsulan((previous) =>
+      genitalia: buildExamNarrative(examTemplates.genitalia, examFocusDraft.genitalia),
+    })
+    setExamAutofillKeys(['kepala', 'dada', 'perut', 'ekstremitas', 'kulit', 'genitalia'])
+    if (examAutofillTimerRef.current) clearTimeout(examAutofillTimerRef.current)
+    examAutofillTimerRef.current = setTimeout(() => setExamAutofillKeys([]), 1800)
+    setPemeriksaanFisikUsulan(previous =>
       dedupedSuggestions.reduce(
-        (draft, item) => appendUniqueDelimitedValue(draft, item, "; "),
-        previous,
-      ),
-    );
+        (draft, item) => appendUniqueDelimitedValue(draft, item, '; '),
+        previous
+      )
+    )
   }
 
   function clearSynthTimers() {
-    synthTimersRef.current.forEach((timer) => clearTimeout(timer));
-    synthTimersRef.current = [];
+    synthTimersRef.current.forEach(timer => clearTimeout(timer))
+    synthTimersRef.current = []
   }
 
   const finalizeSynthRun = useCallback((runId: number) => {
-    if (synthRunIdRef.current !== runId) return;
-    const pendingResult = pendingSynthResultRef.current;
+    if (synthRunIdRef.current !== runId) return
+    const pendingResult = pendingSynthResultRef.current
 
-    setShowEmrLoader(false);
-    setHistoryLoaded(true);
-    setHeaderText("SENTRA // RM-BARU // Synthesia Engine: READY");
-    setAnamnesaVisible([true, true, true]);
+    setShowEmrLoader(false)
+    setHistoryLoaded(true)
+    setHeaderText('SENTRA // RM-BARU // Synthesia Engine: READY')
+    setAnamnesaVisible([true, true, true])
     setAnamnesaEntities({
       utama:
         pendingResult?.entities?.keluhan_utama ||
         keluhanRef.current.utama.trim() ||
-        "Belum terekam",
-      onset:
-        pendingResult?.entities?.onset_durasi ||
-        "Perlu eksplorasi lebih lanjut",
-      faktor:
-        pendingResult?.entities?.faktor_pemberatan || "Belum teridentifikasi",
-    });
-    setIsTyping(false);
-    setWords([]);
-  }, []);
+        'Belum terekam',
+      onset: pendingResult?.entities?.onset_durasi || 'Perlu eksplorasi lebih lanjut',
+      faktor: pendingResult?.entities?.faktor_pemberatan || 'Belum teridentifikasi',
+    })
+    setIsTyping(false)
+    setWords([])
+  }, [])
 
   function resetEmrDraft() {
-    clearSynthTimers();
-    if (examAutofillTimerRef.current)
-      clearTimeout(examAutofillTimerRef.current);
-    synthRunIdRef.current += 1;
-    pendingSynthResultRef.current = null;
-    setKeluhanUtama("");
-    setKeluhanTambahan("");
-    keluhanRef.current = { utama: "", tambahan: "" };
-    setKeluhanAsli("");
-    updateRpsDraft("", { mode: "idle", sourceKeluhan: "", stale: false });
-    setRiwayat((prev) => ({ ...prev, rpk: "" }));
-    setPemeriksaanFisikUsulan("");
-    setHasilLab("");
-    setPemeriksaanPenunjang("");
-    setBodyWeightKg("");
-    setRecentActivity("resting");
-    setStressState("calm");
-    setMedicationFlags(new Set());
+    clearSynthTimers()
+    if (examAutofillTimerRef.current) clearTimeout(examAutofillTimerRef.current)
+    synthRunIdRef.current += 1
+    pendingSynthResultRef.current = null
+    setKeluhanUtama('')
+    setKeluhanTambahan('')
+    keluhanRef.current = { utama: '', tambahan: '' }
+    setKeluhanAsli('')
+    updateRpsDraft('', { mode: 'idle', sourceKeluhan: '', stale: false })
+    setRiwayat(prev => ({ ...prev, rpk: '' }))
+    setPemeriksaanFisikUsulan('')
+    setHasilLab('')
+    setPemeriksaanPenunjang('')
+    setBodyWeightKg('')
+    setRecentActivity('resting')
+    setStressState('calm')
+    setMedicationFlags(new Set())
     setVitals({
-      gcs: "",
-      td: "",
-      nadi: "",
-      napas: "",
-      suhu: "",
-      spo2: "",
-      map: "",
-    });
-    setVitalMeta(createInitialVitalMeta());
-    setGulaDarah({ nilai: "", tipe: "GDS" });
+      gcs: '',
+      td: '',
+      nadi: '',
+      napas: '',
+      suhu: '',
+      spo2: '',
+      map: '',
+    })
+    setVitalMeta(createInitialVitalMeta())
+    setGulaDarah({ nilai: '', tipe: 'GDS' })
     setExam({
-      kepala: "",
-      dada: "",
-      perut: "",
-      ekstremitas: "",
-      kulit: "",
-      genitalia: "",
-    });
-    setExamAutofillKeys([]);
-    setRpdSelected(new Set());
-    setAlergiSelected(new Set());
-    setActiveScenario(null);
-    setCdssResult(null);
-    setCdssError("");
-    setCdssLoading(false);
-    setClinicalChain(null);
-    setSelectedPemeriksaan(new Set());
-    setIsAutocompleteLoading(false);
-    setAssessmentConclusion("");
-    setSelectedSuggestionKey(null);
-    setSelectedDiagnosisDraft(null);
-    setConsideredMustNotMissKeys([]);
-    setEmergencyAcknowledged(false);
-    setSafetyChecklist({});
-    setAssessmentConclusionMeta({ mode: "idle", signature: "" });
-    setReviewAcceptanceReason("");
-    setFeedbackFinalIcd("");
-    setFeedbackOverrideReason("");
-    setFeedbackFollowUpNote("");
-    setFeedbackOutcomeConfirmed(null);
-    setWords([]);
-    setAnamnesaVisible([false, false, false]);
-    setAnamnesaEntities({ utama: "", onset: "", faktor: "" });
-    setShowEmrLoader(false);
-    setHistoryLoaded(false);
-    setExpandedPemItem(null);
-    setDraftBorderColor("var(--text-muted)");
-    setHeaderText(
-      "SENTRA / PUSKESMAS KEDIRI // RM-BARU // SENAUTO ENGINE: IDLE",
-    );
-    setHeaderColor("var(--text-muted)");
-    setIsTyping(false);
-    setGhostVisible(true);
-    setScanFlash(false);
-    setAutoOpenUsulanPending(false);
+      kepala: '',
+      dada: '',
+      perut: '',
+      ekstremitas: '',
+      kulit: '',
+      genitalia: '',
+    })
+    setExamAutofillKeys([])
+    setRpdSelected(new Set())
+    setAlergiSelected(new Set())
+    setTriageSignalContext({})
+    setStructuredSignsDraft(createInitialStructuredSigns())
+    setScreeningAlerts([])
+    setCompositeDeterioration(null)
+    setReceivedVisitHistory([])
+    setEncounterMeasurements([])
+    latestEncounterMeasurementSignatureRef.current = ''
+    setActiveScenario(null)
+    setCdssResult(null)
+    setCdssError('')
+    setCdssLoading(false)
+    setClinicalChain(null)
+    setSelectedPemeriksaan(new Set())
+    setIsAutocompleteLoading(false)
+    setAssessmentConclusion('')
+    setSelectedSuggestionKey(null)
+    setSelectedDiagnosisDraft(null)
+    setConsideredMustNotMissKeys([])
+    setEmergencyAcknowledged(false)
+    setSafetyChecklist({})
+    setAssessmentConclusionMeta({ mode: 'idle', signature: '' })
+    setReviewAcceptanceReason('')
+    setFeedbackFinalIcd('')
+    setFeedbackOverrideReason('')
+    setFeedbackFollowUpNote('')
+    setFeedbackOutcomeConfirmed(null)
+    setWords([])
+    setAnamnesaVisible([false, false, false])
+    setAnamnesaEntities({ utama: '', onset: '', faktor: '' })
+    setShowEmrLoader(false)
+    setHistoryLoaded(false)
+    setExpandedPemItem(null)
+    setDraftBorderColor('var(--text-muted)')
+    setHeaderText('SENTRA / PUSKESMAS KEDIRI // RM-BARU // SENAUTO ENGINE: IDLE')
+    setHeaderColor('var(--text-muted)')
+    setIsTyping(false)
+    setGhostVisible(true)
+    setScanFlash(false)
+    setAutoOpenUsulanPending(false)
   }
 
   function handleSenAutoClick(e: React.MouseEvent) {
-    e.stopPropagation();
-    const normalizedKeluhan = normalizeClinicalPhrase(keluhanUtama);
-    if (isTyping || !normalizedKeluhan) return;
+    e.stopPropagation()
+    const normalizedKeluhan = normalizeClinicalPhrase(keluhanUtama)
+    if (isTyping || !normalizedKeluhan) return
 
-    clearSynthTimers();
-    synthRunIdRef.current += 1;
-    const runId = synthRunIdRef.current;
+    clearSynthTimers()
+    synthRunIdRef.current += 1
+    const runId = synthRunIdRef.current
 
     // Flash scan effect — pink sweep selama 900ms sebelum synthesia dimulai
-    setScanFlash(true);
+    setScanFlash(true)
     const flashTimer = setTimeout(() => {
-      if (synthRunIdRef.current !== runId) return;
-      setScanFlash(false);
-    }, 900);
-    synthTimersRef.current.push(flashTimer);
+      if (synthRunIdRef.current !== runId) return
+      setScanFlash(false)
+    }, 900)
+    synthTimersRef.current.push(flashTimer)
 
     // Simpan teks asli untuk inferTTV, lalu generate narasi klinis
-    const rawKeluhan = normalizedKeluhan;
-    setKeluhanAsli(rawKeluhan);
-    let result: ReturnType<typeof generateNarrative>;
+    const rawKeluhan = normalizedKeluhan
+    setKeluhanAsli(rawKeluhan)
+    let result: ReturnType<typeof generateNarrative>
     try {
-      result = generateNarrative(rawKeluhan);
+      result = generateNarrative(rawKeluhan)
     } catch (error) {
-      pendingSynthResultRef.current = null;
-      setScanFlash(false);
-      setShowEmrLoader(false);
-      setIsTyping(false);
-      setWords([]);
-      setHeaderText("SENTRA // RM-BARU // Synthesia Engine: FAILED");
-      setHeaderColor("var(--c-critical)");
-      console.error("[Synthesia] gagal membentuk narasi:", error);
-      return;
+      pendingSynthResultRef.current = null
+      setScanFlash(false)
+      setShowEmrLoader(false)
+      setIsTyping(false)
+      setWords([])
+      setHeaderText('SENTRA // RM-BARU // Synthesia Engine: FAILED')
+      setHeaderColor('var(--c-critical)')
+      console.error('[Synthesia] gagal membentuk narasi:', error)
+      return
     }
-    pendingSynthResultRef.current = result;
-    const narrative = result.keluhan_utama || rawKeluhan;
+    pendingSynthResultRef.current = result
+    const narrative = result.keluhan_utama || rawKeluhan
     updateRpsDraft(narrative, {
-      mode: "auto",
+      mode: 'auto',
       sourceKeluhan: rawKeluhan,
       stale: false,
-    });
-    setHistoryLoaded(false);
-    setAnamnesaVisible([false, false, false]);
-    setAnamnesaEntities({ utama: "", onset: "", faktor: "" });
-    setShowEmrLoader(false);
+    })
+    setHistoryLoaded(false)
+    setAnamnesaVisible([false, false, false])
+    setAnamnesaEntities({ utama: '', onset: '', faktor: '' })
+    setShowEmrLoader(false)
     // Collapse lalu reveal ulang agar panel mengikuti alur synthesia secara bertahap.
-    setAutoOpenUsulanPending(true);
+    setAutoOpenUsulanPending(true)
     const collapseTimer = setTimeout(() => {
-      if (synthRunIdRef.current !== runId) return;
-      setSifatOpen(false);
-      setLokasiOpen(false);
-      setPenyertaOpen(false);
-      setUsulanFisikOpen(false);
-      setUsulanLabOpen(false);
-      setUsulanPenunjangOpen(false);
-    }, 400);
-    synthTimersRef.current.push(collapseTimer);
+      if (synthRunIdRef.current !== runId) return
+      setSifatOpen(false)
+      setLokasiOpen(false)
+      setPenyertaOpen(false)
+      setUsulanFisikOpen(false)
+      setUsulanLabOpen(false)
+      setUsulanPenunjangOpen(false)
+    }, 400)
+    synthTimersRef.current.push(collapseTimer)
     // Trigger autocomplete dengan keluhan asli, tanpa debounce delay
-    triggerAutocomplete(rawKeluhan, 0);
+    triggerAutocomplete(rawKeluhan, 0)
 
-    setIsTyping(true);
-    setGhostVisible(false);
-    setDraftBorderColor("var(--c-asesmen)");
-    setHeaderText("SENTRA // RM-BARU // SENAUTO ENGINE: SYNTHESIZING...");
-    setHeaderColor("var(--c-asesmen)");
-    const narrativeWords = narrative.split(/\s+/).filter(Boolean);
-    const previewWords = narrativeWords.slice(0, 24);
-    setWords(previewWords);
+    setIsTyping(true)
+    setGhostVisible(false)
+    setDraftBorderColor('var(--c-asesmen)')
+    setHeaderText('SENTRA // RM-BARU // SENAUTO ENGINE: SYNTHESIZING...')
+    setHeaderColor('var(--c-asesmen)')
+    const narrativeWords = narrative.split(/\s+/).filter(Boolean)
+    const previewWords = narrativeWords.slice(0, 24)
+    setWords(previewWords)
 
-    const totalTime = Math.min(1600, Math.max(720, previewWords.length * 55));
+    const totalTime = Math.min(1600, Math.max(720, previewWords.length * 55))
 
     const retrievalTimer = setTimeout(() => {
-      if (synthRunIdRef.current !== runId) return;
-      setHeaderText("SENTRA // RM-BARU // CLINICAL MIND ALGORITHM RETRIEVAL ACTIVE");
-      setShowEmrLoader(true);
+      if (synthRunIdRef.current !== runId) return
+      setHeaderText('SENTRA // RM-BARU // CLINICAL MIND ALGORITHM RETRIEVAL ACTIVE')
+      setShowEmrLoader(true)
 
-      [0, 1, 2].forEach((i) => {
+      ;[0, 1, 2].forEach(i => {
         const entityTimer = setTimeout(() => {
-          if (synthRunIdRef.current !== runId) return;
-          setAnamnesaVisible((prev) => {
-            const next = [...prev];
-            next[i] = true;
-            return next;
-          });
-        }, i * 200);
-        synthTimersRef.current.push(entityTimer);
-      });
+          if (synthRunIdRef.current !== runId) return
+          setAnamnesaVisible(prev => {
+            const next = [...prev]
+            next[i] = true
+            return next
+          })
+        }, i * 200)
+        synthTimersRef.current.push(entityTimer)
+      })
 
       const readyTimer = setTimeout(() => {
-        finalizeSynthRun(runId);
-      }, 1050);
-      synthTimersRef.current.push(readyTimer);
-    }, totalTime);
-    synthTimersRef.current.push(retrievalTimer);
+        finalizeSynthRun(runId)
+      }, 1050)
+      synthTimersRef.current.push(readyTimer)
+    }, totalTime)
+    synthTimersRef.current.push(retrievalTimer)
 
     const hardFinalizeTimer = setTimeout(() => {
-      finalizeSynthRun(runId);
-    }, totalTime + 1600);
-    synthTimersRef.current.push(hardFinalizeTimer);
+      finalizeSynthRun(runId)
+    }, totalTime + 1600)
+    synthTimersRef.current.push(hardFinalizeTimer)
   }
 
   useEffect(() => {
-    if (!isTyping) return;
+    if (!isTyping) return
 
-    const runId = synthRunIdRef.current;
+    const runId = synthRunIdRef.current
     const watchdogTimer = setTimeout(() => {
-      finalizeSynthRun(runId);
-    }, 3400);
+      finalizeSynthRun(runId)
+    }, 3400)
 
-    return () => clearTimeout(watchdogTimer);
-  }, [isTyping, finalizeSynthRun]);
+    return () => clearTimeout(watchdogTimer)
+  }, [isTyping, finalizeSynthRun])
 
   // Viewport-based phase dimming via IntersectionObserver
   useEffect(() => {
-    const ids = ["row1", "row2", "row3"] as const;
-    const refs = [row1SectionRef, row2SectionRef, row3SectionRef];
-    const elementToId = new Map<Element, "row1" | "row2" | "row3">();
-    const ratios = new Map<"row1" | "row2" | "row3", number>();
+    const ids = ['row1', 'row2', 'row3'] as const
+    const refs = [row1SectionRef, row2SectionRef, row3SectionRef]
+    const elementToId = new Map<Element, 'row1' | 'row2' | 'row3'>()
+    const ratios = new Map<'row1' | 'row2' | 'row3', number>()
 
     const pick = () => {
-      if (ratios.size === 0) return;
-      let best: "row1" | "row2" | "row3" = "row1";
-      let bestR = -1;
+      if (ratios.size === 0) return
+      let best: 'row1' | 'row2' | 'row3' = 'row1'
+      let bestR = -1
       ratios.forEach((r, id) => {
         if (r > bestR) {
-          bestR = r;
-          best = id;
+          bestR = r
+          best = id
         }
-      });
-      setActiveViewPhase(best);
-    };
+      })
+      setActiveViewPhase(best)
+    }
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const id = elementToId.get(entry.target);
-          if (!id) return;
-          if (entry.isIntersecting) ratios.set(id, entry.intersectionRatio);
-          else ratios.delete(id);
-        });
-        pick();
+      entries => {
+        entries.forEach(entry => {
+          const id = elementToId.get(entry.target)
+          if (!id) return
+          if (entry.isIntersecting) ratios.set(id, entry.intersectionRatio)
+          else ratios.delete(id)
+        })
+        pick()
       },
-      { threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] },
-    );
+      { threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] }
+    )
 
     ids.forEach((id, i) => {
-      const el = refs[i].current;
+      const el = refs[i].current
       if (el) {
-        elementToId.set(el, id);
-        observer.observe(el);
+        elementToId.set(el, id)
+        observer.observe(el)
       }
-    });
+    })
 
-    return () => observer.disconnect();
-  }, []);
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!workflowScrollInitializedRef.current) {
-      workflowScrollInitializedRef.current = true;
-      return;
+      workflowScrollInitializedRef.current = true
+      return
     }
 
     const target =
-      workflowTab === "triage"
+      workflowTab === 'triage'
         ? row1SectionRef.current
-        : workflowTab === "review"
+        : workflowTab === 'review'
           ? (reviewHandoffRef.current ?? row2SectionRef.current)
-          : workflowTab === "assessment"
+          : workflowTab === 'assessment'
             ? row3SectionRef.current
-            : (finalizeAnchorRef.current ?? row3SectionRef.current);
+            : (finalizeAnchorRef.current ?? row3SectionRef.current)
 
-    if (!target) return;
+    if (!target) return
 
     const timer = window.setTimeout(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 80);
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
 
-    return () => window.clearTimeout(timer);
-  }, [workflowTab]);
+    return () => window.clearTimeout(timer)
+  }, [workflowTab])
 
   function appendToRps(value: string) {
-    const cleanValue = value.trim();
-    if (!cleanValue) return;
-    setRiwayat((prev) => ({
+    const cleanValue = value.trim()
+    if (!cleanValue) return
+    setRiwayat(prev => ({
       ...prev,
       rps: appendUniqueNarrativeValue(prev.rps, cleanValue),
-    }));
+    }))
     setRpsDraftState({
       sourceKeluhan: keluhanUtama.trim() || rpsDraftState.sourceKeluhan,
-      mode: "edited",
+      mode: 'edited',
       stale: false,
-    });
+    })
   }
 
   function moveToWorkflowTab(nextTab: WorkflowTab) {
-    if (workflowTab === nextTab) return;
-    setWorkflowTab(nextTab);
-    if (nextTab === "review") {
-      setActiveViewPhase("row1");
+    if (workflowTab === nextTab) return
+    setWorkflowTab(nextTab)
+    if (nextTab === 'review') {
+      setActiveViewPhase('row1')
       setTimeout(() => {
         row1SectionRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 60);
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 60)
     }
   }
 
   function toggleTrajectory() {
-    const next = !trajectoryActive;
-    setTrajectoryActive(next);
-    setTrajectoryOpen(next);
+    const next = !trajectoryActive
+    setTrajectoryActive(next)
+    setTrajectoryOpen(next)
     if (next) {
-      if (insightTimeoutRef.current) clearTimeout(insightTimeoutRef.current);
-      setShowInsight(true);
+      if (insightTimeoutRef.current) clearTimeout(insightTimeoutRef.current)
+      setShowInsight(true)
     } else {
-      insightTimeoutRef.current = setTimeout(() => setShowInsight(false), 800);
+      insightTimeoutRef.current = setTimeout(() => setShowInsight(false), 800)
     }
   }
 
   function toggleLab(index: number) {
-    setLabSelected((prev) => {
-      const next = [...prev];
-      next[index] = !next[index];
-      return next;
-    });
+    setLabSelected(prev => {
+      const next = [...prev]
+      next[index] = !next[index]
+      return next
+    })
   }
 
   async function runCDSS() {
-    const minimumBranchAnimationMs = 1400;
-    if (!keluhanUtama.trim()) return;
+    const minimumBranchAnimationMs = 1400
+    if (!keluhanUtama.trim()) return
     if (rpsDraftState.stale && riwayat.rps.trim()) {
       setCdssError(
-        "Riwayat Penyakit Sekarang masih mengacu ke keluhan utama sebelumnya. Mohon perbarui RPS atau jalankan AUTO SENTRA lagi.",
-      );
-      return;
+        'Riwayat Penyakit Sekarang masih mengacu ke keluhan utama sebelumnya. Mohon perbarui RPS atau jalankan AUTO SENTRA lagi.'
+      )
+      return
     }
-    setCdssLoading(true);
-    setCdssError("");
-    setCdssResult(null);
-    setCdssBranchRunId((current) => current + 1);
+    setCdssLoading(true)
+    setCdssError('')
+    setCdssResult(null)
+    setCdssBranchRunId(current => current + 1)
     cdssRunStartedAtRef.current =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
-    setSelectedSuggestionKey(null);
-    setSelectedDiagnosisDraft(null);
-    setConsideredMustNotMissKeys([]);
-    setEmergencyAcknowledged(false);
-    setSafetyChecklist({});
-    setReviewAcceptanceReason("");
+      typeof performance !== 'undefined' ? performance.now() : Date.now()
+    setSelectedSuggestionKey(null)
+    setSelectedDiagnosisDraft(null)
+    setConsideredMustNotMissKeys([])
+    setEmergencyAcknowledged(false)
+    setSafetyChecklist({})
+    setReviewAcceptanceReason('')
 
     const parseTD = (td: string) => {
-      const parts = td.replace("/", " ").split(/[\s/]+/);
+      const parts = td.replace('/', ' ').split(/[\s/]+/)
       return {
-        sbp: parseFloat(parts[0]) || undefined,
-        dbp: parseFloat(parts[1]) || undefined,
-      };
-    };
-    const { sbp, dbp } = vitals.td
-      ? parseTD(vitals.td)
-      : { sbp: undefined, dbp: undefined };
+        sbp: Number.parseFloat(parts[0]) || undefined,
+        dbp: Number.parseFloat(parts[1]) || undefined,
+      }
+    }
+    const { sbp, dbp } = vitals.td ? parseTD(vitals.td) : { sbp: undefined, dbp: undefined }
 
     // Gabung keluhan tambahan + RPS + RPK untuk konteks klinis lengkap
     const keluhanKombinasi =
       [
         keluhanTambahan,
-        riwayat.rps ? `RPS: ${riwayat.rps}` : "",
-        riwayat.rpk ? `RPK: ${riwayat.rpk}` : "",
+        riwayat.rps ? `RPS: ${riwayat.rps}` : '',
+        riwayat.rpk ? `RPK: ${riwayat.rpk}` : '',
       ]
         .filter(Boolean)
-        .join(". ") || undefined;
+        .join('. ') || undefined
+
+    const liveAlertPayload = buildRealtimeAlertPayload()
+    const structuredSigns = liveAlertPayload.structuredSigns as StructuredTriageSigns
+    const nextComposite = evaluateCompositeDeteriorationFromEmrPayload(liveAlertPayload)
+    setCompositeDeterioration(nextComposite)
+    setScreeningAlerts(nextComposite.screeningAlerts)
 
     try {
-      const res = await fetch("/api/cdss/diagnose", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/cdss/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keluhan_utama: keluhanUtama,
           keluhan_tambahan: keluhanKombinasi,
           assessment_conclusion: assessmentConclusion.trim() || undefined,
+          structured_signs: structuredSigns,
+          composite_deterioration: nextComposite,
           vital_signs: {
             systolic: sbp,
             diastolic: dbp,
-            heart_rate: parseFloat(vitals.nadi) || undefined,
-            respiratory_rate: parseFloat(vitals.napas) || undefined,
-            temperature: parseFloat(vitals.suhu) || undefined,
-            spo2: parseFloat(vitals.spo2) || undefined,
-            gcs: parseFloat(vitals.gcs) || undefined,
-            glucose: parseFloat(gulaDarah.nilai) || undefined,
+            heart_rate: Number.parseFloat(vitals.nadi) || undefined,
+            respiratory_rate: Number.parseFloat(vitals.napas) || undefined,
+            temperature: Number.parseFloat(vitals.suhu) || undefined,
+            spo2: Number.parseFloat(vitals.spo2) || undefined,
+            gcs: Number.parseFloat(vitals.gcs) || undefined,
+            glucose: Number.parseFloat(gulaDarah.nilai) || undefined,
           },
-          chronic_diseases:
-            rpdSelected.size > 0 ? Array.from(rpdSelected) : undefined,
-          allergies:
-            alergiSelected.size > 0 ? Array.from(alergiSelected) : undefined,
+          chronic_diseases: rpdSelected.size > 0 ? Array.from(rpdSelected) : undefined,
+          allergies: alergiSelected.size > 0 ? Array.from(alergiSelected) : undefined,
           usia: patientAge,
           jenis_kelamin: patientGender,
-          is_pregnant: patientGender === "P" ? isPregnant : false,
+          is_pregnant: patientGender === 'P' ? isPregnant : false,
           session_id: cdssSessionIdRef.current,
         }),
-      });
+      })
       if (!res.ok) {
         const errorPayload = (await res
           .json()
-          .catch(() => ({ error: "Gagal memproses diagnosis" }))) as {
-          error?: string;
-        };
-        throw new Error(errorPayload.error ?? `HTTP ${res.status}`);
+          .catch(() => ({ error: 'Gagal memproses diagnosis' }))) as {
+          error?: string
+        }
+        throw new Error(errorPayload.error ?? `HTTP ${res.status}`)
       }
-      const data = (await res.json()) as CDSSResult;
-      const startedAt = cdssRunStartedAtRef.current;
-      const now =
-        typeof performance !== "undefined" ? performance.now() : Date.now();
-      const elapsed = startedAt ? now - startedAt : minimumBranchAnimationMs;
-      const remainingDelay = Math.max(0, minimumBranchAnimationMs - elapsed);
+      const data = (await res.json()) as CDSSResult
+      const startedAt = cdssRunStartedAtRef.current
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+      const elapsed = startedAt ? now - startedAt : minimumBranchAnimationMs
+      const remainingDelay = Math.max(0, minimumBranchAnimationMs - elapsed)
       if (remainingDelay > 0) {
-        await new Promise((resolve) =>
-          window.setTimeout(resolve, remainingDelay),
-        );
+        await new Promise(resolve => window.setTimeout(resolve, remainingDelay))
       }
-      setCdssResult(data);
+      setCdssResult(data)
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Gagal menjalankan CDSS. Coba lagi.";
-      setCdssError(message);
+      const message = error instanceof Error ? error.message : 'Gagal menjalankan CDSS. Coba lagi.'
+      setCdssError(message)
     } finally {
-      cdssRunStartedAtRef.current = null;
-      setCdssLoading(false);
+      cdssRunStartedAtRef.current = null
+      setCdssLoading(false)
     }
   }
 
   async function selectCdssSuggestion(s: CDSSSuggestion) {
-    const suggestionKey = getSuggestionKey(s);
-    const status = s.decision_status ?? "review";
-    const selectionIntent =
-      status === "review" ? "review_selection" : "working_diagnosis";
+    const suggestionKey = getSuggestionKey(s)
+    const status = s.decision_status ?? 'review'
+    const selectionIntent = status === 'review' ? 'review_selection' : 'working_diagnosis'
 
-    let reviewReason = "";
-    if (status === "review") {
+    let reviewReason = ''
+    if (status === 'review') {
       reviewReason =
         window
           .prompt(
-            "Masukkan alasan menerima diagnosis berstatus review:",
-            reviewAcceptanceReason.trim(),
+            'Masukkan alasan menerima diagnosis berstatus review:',
+            reviewAcceptanceReason.trim()
           )
-          ?.trim() ?? "";
-      if (!reviewReason) return;
+          ?.trim() ?? ''
+      if (!reviewReason) return
     }
 
-    setSelectionSavingKey(suggestionKey);
-    if (status === "must_not_miss") {
-      setConsideredMustNotMissKeys((prev) =>
-        prev.includes(suggestionKey) ? prev : [...prev, suggestionKey],
-      );
+    setSelectionSavingKey(suggestionKey)
+    if (status === 'must_not_miss') {
+      setConsideredMustNotMissKeys(prev =>
+        prev.includes(suggestionKey) ? prev : [...prev, suggestionKey]
+      )
     }
-    setSelectedSuggestionKey(suggestionKey);
-    setSelectedDiagnosisDraft(s);
-    setFeedbackFinalIcd(s.icd10_code);
-    setReviewAcceptanceReason(reviewReason);
-    setFeedbackOverrideReason("");
-    setFeedbackOutcomeConfirmed(null);
-    setFeedbackFollowUpNote("");
-    setAssessmentConclusion((prev) => {
-      const normalized = prev.trim();
-      if (normalized.length > 0) return prev;
+    setSelectedSuggestionKey(suggestionKey)
+    setSelectedDiagnosisDraft(s)
+    setFeedbackFinalIcd(s.icd10_code)
+    setReviewAcceptanceReason(reviewReason)
+    setFeedbackOverrideReason('')
+    setFeedbackOutcomeConfirmed(null)
+    setFeedbackFollowUpNote('')
+    setAssessmentConclusion(prev => {
+      const normalized = prev.trim()
+      if (normalized.length > 0) return prev
       const prefix =
-        status === "recommended"
-          ? "Dx kerja (recommended)"
-          : status === "must_not_miss"
-            ? "Dx kerja (must-not-miss reviewed)"
-            : "Dx kerja (reviewed by doctor)";
-      return `${prefix}: ${s.diagnosis_name} (${s.icd10_code}) — confidence ${Math.round(s.confidence * 100)}%`;
-    });
+        status === 'recommended'
+          ? 'Dx kerja (recommended)'
+          : status === 'must_not_miss'
+            ? 'Dx kerja (must-not-miss reviewed)'
+            : 'Dx kerja (reviewed by doctor)'
+      return `${prefix}: ${s.diagnosis_name} (${s.icd10_code}) — confidence ${Math.round(s.confidence * 100)}%`
+    })
     globalThis.setTimeout(() => {
       selectedDiagnosisPanelRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }, 260);
+        behavior: 'smooth',
+        block: 'nearest',
+      })
+    }, 260)
     try {
-      const response = await fetch("/api/cdss/suggestion-selected", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/cdss/suggestion-selected', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: cdssSessionIdRef.current,
           selected_icd: s.icd10_code,
@@ -2963,34 +3215,32 @@ export default function EMRPage() {
           selection_intent: selectionIntent,
           review_reason: reviewReason || undefined,
         }),
-      });
+      })
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status}`)
       }
     } catch (error) {
-      console.error("[CDSS Suggestion Selected]", error);
-      if (status === "must_not_miss") {
-        setConsideredMustNotMissKeys((prev) =>
-          prev.filter((key) => key !== suggestionKey),
-        );
+      console.error('[CDSS Suggestion Selected]', error)
+      if (status === 'must_not_miss') {
+        setConsideredMustNotMissKeys(prev => prev.filter(key => key !== suggestionKey))
       }
-      setSelectedSuggestionKey(null);
-      setSelectedDiagnosisDraft(null);
-      setReviewAcceptanceReason("");
+      setSelectedSuggestionKey(null)
+      setSelectedDiagnosisDraft(null)
+      setReviewAcceptanceReason('')
     } finally {
-      setSelectionSavingKey(null);
+      setSelectionSavingKey(null)
     }
   }
 
   async function submitOutcomeFeedback() {
-    if (!selectedDiagnosisDraft) return;
-    if (!feedbackFinalIcd.trim()) return;
+    if (!selectedDiagnosisDraft) return
+    if (!feedbackFinalIcd.trim()) return
 
-    setFeedbackSaving(true);
+    setFeedbackSaving(true)
     try {
-      const response = await fetch("/api/cdss/outcome-feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/cdss/outcome-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: cdssSessionIdRef.current,
           selected_icd: selectedDiagnosisDraft.icd10_code,
@@ -3001,88 +3251,87 @@ export default function EMRPage() {
           review_accept_reason: reviewAcceptanceReason.trim() || undefined,
           override_reason: feedbackOverrideReason.trim() || undefined,
         }),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
     } catch (error) {
-      console.error("[CDSS Outcome Feedback]", error);
+      console.error('[CDSS Outcome Feedback]', error)
     } finally {
-      setFeedbackSaving(false);
+      setFeedbackSaving(false)
     }
   }
 
-  const [sifatKey, setSifatKey] = useState(0);
-  const [chainTabKey, setChainTabKey] = useState(0);
+  const [sifatKey, setSifatKey] = useState(0)
+  const [chainTabKey, setChainTabKey] = useState(0)
 
   useEffect(() => {
-    if (!clinicalChain) return;
-    setSifatKey((k) => k + 1);
-  }, [activeSifatTab]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!clinicalChain) return
+    setSifatKey(k => k + 1)
+  }, [activeSifatTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!clinicalChain) return;
-    setChainTabKey((k) => k + 1);
-  }, [activeChainTab]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!clinicalChain) return
+    setChainTabKey(k => k + 1)
+  }, [activeChainTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autocomplete via clinical-chains.json (local) atau DeepSeek fallback
   function triggerAutocomplete(query: string, delay = 400) {
-    if (autocompleteTimerRef.current)
-      clearTimeout(autocompleteTimerRef.current);
-    const normalizedQuery = normalizeClinicalPhrase(query);
+    if (autocompleteTimerRef.current) clearTimeout(autocompleteTimerRef.current)
+    const normalizedQuery = normalizeClinicalPhrase(query)
     if (normalizedQuery.length < 3) {
-      setClinicalChain(null);
-      setSelectedPemeriksaan(new Set());
-      setIsAutocompleteLoading(false);
-      return;
+      setClinicalChain(null)
+      setSelectedPemeriksaan(new Set())
+      setIsAutocompleteLoading(false)
+      return
     }
-    console.log("[AC] trigger:", normalizedQuery, "delay:", delay);
+    console.log('[AC] trigger:', normalizedQuery, 'delay:', delay)
     autocompleteTimerRef.current = setTimeout(async () => {
-      setIsAutocompleteLoading(true);
-      const controller = new AbortController();
+      setIsAutocompleteLoading(true)
+      const controller = new AbortController()
       const timeoutId = setTimeout(() => {
-        controller.abort();
-        setIsAutocompleteLoading(false);
-      }, 8000);
+        controller.abort()
+        setIsAutocompleteLoading(false)
+      }, 8000)
       try {
-        console.log("[AC] fetch start:", normalizedQuery);
+        console.log('[AC] fetch start:', normalizedQuery)
         const res = await fetchAutocompleteChain(
           {
             query: normalizedQuery,
             context: keluhanUtama
-              .split(",")
-              .map((part) => normalizeClinicalPhrase(part))
+              .split(',')
+              .map(part => normalizeClinicalPhrase(part))
               .filter(Boolean),
           },
-          controller.signal,
-        );
-        clearTimeout(timeoutId);
+          controller.signal
+        )
+        clearTimeout(timeoutId)
         if (!res.ok) {
-          console.warn("[AC] fetch warning:", res.status);
-          setIsAutocompleteLoading(false);
-          return;
+          console.warn('[AC] fetch warning:', res.status)
+          setIsAutocompleteLoading(false)
+          return
         }
         const data = (await res.json()) as {
-          source: "local" | "llm";
+          source: 'local' | 'llm'
           chain: {
-            sifat: { formal: string[]; klinis: string[]; narasi: string[] };
-            lokasi: string[];
-            durasi: string[];
-            logical_chain: string[];
-            predictive_next: { red_flags: string[] };
-            templates: string[];
+            sifat: { formal: string[]; klinis: string[]; narasi: string[] }
+            lokasi: string[]
+            durasi: string[]
+            logical_chain: string[]
+            predictive_next: { red_flags: string[] }
+            templates: string[]
             pemeriksaan: {
-              fisik: string[];
-              lab: string[];
-              penunjang: string[];
-            };
-          };
-        };
+              fisik: string[]
+              lab: string[]
+              penunjang: string[]
+            }
+          }
+        }
         console.log(
-          "[AC] got data, source:",
+          '[AC] got data, source:',
           data.source,
-          "sifat.narasi:",
-          data.chain?.sifat?.narasi?.length,
-        );
-        const c = data.chain;
+          'sifat.narasi:',
+          data.chain?.sifat?.narasi?.length
+        )
+        const c = data.chain
         setClinicalChain({
           sifat: c.sifat ?? { formal: [], klinis: [], narasi: [] },
           lokasi: c.lokasi ?? [],
@@ -3091,129 +3340,123 @@ export default function EMRPage() {
           red_flags: c.predictive_next?.red_flags ?? [],
           templates: c.templates ?? [],
           pemeriksaan: c.pemeriksaan ?? { fisik: [], lab: [], penunjang: [] },
-        });
-        setSelectedPemeriksaan(new Set());
+        })
+        setSelectedPemeriksaan(new Set())
       } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") {
-          console.error("[AC] error:", err.message);
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('[AC] error:', err.message)
         }
       } finally {
-        clearTimeout(timeoutId);
-        setIsAutocompleteLoading(false);
+        clearTimeout(timeoutId)
+        setIsAutocompleteLoading(false)
       }
-    }, delay);
+    }, delay)
   }
 
   useEffect(() => {
-    if (!cdssResult) return;
-    setupEmergencyProtocol(cdssResult);
-  }, [cdssResult]);
+    if (!cdssResult) return
+    setupEmergencyProtocol(cdssResult)
+  }, [cdssResult])
 
   useEffect(() => {
-    if (!cdssResult || workflowTab !== "assessment") return;
+    if (!cdssResult || workflowTab !== 'assessment') return
 
     const timer = window.setTimeout(() => {
       cdssPanelRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }, 120);
+        behavior: 'smooth',
+        block: 'start',
+      })
+    }, 120)
 
-    return () => window.clearTimeout(timer);
-  }, [cdssResult, workflowTab]);
+    return () => window.clearTimeout(timer)
+  }, [cdssResult, workflowTab])
 
   useEffect(() => {
     if (!selectedDiagnosisDraft || !prognosisStageRef.current) {
-      setRow3Spotlight("entry");
-      return;
+      setRow3Spotlight('entry')
+      return
     }
 
     const updateRow3Spotlight = () => {
-      const prognosisRect = prognosisStageRef.current?.getBoundingClientRect();
-      if (!prognosisRect) return;
+      const prognosisRect = prognosisStageRef.current?.getBoundingClientRect()
+      if (!prognosisRect) return
 
-      const viewportFocusLine = window.innerHeight * 0.46;
-      const prognosisInFocus =
-        prognosisRect.top <= viewportFocusLine && prognosisRect.bottom >= 120;
+      const viewportFocusLine = window.innerHeight * 0.46
+      const prognosisInFocus = prognosisRect.top <= viewportFocusLine && prognosisRect.bottom >= 120
 
-      setRow3Spotlight(prognosisInFocus ? "prognosis" : "entry");
-    };
+      setRow3Spotlight(prognosisInFocus ? 'prognosis' : 'entry')
+    }
 
-    updateRow3Spotlight();
-    window.addEventListener("scroll", updateRow3Spotlight, { passive: true });
-    window.addEventListener("resize", updateRow3Spotlight);
+    updateRow3Spotlight()
+    window.addEventListener('scroll', updateRow3Spotlight, { passive: true })
+    window.addEventListener('resize', updateRow3Spotlight)
 
     return () => {
-      window.removeEventListener("scroll", updateRow3Spotlight);
-      window.removeEventListener("resize", updateRow3Spotlight);
-    };
-  }, [selectedDiagnosisDraft]);
+      window.removeEventListener('scroll', updateRow3Spotlight)
+      window.removeEventListener('resize', updateRow3Spotlight)
+    }
+  }, [selectedDiagnosisDraft])
 
-  const emergencyFlags =
-    cdssResult?.red_flags.filter((rf) => rf.severity === "emergency") ?? [];
-  const requiresEmergencyAck =
-    emergencyFlags.length > 0 && !emergencyAcknowledged;
+  const emergencyFlags = cdssResult?.red_flags.filter(rf => rf.severity === 'emergency') ?? []
+  const requiresEmergencyAck = emergencyFlags.length > 0 && !emergencyAcknowledged
   const recommendedSuggestions = useMemo(
     () =>
       sortSuggestionsForDisplay(
         cdssResult?.suggestions.filter(
-          (suggestion) => suggestion.decision_status === "recommended",
-        ) ?? [],
+          suggestion => suggestion.decision_status === 'recommended'
+        ) ?? []
       ),
-    [cdssResult],
-  );
+    [cdssResult]
+  )
   const reviewSuggestions = useMemo(
     () =>
       sortSuggestionsForDisplay(
-        cdssResult?.suggestions.filter(
-          (suggestion) => suggestion.decision_status === "review",
-        ) ?? [],
+        cdssResult?.suggestions.filter(suggestion => suggestion.decision_status === 'review') ?? []
       ),
-    [cdssResult],
-  );
+    [cdssResult]
+  )
   const mustNotMissSuggestions = useMemo(
     () =>
       sortSuggestionsForDisplay(
         cdssResult?.suggestions.filter(
-          (suggestion) => suggestion.decision_status === "must_not_miss",
-        ) ?? [],
+          suggestion => suggestion.decision_status === 'must_not_miss'
+        ) ?? []
       ),
-    [cdssResult],
-  );
+    [cdssResult]
+  )
   const hasOnlyMustNotMissResults =
     Boolean(cdssResult) &&
     recommendedSuggestions.length === 0 &&
     reviewSuggestions.length === 0 &&
-    mustNotMissSuggestions.length > 0;
+    mustNotMissSuggestions.length > 0
   const hasConsideredMustNotMissOnly =
-    hasOnlyMustNotMissResults && consideredMustNotMissKeys.length > 0;
+    hasOnlyMustNotMissResults && consideredMustNotMissKeys.length > 0
   const importantBestQuestions = useMemo(
     () =>
       deriveImportantBestQuestions(
         keluhanUtama,
         keluhanTambahan,
-        cdssResult?.next_best_questions ?? [],
+        cdssResult?.next_best_questions ?? []
       ),
-    [keluhanUtama, keluhanTambahan, cdssResult],
-  );
+    [keluhanUtama, keluhanTambahan, cdssResult]
+  )
   const compactVitalsSignals = useMemo(() => {
     const items = [
-      { label: "TD", value: vitals.td ? `${vitals.td} mmHg` : null },
-      { label: "Nadi", value: vitals.nadi ? `${vitals.nadi} bpm` : null },
-      { label: "RR", value: vitals.napas ? `${vitals.napas} x/menit` : null },
-      { label: "Suhu", value: vitals.suhu ? `${vitals.suhu} °C` : null },
-      { label: "SpO2", value: vitals.spo2 ? `${vitals.spo2}%` : null },
+      { label: 'TD', value: vitals.td ? `${vitals.td} mmHg` : null },
+      { label: 'Nadi', value: vitals.nadi ? `${vitals.nadi} bpm` : null },
+      { label: 'RR', value: vitals.napas ? `${vitals.napas} x/menit` : null },
+      { label: 'Suhu', value: vitals.suhu ? `${vitals.suhu} °C` : null },
+      { label: 'SpO2', value: vitals.spo2 ? `${vitals.spo2}%` : null },
       {
         label: gulaDarah.tipe,
         value: gulaDarah.nilai ? `${gulaDarah.nilai} mg/dL` : null,
       },
       {
-        label: "Alert",
-        value:
-          screeningAlerts.length > 0 ? `${screeningAlerts.length} aktif` : null,
+        label: 'Alert',
+        value: screeningAlerts.length > 0 ? `${screeningAlerts.length} aktif` : null,
       },
-    ];
-    return items.filter((item) => item.value);
+    ]
+    return items.filter(item => item.value)
   }, [
     gulaDarah.nilai,
     gulaDarah.tipe,
@@ -3223,77 +3466,70 @@ export default function EMRPage() {
     vitals.spo2,
     vitals.suhu,
     vitals.td,
-  ]);
-  const showCdssAnimatedBranch = cdssLoading;
-  const cdssBranchFlowKey = `cdss-branch-${cdssBranchRunId}-${cdssResult?.processing_time_ms ?? "loading"}-${cdssResult?.validation_summary.total_validated ?? 0}-${cdssResult?.validation_summary.must_not_miss_count ?? 0}`;
+  ])
+  const showCdssAnimatedBranch = cdssLoading
+  const cdssBranchFlowKey = `cdss-branch-${cdssBranchRunId}-${cdssResult?.processing_time_ms ?? 'loading'}-${cdssResult?.validation_summary.total_validated ?? 0}-${cdssResult?.validation_summary.must_not_miss_count ?? 0}`
   const assessmentStageBadge = cdssLoading
-    ? "ENGINE BERJALAN"
+    ? 'ENGINE BERJALAN'
     : selectedDiagnosisDraft
-      ? "DIAGNOSIS KERJA TERPILIH"
+      ? 'DIAGNOSIS KERJA TERPILIH'
       : hasConsideredMustNotMissOnly
-        ? "RISIKO TINGGI SUDAH DITANDAI"
+        ? 'RISIKO TINGGI SUDAH DITANDAI'
         : cdssResult
           ? hasOnlyMustNotMissResults
-            ? "TINJAU MUST-NOT-MISS"
-            : "HASIL SIAP DIREVIEW"
+            ? 'TINJAU MUST-NOT-MISS'
+            : 'HASIL SIAP DIREVIEW'
           : assessmentConclusion.trim()
-            ? "SIAP MENJALANKAN ENGINE"
-            : "MENUNGGU ASSESSMENT";
+            ? 'SIAP MENJALANKAN ENGINE'
+            : 'MENUNGGU ASSESSMENT'
   const readinessComplaintHeadline = useMemo(() => {
     const parts = [keluhanUtama.trim(), keluhanTambahan.trim()]
       .filter(Boolean)
-      .flatMap((value) => value.split(/[;,]/))
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const uniqueParts = Array.from(new Set(parts));
-    return uniqueParts.slice(0, 3).join(", ");
-  }, [keluhanTambahan, keluhanUtama]);
+      .flatMap(value => value.split(/[;,]/))
+      .map(value => value.trim())
+      .filter(Boolean)
+    const uniqueParts = Array.from(new Set(parts))
+    return uniqueParts.slice(0, 3).join(', ')
+  }, [keluhanTambahan, keluhanUtama])
   const readinessOnsetLabel = useMemo(() => {
-    const onset = anamnesaEntities.onset?.trim() ?? "";
-    if (!onset || /^perlu eksplorasi/i.test(onset)) return null;
-    return onset;
-  }, [anamnesaEntities.onset]);
+    const onset = anamnesaEntities.onset?.trim() ?? ''
+    if (!onset || /^perlu eksplorasi/i.test(onset)) return null
+    return onset
+  }, [anamnesaEntities.onset])
   const readinessTriageLabel = useMemo(() => {
-    if (screeningAlerts.length === 0) return "Hijau";
-    return "Kuning";
-  }, [screeningAlerts.length]);
-  const readinessTriageColor =
-    readinessTriageLabel === "Hijau" ? "#78A884" : "#E8A838";
+    if (screeningAlerts.length === 0) return 'Hijau'
+    return 'Kuning'
+  }, [screeningAlerts.length])
+  const readinessTriageColor = readinessTriageLabel === 'Hijau' ? '#78A884' : '#E8A838'
   const assessmentAutoDraft = useMemo(() => {
     const complaint = summarizeClinicalSnippet(
-      [keluhanUtama.trim(), keluhanTambahan.trim()].filter(Boolean).join(", "),
-      92,
-    );
-    const rps = summarizeClinicalSnippet(riwayat.rps, 152);
+      [keluhanUtama.trim(), keluhanTambahan.trim()].filter(Boolean).join(', '),
+      92
+    )
+    const rps = summarizeClinicalSnippet(riwayat.rps, 152)
     const objective = compactVitalsSignals
-      .filter((item) => item.label !== "Alert")
+      .filter(item => item.label !== 'Alert')
       .slice(0, 4)
-      .map((item) => `${item.label} ${item.value}`)
-      .join(", ");
+      .map(item => `${item.label} ${item.value}`)
+      .join(', ')
     const alerts =
-      screeningAlerts.length > 0
-        ? `${screeningAlerts.length} alert klinis perlu perhatian`
-        : "";
+      screeningAlerts.length > 0 ? `${screeningAlerts.length} alert klinis perlu perhatian` : ''
     const background = [
-      rpdSelected.size > 0
-        ? `Komorbid: ${Array.from(rpdSelected).join(", ")}`
-        : "",
-      alergiSelected.size > 0
-        ? `Alergi: ${Array.from(alergiSelected).join(", ")}`
-        : "",
+      rpdSelected.size > 0 ? `Komorbid: ${Array.from(rpdSelected).join(', ')}` : '',
+      alergiSelected.size > 0 ? `Alergi: ${Array.from(alergiSelected).join(', ')}` : '',
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join(' · ')
 
     const segments = [
-      complaint ? `Keluhan: ${complaint}` : "",
-      rps ? `RPS: ${rps}` : "",
-      objective ? `Objektif: ${objective}` : "",
-      alerts ? `Triage: ${alerts}` : "",
+      complaint ? `Keluhan: ${complaint}` : '',
+      rps ? `RPS: ${rps}` : '',
+      objective ? `Objektif: ${objective}` : '',
+      alerts ? `Triage: ${alerts}` : '',
       background,
-    ].filter(Boolean);
+    ].filter(Boolean)
 
-    return segments.join(". ");
+    return segments.join('. ')
   }, [
     alergiSelected,
     compactVitalsSignals,
@@ -3302,20 +3538,18 @@ export default function EMRPage() {
     riwayat.rps,
     rpdSelected,
     screeningAlerts.length,
-  ]);
+  ])
   const assessmentAutoDraftSignature = useMemo(
     () =>
       [
         keluhanUtama.trim(),
         keluhanTambahan.trim(),
         riwayat.rps.trim(),
-        Array.from(rpdSelected).sort().join("|"),
-        Array.from(alergiSelected).sort().join("|"),
-        compactVitalsSignals
-          .map((item) => `${item.label}:${item.value}`)
-          .join("|"),
+        Array.from(rpdSelected).sort().join('|'),
+        Array.from(alergiSelected).sort().join('|'),
+        compactVitalsSignals.map(item => `${item.label}:${item.value}`).join('|'),
         screeningAlerts.length,
-      ].join("::"),
+      ].join('::'),
     [
       alergiSelected,
       compactVitalsSignals,
@@ -3324,14 +3558,12 @@ export default function EMRPage() {
       riwayat.rps,
       rpdSelected,
       screeningAlerts.length,
-    ],
-  );
+    ]
+  )
   const surfacedSuggestionCount =
-    recommendedSuggestions.length +
-    reviewSuggestions.length +
-    mustNotMissSuggestions.length;
+    recommendedSuggestions.length + reviewSuggestions.length + mustNotMissSuggestions.length
   const readinessOutputTitle = cdssLoading
-    ? "Engine sedang memproses"
+    ? 'Engine sedang memproses'
     : cdssResult
       ? recommendedSuggestions.length > 0
         ? `${recommendedSuggestions.length} rekomendasi siap`
@@ -3339,88 +3571,76 @@ export default function EMRPage() {
           ? `${reviewSuggestions.length} differential perlu review`
           : mustNotMissSuggestions.length > 0
             ? `${mustNotMissSuggestions.length} must-not-miss surfaced`
-            : "Belum ada keluaran"
-      : "CDSS belum dijalankan";
+            : 'Belum ada keluaran'
+      : 'CDSS belum dijalankan'
   const readinessOutputSubtitle = cdssLoading
-    ? "Iskandar sedang menyusun differential, validasi, dan safety lane."
+    ? 'Iskandar sedang menyusun differential, validasi, dan safety lane.'
     : cdssResult
       ? [
-          recommendedSuggestions.length > 0
-            ? `${recommendedSuggestions.length} recommended`
-            : null,
-          reviewSuggestions.length > 0
-            ? `${reviewSuggestions.length} review`
-            : null,
+          recommendedSuggestions.length > 0 ? `${recommendedSuggestions.length} recommended` : null,
+          reviewSuggestions.length > 0 ? `${reviewSuggestions.length} review` : null,
           mustNotMissSuggestions.length > 0
             ? `${mustNotMissSuggestions.length} must-not-miss`
             : null,
-          cdssResult.red_flags.length > 0
-            ? `${cdssResult.red_flags.length} alert klinis`
-            : null,
+          cdssResult.red_flags.length > 0 ? `${cdssResult.red_flags.length} alert klinis` : null,
         ]
           .filter(Boolean)
-          .join(" · ") || `${surfacedSuggestionCount} keluaran klinis tersedia.`
-      : "Jalankan setelah sintesis klinis cukup jelas.";
+          .join(' · ') || `${surfacedSuggestionCount} keluaran klinis tersedia.`
+      : 'Jalankan setelah sintesis klinis cukup jelas.'
   const topSuggestion =
     selectedDiagnosisDraft ??
     recommendedSuggestions[0] ??
     reviewSuggestions[0] ??
     mustNotMissSuggestions[0] ??
-    null;
+    null
   const readinessDecisionTitle = selectedDiagnosisDraft
-    ? "Keputusan klinis dipilih"
+    ? 'Keputusan klinis dipilih'
     : hasConsideredMustNotMissOnly
-      ? "Risiko tinggi sudah ditandai"
+      ? 'Risiko tinggi sudah ditandai'
       : topSuggestion
-        ? "Menunggu keputusan klinis"
-        : "Belum ada keputusan klinis";
+        ? 'Menunggu keputusan klinis'
+        : 'Belum ada keputusan klinis'
   const readinessDecisionSubtitle = selectedDiagnosisDraft
     ? `${selectedDiagnosisDraft.diagnosis_name} (${selectedDiagnosisDraft.icd10_code}) · ${Math.round(selectedDiagnosisDraft.confidence * 100)}% confidence`
     : hasConsideredMustNotMissOnly
-      ? "Must-not-miss sudah dipertimbangkan. Tetapkan diagnosis kerja manual bila sesuai."
+      ? 'Must-not-miss sudah dipertimbangkan. Tetapkan diagnosis kerja manual bila sesuai.'
       : topSuggestion
         ? `Top suggestion: ${topSuggestion.diagnosis_name} (${topSuggestion.icd10_code}) · ${Math.round(topSuggestion.confidence * 100)}% confidence. Klik untuk review.`
-        : "Jalankan CDSS untuk mendapatkan differential dan lane keputusan.";
+        : 'Jalankan CDSS untuk mendapatkan differential dan lane keputusan.'
   const audreyStateLabel = showEmrLoader
-    ? "EXTRACTING..."
+    ? 'EXTRACTING...'
     : isTyping
-      ? "SYNTHESIZING..."
+      ? 'SYNTHESIZING...'
       : historyLoaded
-        ? "READY"
+        ? 'READY'
         : keluhanUtama.trim()
-          ? "STANDBY"
-          : "IDLE";
+          ? 'STANDBY'
+          : 'IDLE'
   const audreyStateColor =
-    showEmrLoader || isTyping
-      ? "#5B8DB8"
-      : historyLoaded
-        ? "var(--text-main)"
-        : "var(--text-muted)";
-  const audreyIsThinking = showEmrLoader || isTyping;
+    showEmrLoader || isTyping ? '#5B8DB8' : historyLoaded ? 'var(--text-main)' : 'var(--text-muted)'
+  const audreyIsThinking = showEmrLoader || isTyping
   useEffect(() => {
-    if (workflowTab !== "assessment") return;
-    if (selectedDiagnosisDraft) return;
-    if (!assessmentAutoDraft.trim()) return;
+    if (workflowTab !== 'assessment') return
+    if (selectedDiagnosisDraft) return
+    if (!assessmentAutoDraft.trim()) return
 
     const shouldAutofill =
-      assessmentConclusionMeta.mode !== "edited" ||
-      !assessmentConclusion.trim();
+      assessmentConclusionMeta.mode !== 'edited' || !assessmentConclusion.trim()
 
-    if (!shouldAutofill) return;
+    if (!shouldAutofill) return
     if (
-      assessmentConclusionMeta.mode === "auto" &&
+      assessmentConclusionMeta.mode === 'auto' &&
       assessmentConclusionMeta.signature === assessmentAutoDraftSignature &&
-      normalizeClinicalPhrase(assessmentConclusion) ===
-        normalizeClinicalPhrase(assessmentAutoDraft)
+      normalizeClinicalPhrase(assessmentConclusion) === normalizeClinicalPhrase(assessmentAutoDraft)
     ) {
-      return;
+      return
     }
 
-    setAssessmentConclusion(assessmentAutoDraft);
+    setAssessmentConclusion(assessmentAutoDraft)
     setAssessmentConclusionMeta({
-      mode: "auto",
+      mode: 'auto',
       signature: assessmentAutoDraftSignature,
-    });
+    })
   }, [
     assessmentAutoDraft,
     assessmentAutoDraftSignature,
@@ -3429,25 +3649,23 @@ export default function EMRPage() {
     assessmentConclusionMeta.signature,
     selectedDiagnosisDraft,
     workflowTab,
-  ]);
+  ])
   const finalizationSuggestion = useMemo(() => {
-    if (!cdssResult || !selectedSuggestionKey) return null;
+    if (!cdssResult || !selectedSuggestionKey) return null
     return (
       cdssResult.suggestions.find(
-        (suggestion) => getSuggestionKey(suggestion) === selectedSuggestionKey,
+        suggestion => getSuggestionKey(suggestion) === selectedSuggestionKey
       ) ?? null
-    );
-  }, [cdssResult, selectedSuggestionKey]);
+    )
+  }, [cdssResult, selectedSuggestionKey])
   const finalizationReferralDiagnosisCandidates = useMemo(() => {
-    if (!cdssResult) return [];
-    const primaryName = finalizationSuggestion?.diagnosis_name
-      ?.trim()
-      .toLowerCase();
+    if (!cdssResult) return []
+    const primaryName = finalizationSuggestion?.diagnosis_name?.trim().toLowerCase()
     return cdssResult.suggestions
-      .map((suggestion) => suggestion.diagnosis_name.trim())
-      .filter((name) => name && name.toLowerCase() !== primaryName)
-      .slice(0, 3);
-  }, [cdssResult, finalizationSuggestion?.diagnosis_name]);
+      .map(suggestion => suggestion.diagnosis_name.trim())
+      .filter(name => name && name.toLowerCase() !== primaryName)
+      .slice(0, 3)
+  }, [cdssResult, finalizationSuggestion?.diagnosis_name])
   const finalizationTherapyPlan = useMemo(
     () =>
       buildFinalizationTherapyPlan({
@@ -3458,7 +3676,7 @@ export default function EMRPage() {
         chronicDiseases: Array.from(rpdSelected),
         patientAge,
         patientGender,
-        isPregnant: patientGender === "P" ? isPregnant : false,
+        isPregnant: patientGender === 'P' ? isPregnant : false,
       }),
     [
       alergiSelected,
@@ -3469,126 +3687,106 @@ export default function EMRPage() {
       patientAge,
       patientGender,
       rpdSelected,
-    ],
-  );
+    ]
+  )
   const finalizationDiagnosisSummary = useMemo(
-    () =>
-      selectedDiagnosisDraft
-        ? summarizeSuggestionReason(selectedDiagnosisDraft)
-        : "",
-    [selectedDiagnosisDraft],
-  );
+    () => (selectedDiagnosisDraft ? summarizeSuggestionReason(selectedDiagnosisDraft) : ''),
+    [selectedDiagnosisDraft]
+  )
   const finalizationDecisionBucket = useMemo(
     () =>
-      selectedDiagnosisDraft
-        ? getDecisionBucketLabel(selectedDiagnosisDraft.decision_status)
-        : "",
-    [selectedDiagnosisDraft],
-  );
+      selectedDiagnosisDraft ? getDecisionBucketLabel(selectedDiagnosisDraft.decision_status) : '',
+    [selectedDiagnosisDraft]
+  )
   const manualMedicationSuggestions = useMemo(
     () => searchManualMedicationSuggestions(medInput),
-    [medInput],
-  );
+    [medInput]
+  )
   useEffect(() => {
     if (!medInput.trim() || manualMedicationSuggestions.length === 0) {
-      setActiveMedicationSuggestionIndex(0);
-      return;
+      setActiveMedicationSuggestionIndex(0)
+      return
     }
 
-    setActiveMedicationSuggestionIndex((prev) => {
-      if (prev < 0) return 0;
-      return Math.min(prev, manualMedicationSuggestions.length - 1);
-    });
-  }, [manualMedicationSuggestions, medInput]);
+    setActiveMedicationSuggestionIndex(prev => {
+      if (prev < 0) return 0
+      return Math.min(prev, manualMedicationSuggestions.length - 1)
+    })
+  }, [manualMedicationSuggestions, medInput])
   const appendManualMedication = useCallback((entry: ManualMedicationEntry) => {
-    setManualMedications((prev) => {
+    setManualMedications(prev => {
       const duplicate = prev.some(
-        (item) =>
+        item =>
           item.name.toLowerCase() === entry.name.toLowerCase() &&
           item.dose === entry.dose &&
           item.frequency === entry.frequency &&
-          item.route === entry.route,
-      );
+          item.route === entry.route
+      )
       if (duplicate || prev.length >= 4) {
-        return prev;
+        return prev
       }
-      return [...prev, entry];
-    });
-    setMedInput("");
-    setActiveMedicationSuggestionIndex(0);
-  }, []);
+      return [...prev, entry]
+    })
+    setMedInput('')
+    setActiveMedicationSuggestionIndex(0)
+  }, [])
   const submitManualMedication = useCallback(() => {
-    if (!medInput.trim() || manualMedications.length >= 4) return;
+    if (!medInput.trim() || manualMedications.length >= 4) return
     const suggested =
-      manualMedicationSuggestions[activeMedicationSuggestionIndex] ??
-      manualMedicationSuggestions[0];
+      manualMedicationSuggestions[activeMedicationSuggestionIndex] ?? manualMedicationSuggestions[0]
     appendManualMedication(
       suggested
         ? createManualMedicationEntryFromSuggestion(suggested)
-        : createManualMedicationEntryFromFreeText(medInput),
-    );
+        : createManualMedicationEntryFromFreeText(medInput)
+    )
   }, [
     activeMedicationSuggestionIndex,
     appendManualMedication,
     manualMedicationSuggestions,
     manualMedications.length,
     medInput,
-  ]);
-  const getFinalizationMedicationKey = useCallback(
-    (item: FinalizationMedicationItem) => {
-      return [item.canonicalName, item.name, item.dose, item.frequency]
-        .filter(Boolean)
-        .join("::");
-    },
-    [],
-  );
+  ])
+  const getFinalizationMedicationKey = useCallback((item: FinalizationMedicationItem) => {
+    return [item.canonicalName, item.name, item.dose, item.frequency].filter(Boolean).join('::')
+  }, [])
   const finalizationMedicationKeys = useMemo(
-    () =>
-      finalizationTherapyPlan.medications.map((item) =>
-        getFinalizationMedicationKey(item),
-      ),
-    [finalizationTherapyPlan.medications, getFinalizationMedicationKey],
-  );
+    () => finalizationTherapyPlan.medications.map(item => getFinalizationMedicationKey(item)),
+    [finalizationTherapyPlan.medications, getFinalizationMedicationKey]
+  )
   useEffect(() => {
-    setSelectedAIMedicationKeys((prev) => {
-      if (finalizationMedicationKeys.length === 0) return [];
-      if (prev.length === 0) return finalizationMedicationKeys;
+    setSelectedAIMedicationKeys(prev => {
+      if (finalizationMedicationKeys.length === 0) return []
+      if (prev.length === 0) return finalizationMedicationKeys
 
-      const previousSelection = new Set(prev);
-      const preserved = finalizationMedicationKeys.filter((key) =>
-        previousSelection.has(key),
-      );
-      return preserved.length > 0 ? preserved : finalizationMedicationKeys;
-    });
-  }, [finalizationMedicationKeys]);
+      const previousSelection = new Set(prev)
+      const preserved = finalizationMedicationKeys.filter(key => previousSelection.has(key))
+      return preserved.length > 0 ? preserved : finalizationMedicationKeys
+    })
+  }, [finalizationMedicationKeys])
   const selectedAIMedicationKeySet = useMemo(
     () => new Set(selectedAIMedicationKeys),
-    [selectedAIMedicationKeys],
-  );
+    [selectedAIMedicationKeys]
+  )
   const selectedFinalizationMedications = useMemo(
     () =>
-      finalizationTherapyPlan.medications.filter((item) =>
-        selectedAIMedicationKeySet.has(getFinalizationMedicationKey(item)),
+      finalizationTherapyPlan.medications.filter(item =>
+        selectedAIMedicationKeySet.has(getFinalizationMedicationKey(item))
       ),
-    [
-      finalizationTherapyPlan.medications,
-      getFinalizationMedicationKey,
-      selectedAIMedicationKeySet,
-    ],
-  );
+    [finalizationTherapyPlan.medications, getFinalizationMedicationKey, selectedAIMedicationKeySet]
+  )
   const toggleAIMedicationSelection = useCallback((medicationKey: string) => {
-    setSelectedAIMedicationKeys((prev) =>
+    setSelectedAIMedicationKeys(prev =>
       prev.includes(medicationKey)
-        ? prev.filter((key) => key !== medicationKey)
-        : [...prev, medicationKey],
-    );
-  }, []);
+        ? prev.filter(key => key !== medicationKey)
+        : [...prev, medicationKey]
+    )
+  }, [])
   const selectAllAIMedications = useCallback(() => {
-    setSelectedAIMedicationKeys(finalizationMedicationKeys);
-  }, [finalizationMedicationKeys]);
+    setSelectedAIMedicationKeys(finalizationMedicationKeys)
+  }, [finalizationMedicationKeys])
   const clearAllAIMedications = useCallback(() => {
-    setSelectedAIMedicationKeys([]);
-  }, []);
+    setSelectedAIMedicationKeys([])
+  }, [])
   const visibleFinalizationMedications = useMemo(
     () =>
       showSelectedAIMedicationsOnly
@@ -3598,21 +3796,21 @@ export default function EMRPage() {
       finalizationTherapyPlan.medications,
       selectedFinalizationMedications,
       showSelectedAIMedicationsOnly,
-    ],
-  );
+    ]
+  )
   const finalizationMedicationSummary = useMemo(() => {
     const available = finalizationTherapyPlan.medications.filter(
-      (item) => item.stockStatus === "mapped_available",
-    ).length;
+      item => item.stockStatus === 'mapped_available'
+    ).length
     const limited = finalizationTherapyPlan.medications.filter(
-      (item) => item.stockStatus === "mapped_limited",
-    ).length;
+      item => item.stockStatus === 'mapped_limited'
+    ).length
     const unavailable = finalizationTherapyPlan.medications.filter(
-      (item) => item.stockStatus === "mapped_not_in_stock",
-    ).length;
+      item => item.stockStatus === 'mapped_not_in_stock'
+    ).length
     const unmapped = finalizationTherapyPlan.medications.filter(
-      (item) => item.stockStatus === "not_mapped_to_formulary",
-    ).length;
+      item => item.stockStatus === 'not_mapped_to_formulary'
+    ).length
     return {
       total: finalizationTherapyPlan.medications.length,
       selected: selectedFinalizationMedications.length,
@@ -3620,92 +3818,88 @@ export default function EMRPage() {
       limited,
       unavailable,
       unmapped,
-    };
-  }, [finalizationTherapyPlan, selectedFinalizationMedications.length]);
+    }
+  }, [finalizationTherapyPlan, selectedFinalizationMedications.length])
   const finalizationReadiness = useMemo(() => {
     const checks = [
       {
-        label: "Diagnosis kerja",
+        label: 'Diagnosis kerja',
         value: selectedDiagnosisDraft
           ? `${selectedDiagnosisDraft.icd10_code} • ${selectedDiagnosisDraft.diagnosis_name}`
-          : "Belum dipilih",
-        state: selectedDiagnosisDraft ? "ready" : ("pending" as const),
+          : 'Belum dipilih',
+        state: selectedDiagnosisDraft ? 'ready' : ('pending' as const),
       },
       {
-        label: "Farmakologi",
+        label: 'Farmakologi',
         value:
           finalizationTherapyPlan.medications.length > 0
             ? `${selectedFinalizationMedications.length}/${finalizationTherapyPlan.medications.length} obat AI dipakai di resep`
-            : "Belum ada obat terpetakan",
+            : 'Belum ada obat terpetakan',
         state:
           selectedFinalizationMedications.length > 0
-            ? "ready"
+            ? 'ready'
             : finalizationTherapyPlan.medications.length > 0
-              ? "review"
-              : "pending",
+              ? 'review'
+              : 'pending',
       },
       {
-        label: "Safety check",
+        label: 'Safety check',
         value:
           finalizationTherapyPlan.safetyChecks.length > 0
             ? `${finalizationTherapyPlan.safetyChecks.length} guardrail aktif`
-            : "Belum ada guardrail",
-        state:
-          finalizationTherapyPlan.safetyChecks.length > 0 ? "ready" : "pending",
+            : 'Belum ada guardrail',
+        state: finalizationTherapyPlan.safetyChecks.length > 0 ? 'ready' : 'pending',
       },
-    ];
+    ]
 
-    const hasPending = checks.some((check) => check.state === "pending");
-    const hasReview = checks.some((check) => check.state === "review");
+    const hasPending = checks.some(check => check.state === 'pending')
+    const hasReview = checks.some(check => check.state === 'review')
 
     return {
       checks,
       title: hasPending
-        ? "Belum siap sign-off"
+        ? 'Belum siap sign-off'
         : hasReview
-          ? "Siap dengan verifikasi akhir"
-          : "Siap untuk sign-off dokter",
+          ? 'Siap dengan verifikasi akhir'
+          : 'Siap untuk sign-off dokter',
       note: hasPending
-        ? "Lengkapi diagnosis kerja dan elemen terapi penting sebelum finalisasi dianggap utuh."
+        ? 'Lengkapi diagnosis kerja dan elemen terapi penting sebelum finalisasi dianggap utuh.'
         : hasReview
-          ? "Diagnosis sudah siap, tetapi susunan farmakologi masih perlu diverifikasi manual sebelum resep diterbitkan."
-          : "Diagnosis, terapi awal, dan safety check sudah cukup rapi untuk verifikasi final dokter.",
-      tone: hasPending ? "pending" : hasReview ? "review" : "ready",
-    };
+          ? 'Diagnosis sudah siap, tetapi susunan farmakologi masih perlu diverifikasi manual sebelum resep diterbitkan.'
+          : 'Diagnosis, terapi awal, dan safety check sudah cukup rapi untuk verifikasi final dokter.',
+      tone: hasPending ? 'pending' : hasReview ? 'review' : 'ready',
+    }
   }, [
     finalizationTherapyPlan,
     finalizationTherapyPlan.medications.length,
     finalizationTherapyPlan.safetyChecks.length,
     selectedDiagnosisDraft,
     selectedFinalizationMedications.length,
-  ]);
+  ])
 
   function renderSuggestionCard(s: CDSSSuggestion) {
-    const suggestionKey = getSuggestionKey(s);
-    const accent = getDecisionAccent(s.decision_status);
-    const isMustNotMiss = s.decision_status === "must_not_miss";
-    const isReview = s.decision_status === "review";
+    const suggestionKey = getSuggestionKey(s)
+    const accent = getDecisionAccent(s.decision_status)
+    const isMustNotMiss = s.decision_status === 'must_not_miss'
+    const isReview = s.decision_status === 'review'
     const isSelected =
-      selectedSuggestionKey === suggestionKey ||
-      consideredMustNotMissKeys.includes(suggestionKey);
-    const summaryReason = summarizeSuggestionReason(s);
-    const disposition = getSuggestionDisposition(s);
+      selectedSuggestionKey === suggestionKey || consideredMustNotMissKeys.includes(suggestionKey)
+    const summaryReason = summarizeSuggestionReason(s)
+    const disposition = getSuggestionDisposition(s)
 
     return (
       <details
-        key={`${s.rank}-${s.icd10_code}-${s.decision_status ?? "review"}`}
-        className={`cdss-dropbar${isSelected ? " is-selected" : ""}`}
+        key={`${s.rank}-${s.icd10_code}-${s.decision_status ?? 'review'}`}
+        className={`cdss-dropbar${isSelected ? ' is-selected' : ''}`}
         open={isSelected}
-        style={{ ["--cdss-accent" as any]: accent }}
+        style={{ ['--cdss-accent' as any]: accent }}
       >
         <summary className="cdss-dropbar-summary">
           <div className="cdss-dropbar-main">
             <div className="cdss-dropbar-meta-row">
               <span className="cdss-dropbar-icd">
                 {s.icd10_code}
-                {s.rag_verified && (
-                  <span style={{ marginLeft: 4, opacity: 0.6 }}>✓</span>
-                )}
+                {s.rag_verified && <span style={{ marginLeft: 4, opacity: 0.6 }}>✓</span>}
               </span>
               <span className="cdss-dropbar-bucket">
                 {getDecisionBucketLabel(s.decision_status)}
@@ -3717,7 +3911,7 @@ export default function EMRPage() {
           <div className="cdss-dropbar-side">
             <span className="cdss-dropbar-score">
               {Math.round(s.confidence * 100)}%
-              {typeof s.deterministic_score === "number" &&
+              {typeof s.deterministic_score === 'number' &&
                 ` · H${Math.round(s.deterministic_score * 100)}`}
             </span>
             <span className="cdss-dropbar-expand-hint">click</span>
@@ -3726,36 +3920,32 @@ export default function EMRPage() {
         </summary>
         <div className="cdss-dropbar-body">
           <div className="cdss-suggestion-meta">
-            <span>source {s.rank_source ?? "hybrid"}</span>
-            {typeof s.llm_rank === "number" && <span>llm #{s.llm_rank}</span>}
-            {typeof s.deterministic_score === "number" && (
+            <span>source {s.rank_source ?? 'hybrid'}</span>
+            {typeof s.llm_rank === 'number' && <span>llm #{s.llm_rank}</span>}
+            {typeof s.deterministic_score === 'number' && (
               <span>hybrid {Math.round(s.deterministic_score * 100)}%</span>
             )}
           </div>
-          <div
-            className={`cdss-disposition-card cdss-disposition-card-${disposition.tone}`}
-          >
+          <div className={`cdss-disposition-card cdss-disposition-card-${disposition.tone}`}>
             <div className="cdss-disposition-label">{disposition.label}</div>
             <div className="cdss-disposition-note">{disposition.note}</div>
           </div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            {s.reasoning}
-          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{s.reasoning}</div>
           {s.validation_flags && s.validation_flags.length > 0 && (
             <div
               style={{
-                width: "100%",
+                width: '100%',
                 marginTop: 4,
-                padding: "6px 8px",
-                borderLeft: "2px solid #E8A838",
-                background: "rgba(232,168,56,0.06)",
+                padding: '6px 8px',
+                borderLeft: '2px solid #E8A838',
+                background: 'rgba(232,168,56,0.06)',
               }}
             >
               <div
                 style={{
                   fontSize: 12,
-                  letterSpacing: "0.08em",
-                  color: "#E8A838",
+                  letterSpacing: '0.08em',
+                  color: '#E8A838',
                   marginBottom: 4,
                 }}
               >
@@ -3764,7 +3954,7 @@ export default function EMRPage() {
               {s.validation_flags.slice(0, 3).map((flag, idx) => (
                 <div
                   key={`${s.icd10_code}-validation-${idx}`}
-                  style={{ fontSize: 12, color: "var(--text-muted)" }}
+                  style={{ fontSize: 12, color: 'var(--text-muted)' }}
                 >
                   • {flag.message}
                 </div>
@@ -3772,12 +3962,12 @@ export default function EMRPage() {
             </div>
           )}
           {s.key_reasons && s.key_reasons.length > 0 && (
-            <div style={{ width: "100%", marginTop: 4 }}>
+            <div style={{ width: '100%', marginTop: 4 }}>
               <div
                 style={{
                   fontSize: 13,
-                  letterSpacing: "0.08em",
-                  color: "var(--text-muted)",
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-muted)',
                 }}
               >
                 TOP-3 ALASAN
@@ -3785,7 +3975,7 @@ export default function EMRPage() {
               {s.key_reasons.slice(0, 3).map((reason, idx) => (
                 <div
                   key={`${s.icd10_code}-reason-${idx}`}
-                  style={{ fontSize: 13, color: "var(--text-main)" }}
+                  style={{ fontSize: 13, color: 'var(--text-main)' }}
                 >
                   • {reason}
                 </div>
@@ -3793,12 +3983,12 @@ export default function EMRPage() {
             </div>
           )}
           {s.missing_information && s.missing_information.length > 0 && (
-            <div style={{ width: "100%", marginTop: 4 }}>
+            <div style={{ width: '100%', marginTop: 4 }}>
               <div
                 style={{
                   fontSize: 13,
-                  letterSpacing: "0.08em",
-                  color: "var(--text-muted)",
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-muted)',
                 }}
               >
                 DATA TAMBAHAN DIBUTUHKAN
@@ -3806,7 +3996,7 @@ export default function EMRPage() {
               {s.missing_information.slice(0, 2).map((info, idx) => (
                 <div
                   key={`${s.icd10_code}-missing-${idx}`}
-                  style={{ fontSize: 13, color: "var(--text-muted)" }}
+                  style={{ fontSize: 13, color: 'var(--text-muted)' }}
                 >
                   ▸ {info}
                 </div>
@@ -3817,8 +4007,8 @@ export default function EMRPage() {
             <div
               style={{
                 fontSize: 13,
-                color: "var(--text-muted)",
-                fontStyle: "italic",
+                color: 'var(--text-muted)',
+                fontStyle: 'italic',
               }}
             >
               → {s.recommended_actions[0]}
@@ -3827,83 +4017,74 @@ export default function EMRPage() {
           <button
             type="button"
             onClick={() => void selectCdssSuggestion(s)}
-            disabled={
-              selectionSavingKey === suggestionKey || requiresEmergencyAck
-            }
+            disabled={selectionSavingKey === suggestionKey || requiresEmergencyAck}
             style={{
               marginTop: 4,
-              border: `1px solid ${isSelected ? accent : "var(--line-base)"}`,
-              background: isSelected ? "rgba(212,122,87,0.14)" : "transparent",
-              color: isSelected ? accent : "var(--text-muted)",
+              border: `1px solid ${isSelected ? accent : 'var(--line-base)'}`,
+              background: isSelected ? 'rgba(212,122,87,0.14)' : 'transparent',
+              color: isSelected ? accent : 'var(--text-muted)',
               fontSize: 13,
-              letterSpacing: "0.08em",
-              padding: "4px 8px",
+              letterSpacing: '0.08em',
+              padding: '4px 8px',
               cursor:
                 selectionSavingKey === suggestionKey || requiresEmergencyAck
-                  ? "not-allowed"
-                  : "pointer",
-              opacity:
-                selectionSavingKey === suggestionKey || requiresEmergencyAck
-                  ? 0.6
-                  : 1,
+                  ? 'not-allowed'
+                  : 'pointer',
+              opacity: selectionSavingKey === suggestionKey || requiresEmergencyAck ? 0.6 : 1,
             }}
           >
             {requiresEmergencyAck
-              ? "WAJIB ACK EMERGENCY"
+              ? 'WAJIB ACK EMERGENCY'
               : selectionSavingKey === suggestionKey
-                ? "MENYIMPAN..."
+                ? 'MENYIMPAN...'
                 : isMustNotMiss
                   ? isSelected
-                    ? "TERPILIH ✓"
-                    : "PILIH DIAGNOSIS KRITIS"
+                    ? 'TERPILIH ✓'
+                    : 'PILIH DIAGNOSIS KRITIS'
                   : isSelected
-                    ? "TERPILIH ✓"
+                    ? 'TERPILIH ✓'
                     : isReview
-                      ? "PILIH DENGAN ALASAN"
-                      : "PILIH DIAGNOSIS"}
+                      ? 'PILIH DENGAN ALASAN'
+                      : 'PILIH DIAGNOSIS'}
           </button>
         </div>
       </details>
-    );
+    )
   }
 
   function renderCdssBranchFlow() {
     const processingAgents = {
       left: [
-        { key: "intake", title: "THE", subtitle: "INTAKE AGENT" },
-        { key: "reasoning", title: "THE", subtitle: "REASONING AGENT" },
-        { key: "output", title: "THE", subtitle: "OUTPUT AGENT" },
+        { key: 'intake', title: 'THE', subtitle: 'INTAKE AGENT' },
+        { key: 'reasoning', title: 'THE', subtitle: 'REASONING AGENT' },
+        { key: 'output', title: 'THE', subtitle: 'OUTPUT AGENT' },
       ],
       right: [
-        { key: "mapping", title: "ICD-10", subtitle: "SEMANTIC MAPPING" },
-        { key: "path", title: "CLINICAL PATH", subtitle: "INTELLIGENCE" },
-        { key: "resource", title: "RESOURCE-AWARE", subtitle: "DIAGNOSTICS" },
+        { key: 'mapping', title: 'ICD-10', subtitle: 'SEMANTIC MAPPING' },
+        { key: 'path', title: 'CLINICAL PATH', subtitle: 'INTELLIGENCE' },
+        { key: 'resource', title: 'RESOURCE-AWARE', subtitle: 'DIAGNOSTICS' },
       ],
-    };
+    }
 
     const branchFlowClassName = [
-      "cdss-branch-flow",
-      showCdssAnimatedBranch ? "is-processing" : "",
-      cdssResult && !cdssLoading ? "is-result" : "",
+      'cdss-branch-flow',
+      showCdssAnimatedBranch ? 'is-processing' : '',
+      cdssResult && !cdssLoading ? 'is-result' : '',
     ]
       .filter(Boolean)
-      .join(" ");
+      .join(' ')
 
     const branchCoreClassName = [
-      "cdss-branch-core-shell",
-      cdssResult && !cdssLoading ? "is-result" : "",
+      'cdss-branch-core-shell',
+      cdssResult && !cdssLoading ? 'is-result' : '',
     ]
       .filter(Boolean)
-      .join(" ");
-    const showResultScanner = Boolean(cdssResult) && !cdssLoading;
-    const showProcessingGhost = showCdssAnimatedBranch;
+      .join(' ')
+    const showResultScanner = Boolean(cdssResult) && !cdssLoading
+    const showProcessingGhost = showCdssAnimatedBranch
 
     return (
-      <div
-        key={cdssBranchFlowKey}
-        className={branchFlowClassName}
-        aria-hidden="true"
-      >
+      <div key={cdssBranchFlowKey} className={branchFlowClassName} aria-hidden="true">
         {showResultScanner && (
           <>
             <div className="cdss-branch-scanner" aria-hidden="true">
@@ -3958,11 +4139,7 @@ export default function EMRPage() {
             </div>
           </div>
         )}
-        <svg
-          className="cdss-branch-svg"
-          viewBox="0 0 1000 180"
-          preserveAspectRatio="none"
-        >
+        <svg className="cdss-branch-svg" viewBox="0 0 1000 180" preserveAspectRatio="none">
           <defs>
             <marker
               id="cdss-branch-arrow"
@@ -4066,24 +4243,23 @@ export default function EMRPage() {
           ) : null}
         </svg>
       </div>
-    );
+    )
   }
 
   // ── TTV Inference — Gate 1: pakai Assist inferVitals + BP_THRESHOLDS ────────
 
   function inferTTV(overrideKeluhan?: string) {
-    const rpdStr = Array.from(rpdSelected).join(" ").toLowerCase();
+    const rpdStr = Array.from(rpdSelected).join(' ').toLowerCase()
     const baseComplaint =
-      overrideKeluhan ??
-      keluhanRef.current.utama + " " + keluhanRef.current.tambahan;
-    const complaint = (baseComplaint + " " + rpdStr).toLowerCase();
-    const isAdultOutpatient = patientAge >= 18;
-    const respiratoryComplaint = hasRespiratoryComplaint(complaint);
+      overrideKeluhan ?? keluhanRef.current.utama + ' ' + keluhanRef.current.tambahan
+    const complaint = (baseComplaint + ' ' + rpdStr).toLowerCase()
+    const isAdultOutpatient = patientAge >= 18
+    const respiratoryComplaint = hasRespiratoryComplaint(complaint)
 
     const contextualAdvice = suggestContextualVitals(complaint, {
       ageYears: patientAge,
       sex: patientGender,
-      isPregnant: patientGender === "P" ? isPregnant : false,
+      isPregnant: patientGender === 'P' ? isPregnant : false,
       bodyWeightKg: bodyWeightKg.trim() ? Number(bodyWeightKg) : undefined,
       recentActivity,
       stressState,
@@ -4093,7 +4269,7 @@ export default function EMRPage() {
         rr: vitals.napas.trim() ? Number(vitals.napas) : undefined,
         temp: vitals.suhu.trim() ? Number(vitals.suhu) : undefined,
       },
-    });
+    })
 
     const newVitals = {
       gcs: vitals.gcs.trim()
@@ -4120,544 +4296,446 @@ export default function EMRPage() {
           ? String(contextualAdvice.defaults.spo2)
           : vitals.spo2,
       map: vitals.map,
-    };
+    }
 
     const nextVitalMeta: Record<EmrVitalKey, VitalEntryMeta> = {
       gcs: vitals.gcs.trim()
         ? {
-            mode: "measured",
-            confidence: "high",
-            note: "Nilai GCS berasal dari input manual.",
+            mode: 'measured',
+            confidence: 'high',
+            note: 'Nilai GCS berasal dari input manual.',
           }
         : isAdultOutpatient && contextualAdvice.defaults.gcs !== undefined
           ? {
-              mode: "estimated",
-              confidence: "high",
-              note: "Default poli umum dewasa: GCS 15. Verifikasi bila ada perubahan kesadaran.",
+              mode: 'estimated',
+              confidence: 'high',
+              note: 'Default poli umum dewasa: GCS 15. Verifikasi bila ada perubahan kesadaran.',
             }
           : {
-              mode: "manual_required",
-              note: "GCS harus dinilai langsung di pasien.",
+              mode: 'manual_required',
+              note: 'GCS harus dinilai langsung di pasien.',
             },
       td: vitals.td.trim()
         ? {
-            mode: "measured",
-            confidence: "high",
-            note: "Tekanan darah berasal dari pengukuran manual.",
+            mode: 'measured',
+            confidence: 'high',
+            note: 'Tekanan darah berasal dari pengukuran manual.',
           }
         : {
-            mode: "manual_required",
-            note: "Tekanan darah wajib diukur manual sebelum keputusan klinis final.",
+            mode: 'manual_required',
+            note: 'Tekanan darah wajib diukur manual sebelum keputusan klinis final.',
           },
       nadi:
-        contextualAdvice.metadata.pulse?.source === "measured"
+        contextualAdvice.metadata.pulse?.source === 'measured'
           ? {
-              mode: "measured",
-              confidence: "high",
-              note: "Nadi berasal dari input manual.",
+              mode: 'measured',
+              confidence: 'high',
+              note: 'Nadi berasal dari input manual.',
             }
           : {
-              mode: "estimated",
-              confidence: contextualAdvice.metadata.pulse?.confidence ?? "low",
+              mode: 'estimated',
+              confidence: contextualAdvice.metadata.pulse?.confidence ?? 'low',
               note: contextualAdvice.metadata.pulse?.range
                 ? `Estimasi awal ${contextualAdvice.metadata.pulse.range.min}-${contextualAdvice.metadata.pulse.range.max} bpm.`
-                : "Estimasi awal, verifikasi dengan pengukuran manual bila memungkinkan.",
+                : 'Estimasi awal, verifikasi dengan pengukuran manual bila memungkinkan.',
             },
       napas:
-        contextualAdvice.metadata.rr?.source === "measured"
+        contextualAdvice.metadata.rr?.source === 'measured'
           ? {
-              mode: "measured",
-              confidence: "high",
-              note: "Frekuensi napas berasal dari input manual.",
+              mode: 'measured',
+              confidence: 'high',
+              note: 'Frekuensi napas berasal dari input manual.',
             }
           : {
-              mode: "estimated",
-              confidence: contextualAdvice.metadata.rr?.confidence ?? "low",
+              mode: 'estimated',
+              confidence: contextualAdvice.metadata.rr?.confidence ?? 'low',
               note: contextualAdvice.metadata.rr?.range
                 ? `Estimasi awal ${contextualAdvice.metadata.rr.range.min}-${contextualAdvice.metadata.rr.range.max} x/menit.`
-                : "Estimasi awal, verifikasi dengan pengamatan respirasi.",
+                : 'Estimasi awal, verifikasi dengan pengamatan respirasi.',
             },
       suhu:
-        contextualAdvice.metadata.temp?.source === "measured"
+        contextualAdvice.metadata.temp?.source === 'measured'
           ? {
-              mode: "measured",
-              confidence: "high",
-              note: "Suhu berasal dari input manual.",
+              mode: 'measured',
+              confidence: 'high',
+              note: 'Suhu berasal dari input manual.',
             }
           : {
-              mode: "estimated",
-              confidence: contextualAdvice.metadata.temp?.confidence ?? "low",
+              mode: 'estimated',
+              confidence: contextualAdvice.metadata.temp?.confidence ?? 'low',
               note: contextualAdvice.metadata.temp?.range
                 ? `Estimasi awal ${contextualAdvice.metadata.temp.range.min.toFixed(1)}-${contextualAdvice.metadata.temp.range.max.toFixed(1)}°C.`
-                : "Estimasi awal, verifikasi dengan termometer.",
+                : 'Estimasi awal, verifikasi dengan termometer.',
             },
       spo2: vitals.spo2.trim()
         ? {
-            mode: "measured",
-            confidence: "high",
-            note: "SpO2 berasal dari pulse oximeter.",
+            mode: 'measured',
+            confidence: 'high',
+            note: 'SpO2 berasal dari pulse oximeter.',
           }
         : isAdultOutpatient && contextualAdvice.defaults.spo2 !== undefined
           ? {
-              mode: "estimated",
-              confidence: "high",
-              note: "Default poli umum dewasa: SpO2 98%. Jika keluhan sesak, wajib ukur manual.",
+              mode: 'estimated',
+              confidence: 'high',
+              note: 'Default poli umum dewasa: SpO2 98%. Jika keluhan sesak, wajib ukur manual.',
             }
           : {
-              mode: "manual_required",
+              mode: 'manual_required',
               note: respiratoryComplaint
-                ? "Keluhan sesak membuat SpO2 wajib diukur manual."
-                : "SpO2 tidak aman diestimasi; ukur manual jika alat tersedia.",
+                ? 'Keluhan sesak membuat SpO2 wajib diukur manual.'
+                : 'SpO2 tidak aman diestimasi; ukur manual jika alat tersedia.',
             },
       map: vitals.map.trim()
         ? {
-            mode: "measured",
-            confidence: "high",
-            note: "MAP berasal dari input manual atau perhitungan terukur.",
+            mode: 'measured',
+            confidence: 'high',
+            note: 'MAP berasal dari input manual atau perhitungan terukur.',
           }
         : {
-            mode: "manual_required",
-            note: "MAP mengikuti tekanan darah terukur; hitung setelah TD tersedia.",
+            mode: 'manual_required',
+            note: 'MAP mengikuti tekanan darah terukur; hitung setelah TD tersedia.',
           },
-    };
+    }
 
-    const fields = (["gcs", "nadi", "napas", "suhu", "spo2"] as const)
-      .filter((field) => newVitals[field] && !vitals[field].trim())
+    const fields = (['gcs', 'nadi', 'napas', 'suhu', 'spo2'] as const)
+      .filter(field => newVitals[field] && !vitals[field].trim())
       .slice()
-      .sort(() => Math.random() - 0.5);
-    const FLASH_DUR = 160; // ms kilat menyala per field
-    const STEP_GAP = 200; // ms jarak antar field
+      .sort(() => Math.random() - 0.5)
+    const FLASH_DUR = 160 // ms kilat menyala per field
+    const STEP_GAP = 200 // ms jarak antar field
 
-    setVitalMeta(nextVitalMeta);
+    setVitalMeta(nextVitalMeta)
 
     fields.forEach((field, i) => {
-      const t = i * STEP_GAP;
-      setTimeout(() => setFlashingVital(field), t);
+      const t = i * STEP_GAP
+      setTimeout(() => setFlashingVital(field), t)
       setTimeout(
-        () => setVitals((prev) => ({ ...prev, [field]: newVitals[field] })),
-        t + FLASH_DUR / 2,
-      );
-      setTimeout(() => setFlashingVital(null), t + FLASH_DUR);
-    });
+        () => setVitals(prev => ({ ...prev, [field]: newVitals[field] })),
+        t + FLASH_DUR / 2
+      )
+      setTimeout(() => setFlashingVital(null), t + FLASH_DUR)
+    })
 
     if (fields.length === 0) {
-      setVitals((prev) => ({ ...prev, ...newVitals }));
+      setVitals(prev => ({ ...prev, ...newVitals }))
     }
 
-    setTimeout(
-      () => {
-        setHeaderText(
-          "Clinical Mind Algorithm dalam masa pengembangan intensif — khusus penggunaan Poli Umum Dewasa Puskesmas Balowerti",
-        );
-        setHeaderColor("var(--c-asesmen)");
-      },
-      Math.max(fields.length, 1) * STEP_GAP,
-    );
+    setTimeout(() => {
+      setHeaderText(
+        'Clinical Mind Algorithm dalam masa pengembangan intensif — khusus penggunaan Poli Umum Dewasa Puskesmas Balowerti'
+      )
+      setHeaderColor('var(--c-asesmen)')
+    }, Math.max(fields.length, 1) * STEP_GAP)
   }
 
-  // ── Gate 2/3/4 Alert Engine — sama persis pola Assist TTVInferenceUI.tsx ──
+  // ── Shared bedside alert evaluation (hard-stop + composite) ─────────────
   useEffect(() => {
-    const alerts: ScreeningAlert[] = [];
-    const [sbpStr, dbpStr] = (vitals.td || "/").split("/");
-    const sbpNum = parseInt(sbpStr) || 0;
-    const dbpNum = parseInt(dbpStr) || 0;
-    const glucoseNum = parseInt(gulaDarah.nilai) || 0;
+    if (!currentEncounterMeasurement) return
 
-    // Gate 2: HTN
-    if (sbpNum > 0) {
-      const bpSession: BPMeasurementSession = {
-        readings: [{ sbp: sbpNum, dbp: dbpNum }],
-        measurement_quality: "acceptable",
-        final_bp: { sbp: sbpNum, dbp: dbpNum },
-      };
-      const htnResult = classifyHypertension(bpSession);
-      if (sbpNum >= BP_THRESHOLDS.CRISIS.sbp) {
-        alerts.push({
-          id: "gate2-htn",
-          gate: "GATE_2_HTN",
-          type: "ht_crisis",
-          severity: "critical",
-          title: "HTN EMERGENCY — RUJUK IGD",
-          reasoning: htnResult.reasoning,
-          recommendations: getHTNRecommendations(htnResult.type, {
-            sbp: sbpNum,
-            dbp: dbpNum,
-          }),
-        });
-      } else if (sbpNum >= BP_THRESHOLDS.STAGE2.sbp) {
-        alerts.push({
-          id: "gate2-htn",
-          gate: "GATE_2_HTN",
-          type: "ht_urgency",
-          severity: "high",
-          title: "HTN URGENCY — CAPTOPRIL SL",
-          reasoning: htnResult.reasoning,
-          recommendations: getHTNRecommendations(htnResult.type, {
-            sbp: sbpNum,
-            dbp: dbpNum,
-          }),
-        });
-      }
+    const nextSignature = buildEncounterMeasurementSignature(currentEncounterMeasurement)
+    if (!nextSignature || nextSignature === latestEncounterMeasurementSignatureRef.current) {
+      return
     }
 
-    // Gate 3: Glucose
-    if (glucoseNum > 0) {
-      const glucoseData: GlucoseData = {
-        gds: glucoseNum,
-        sample_type: "capillary",
-        has_classic_symptoms: false,
-      };
-      const glucoseResult = classifyBloodGlucose(glucoseData);
-      if (glucoseResult.category === "HYPOGLYCEMIA_CRISIS") {
-        alerts.push({
-          id: "gate3-hipo",
-          gate: "GATE_3_GLUCOSE",
-          type: "hypoglycemia",
-          severity: "critical",
-          title: `HIPOGLIKEMIA — GDS ${glucoseNum} mg/dL`,
-          reasoning: glucoseResult.reasoning,
-          recommendations: glucoseResult.recommendations,
-        });
-      } else if (
-        glucoseResult.category === "DIABETES_CONFIRMED" ||
-        glucoseResult.category === "HYPERGLYCEMIA_CRISIS"
-      ) {
-        alerts.push({
-          id: "gate3-hiper",
-          gate: "GATE_3_GLUCOSE",
-          type: "hyperglycemia",
-          severity:
-            glucoseResult.category === "HYPERGLYCEMIA_CRISIS"
-              ? "critical"
-              : "high",
-          title: `${glucoseResult.category} — GDS ${glucoseNum} mg/dL`,
-          reasoning: glucoseResult.reasoning,
-          recommendations: glucoseResult.recommendations,
-        });
-      } else if (glucoseResult.category === "PREDIABETES") {
-        alerts.push({
-          id: "gate3-pre",
-          gate: "GATE_3_GLUCOSE",
-          type: "hyperglycemia",
-          severity: "warning",
-          title: `PREDIABETES — GDS ${glucoseNum} mg/dL`,
-          reasoning: glucoseResult.reasoning,
-          recommendations: glucoseResult.recommendations,
-        });
-      }
-    }
+    const timer = window.setTimeout(() => {
+      latestEncounterMeasurementSignatureRef.current = nextSignature
+      setEncounterMeasurements(prev =>
+        trimEncounterMeasurements([
+          ...prev,
+          {
+            ...currentEncounterMeasurement,
+            measuredAt: new Date().toISOString(),
+          },
+        ])
+      )
+    }, 1200)
 
-    // Gate 4: Occult Shock (hanya jika RPD Hipertensi)
-    if (sbpNum > 0 && rpdSelected.has("Hipertensi")) {
-      const shockResult = detectOccultShock({
-        vitals: {
-          current_sbp: sbpNum,
-          current_dbp: dbpNum,
-          glucose: glucoseNum || undefined,
-        },
-        last_3_visits: occultShockBaselineVisits,
-        symptoms: {
-          dizziness: false,
-          presyncope: false,
-          syncope: false,
-          weakness: false,
-        },
-        known_htn: true,
-      });
-      if (
-        shockResult.risk_level === "CRITICAL" ||
-        shockResult.risk_level === "HIGH"
-      ) {
-        alerts.push({
-          id: "gate4-shock",
-          gate: "GATE_4_OCCULT_SHOCK",
-          type: "occult_shock",
-          severity: shockResult.risk_level === "CRITICAL" ? "critical" : "high",
-          title: `OCCULT SHOCK — ${shockResult.risk_level}`,
-          reasoning: shockResult.triggers.join("; "),
-          recommendations: shockResult.recommendations,
-        });
-      }
-    }
+    return () => window.clearTimeout(timer)
+  }, [currentEncounterMeasurement])
 
-    setScreeningAlerts(alerts);
-  }, [vitals.td, gulaDarah.nilai, rpdSelected]);
+  useEffect(() => {
+    const nextComposite = evaluateCompositeDeteriorationFromEmrPayload(
+      buildRealtimeAlertPayload()
+    )
+
+    setScreeningAlerts(nextComposite.screeningAlerts)
+    setCompositeDeterioration(nextComposite)
+  }, [
+    gulaDarah.nilai,
+    isPregnant,
+    keluhanTambahan,
+    keluhanUtama,
+    patientAge,
+    patientGender,
+    receivedVisitHistory,
+    rpdSelected,
+    triageSignalContext,
+    vitals.gcs,
+    vitals.nadi,
+    vitals.napas,
+    vitals.spo2,
+    vitals.suhu,
+    vitals.td,
+  ])
 
   // ── Auto-generate skenario klinis ────────────────────────────────────────
   const AUTOGEN_SCENARIOS = {
     hipertensi: {
-      label: "HIPERTENSI",
-      keluhan_utama: "nyeri kepala bagian belakang, tengkuk terasa berat",
-      keluhan_tambahan:
-        "pandangan kadang kabur, riwayat hipertensi sejak 3 tahun",
+      label: 'HIPERTENSI',
+      keluhan_utama: 'nyeri kepala bagian belakang, tengkuk terasa berat',
+      keluhan_tambahan: 'pandangan kadang kabur, riwayat hipertensi sejak 3 tahun',
       vitals: {
-        gcs: "15",
-        td: "170/100",
-        nadi: "88",
-        napas: "18",
-        suhu: "36.8",
-        spo2: "97",
-        map: "123",
+        gcs: '15',
+        td: '170/100',
+        nadi: '88',
+        napas: '18',
+        suhu: '36.8',
+        spo2: '97',
+        map: '123',
       },
     },
     hiperglikemi: {
-      label: "HIPERGLIKEMIA",
-      keluhan_utama: "sering buang air kecil, haus terus, badan lemas",
-      keluhan_tambahan:
-        "penurunan berat badan 5 kg dalam 1 bulan, riwayat DM tipe 2",
+      label: 'HIPERGLIKEMIA',
+      keluhan_utama: 'sering buang air kecil, haus terus, badan lemas',
+      keluhan_tambahan: 'penurunan berat badan 5 kg dalam 1 bulan, riwayat DM tipe 2',
       vitals: {
-        gcs: "15",
-        td: "130/85",
-        nadi: "92",
-        napas: "20",
-        suhu: "37.2",
-        spo2: "98",
-        map: "100",
+        gcs: '15',
+        td: '130/85',
+        nadi: '92',
+        napas: '20',
+        suhu: '37.2',
+        spo2: '98',
+        map: '100',
       },
     },
     hipoglikemi: {
-      label: "HIPOGLIKEMIA",
-      keluhan_utama: "tangan gemetar, keringat dingin, pusing mendadak",
-      keluhan_tambahan:
-        "pasien DM pengguna insulin, telat makan siang, sempat lemas",
+      label: 'HIPOGLIKEMIA',
+      keluhan_utama: 'tangan gemetar, keringat dingin, pusing mendadak',
+      keluhan_tambahan: 'pasien DM pengguna insulin, telat makan siang, sempat lemas',
       vitals: {
-        gcs: "14",
-        td: "100/65",
-        nadi: "110",
-        napas: "22",
-        suhu: "36.5",
-        spo2: "96",
-        map: "77",
+        gcs: '14',
+        td: '100/65',
+        nadi: '110',
+        napas: '22',
+        suhu: '36.5',
+        spo2: '96',
+        map: '77',
       },
     },
-  } as const;
+  } as const
 
   function autoFillScenario(key: keyof typeof AUTOGEN_SCENARIOS) {
     // Toggle: klik lagi skenario yang aktif → reset
     if (activeScenario === key) {
-      setActiveScenario(null);
+      setActiveScenario(null)
       setVitals({
-        gcs: "",
-        td: "",
-        nadi: "",
-        napas: "",
-        suhu: "",
-        spo2: "",
-        map: "",
-      });
-      setVitalMeta(createInitialVitalMeta());
-      setHeaderText(
-        "SENTRA / PUSKESMAS KEDIRI // RM-BARU // SENAUTO ENGINE: IDLE",
-      );
-      setHeaderColor("var(--text-muted)");
-      return;
+        gcs: '',
+        td: '',
+        nadi: '',
+        napas: '',
+        suhu: '',
+        spo2: '',
+        map: '',
+      })
+      setVitalMeta(createInitialVitalMeta())
+      setHeaderText('SENTRA / PUSKESMAS KEDIRI // RM-BARU // SENAUTO ENGINE: IDLE')
+      setHeaderColor('var(--text-muted)')
+      return
     }
-    const s = AUTOGEN_SCENARIOS[key];
+    const s = AUTOGEN_SCENARIOS[key]
     // Hanya set skenario aktif — vitals diisi oleh Auto TTV
-    setActiveScenario(key);
-    setHeaderText(
-      `SENTRA // RM-BARU // AUTOGEN: SKENARIO ${s.label} AKTIF — JALANKAN AUTO TTV`,
-    );
-    setHeaderColor("var(--c-asesmen)");
+    setActiveScenario(key)
+    setHeaderText(`SENTRA // RM-BARU // AUTOGEN: SKENARIO ${s.label} AKTIF — JALANKAN AUTO TTV`)
+    setHeaderColor('var(--c-asesmen)')
   }
 
   const labItems = [
-    { name: "Hematologi Lengkap", status: "BELUM DIORDER" },
-    { name: "C-Reactive Protein (CRP)", status: "BELUM DIORDER" },
-    { name: "Foto Thorax AP/PA", status: "BELUM DIORDER" },
-  ];
+    { name: 'Hematologi Lengkap', status: 'BELUM DIORDER' },
+    { name: 'C-Reactive Protein (CRP)', status: 'BELUM DIORDER' },
+    { name: 'Foto Thorax AP/PA', status: 'BELUM DIORDER' },
+  ]
 
   const isCritical = (val: string, key: string) => {
-    const n = parseFloat(val);
-    if (isNaN(n)) return false;
-    if (key === "suhu" && n >= 38.0) return true;
-    if (key === "spo2" && n < 95) return true;
-    if (key === "nadi" && (n > 100 || n < 60)) return true;
-    return false;
-  };
+    const n = Number.parseFloat(val)
+    if (isNaN(n)) return false
+    if (key === 'suhu' && n >= 38.0) return true
+    if (key === 'spo2' && n < 95) return true
+    if (key === 'nadi' && (n > 100 || n < 60)) return true
+    return false
+  }
 
   const vitalFields: {
-    key: keyof typeof vitals;
-    label: string;
-    unit: string;
+    key: keyof typeof vitals
+    label: string
+    unit: string
   }[] = [
-    { key: "gcs", label: "GCS", unit: "/15" },
-    { key: "td", label: "Tekanan Darah", unit: "mmHg" },
-    { key: "nadi", label: "Nadi", unit: "bpm" },
-    { key: "napas", label: "Napas", unit: "x/m" },
-    { key: "suhu", label: "Suhu", unit: "°C" },
-    { key: "spo2", label: "SpO2", unit: "%" },
-    { key: "map", label: "MAP", unit: "mmHg" },
-  ];
+    { key: 'gcs', label: 'GCS', unit: '/15' },
+    { key: 'td', label: 'Tekanan Darah', unit: 'mmHg' },
+    { key: 'nadi', label: 'Nadi', unit: 'bpm' },
+    { key: 'napas', label: 'Napas', unit: 'x/m' },
+    { key: 'suhu', label: 'Suhu', unit: '°C' },
+    { key: 'spo2', label: 'SpO2', unit: '%' },
+    { key: 'map', label: 'MAP', unit: 'mmHg' },
+  ]
 
   const getVitalMetaLabel = (meta: VitalEntryMeta) => {
     switch (meta.mode) {
-      case "measured":
-        return "MEASURED";
-      case "estimated":
-        return meta.confidence
-          ? `EST. ${meta.confidence.toUpperCase()}`
-          : "ESTIMATED";
-      case "manual_required":
-        return "UKUR MANUAL";
+      case 'measured':
+        return 'MEASURED'
+      case 'estimated':
+        return meta.confidence ? `EST. ${meta.confidence.toUpperCase()}` : 'ESTIMATED'
+      case 'manual_required':
+        return 'UKUR MANUAL'
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   const getVitalMetaClassName = (meta: VitalEntryMeta) => {
     switch (meta.mode) {
-      case "measured":
-        return "v-meta-badge is-measured";
-      case "estimated":
-        return "v-meta-badge is-estimated";
-      case "manual_required":
-        return "v-meta-badge is-manual";
+      case 'measured':
+        return 'v-meta-badge is-measured'
+      case 'estimated':
+        return 'v-meta-badge is-estimated'
+      case 'manual_required':
+        return 'v-meta-badge is-manual'
       default:
-        return "v-meta-badge";
+        return 'v-meta-badge'
     }
-  };
+  }
 
   const examFields: { key: keyof typeof exam; label: string }[] = [
-    { key: "kepala", label: "Kepala & Leher" },
-    { key: "dada", label: "Dada (Cor & Pulmo)" },
-    { key: "perut", label: "Perut (Abdomen)" },
-    { key: "ekstremitas", label: "Ekstremitas" },
-    { key: "kulit", label: "Kulit" },
-    { key: "genitalia", label: "Genitalia" },
-  ];
+    { key: 'kepala', label: 'Kepala & Leher' },
+    { key: 'dada', label: 'Dada (Cor & Pulmo)' },
+    { key: 'perut', label: 'Perut (Abdomen)' },
+    { key: 'ekstremitas', label: 'Ekstremitas' },
+    { key: 'kulit', label: 'Kulit' },
+    { key: 'genitalia', label: 'Genitalia' },
+  ]
 
-  const filledVitals = Object.values(vitals).filter(Boolean).length;
-  const filledExam = Object.values(exam).filter(Boolean).length;
+  const filledVitals = Object.values(vitals).filter(Boolean).length
+  const filledExam = Object.values(exam).filter(Boolean).length
   const progress = Math.round(
-    (((!!keluhanUtama ? 1 : 0) +
-      (!!keluhanTambahan ? 0.5 : 0) +
-      filledVitals / 7 +
-      filledExam / 6) /
+    (((keluhanUtama ? 1 : 0) + (keluhanTambahan ? 0.5 : 0) + filledVitals / 7 + filledExam / 6) /
       2.5) *
-      100,
-  );
+      100
+  )
   const workflowTabs: Array<{
-    id: WorkflowTab;
-    label: string;
-    role: string;
-    hint: string;
+    id: WorkflowTab
+    label: string
+    role: string
+    hint: string
   }> = [
     {
-      id: "triage",
-      label: "Pengkajian Awal",
-      role: "Perawat / Tenaga Klinis Lain",
-      hint: "Keluhan utama, TTV, objektif awal",
+      id: 'triage',
+      label: 'Pengkajian Awal',
+      role: 'Perawat / Tenaga Klinis Lain',
+      hint: 'Keluhan utama, TTV, objektif awal',
     },
     {
-      id: "review",
-      label: "Anamnesa",
-      role: "Dokter",
-      hint: "RPS, Audrey, riwayat, penunjang",
+      id: 'review',
+      label: 'Anamnesa',
+      role: 'Dokter',
+      hint: 'RPS, Audrey, riwayat, penunjang',
     },
     {
-      id: "assessment",
-      label: "Asesmen",
-      role: "Dokter",
-      hint: "Iskandar, differential, keputusan klinis",
+      id: 'assessment',
+      label: 'Asesmen',
+      role: 'Dokter',
+      hint: 'Iskandar, differential, keputusan klinis',
     },
     {
-      id: "finalize",
-      label: "Tata Laksana",
-      role: "Dokter",
-      hint: "Terapi, edukasi, rujukan, sign-off",
+      id: 'finalize',
+      label: 'Tata Laksana',
+      role: 'Dokter',
+      hint: 'Terapi, edukasi, rujukan, sign-off',
     },
-  ];
-  const isTriageTab = workflowTab === "triage";
-  const isReviewTab = workflowTab === "review";
-  const isAssessmentTab = workflowTab === "assessment";
-  const isFinalizeTab = workflowTab === "finalize";
-  const showIntakeSection = isTriageTab || isReviewTab;
-  const showWorkupSection = isTriageTab || isReviewTab;
-  const showDecisionSection = isAssessmentTab || isFinalizeTab;
-  const highlightReviewHandoff = workflowTab === "review";
+  ]
+  const isTriageTab = workflowTab === 'triage'
+  const isReviewTab = workflowTab === 'review'
+  const isAssessmentTab = workflowTab === 'assessment'
+  const isFinalizeTab = workflowTab === 'finalize'
+  const showIntakeSection = isTriageTab || isReviewTab
+  const showWorkupSection = isTriageTab || isReviewTab
+  const showDecisionSection = isAssessmentTab || isFinalizeTab
+  const highlightReviewHandoff = workflowTab === 'review'
   const canAutoAssistExam = Boolean(
     keluhanUtama.trim() ||
-    keluhanTambahan.trim() ||
-    pemeriksaanFisikUsulan.trim() ||
-    clinicalChain?.pemeriksaan.fisik.length,
-  );
+      keluhanTambahan.trim() ||
+      pemeriksaanFisikUsulan.trim() ||
+      clinicalChain?.pemeriksaan.fisik.length
+  )
   const prognosisVitals = useMemo(
     () => ({
-      sbp: parseInt(vitals.td.split("/")[0]) || 0,
-      dbp: parseInt(vitals.td.split("/")[1]) || 0,
-      hr: parseFloat(vitals.nadi) || 0,
-      rr: parseFloat(vitals.napas) || 0,
-      temp: parseFloat(vitals.suhu) || 0,
-      glucose: parseFloat(gulaDarah.nilai) || 0,
+      sbp: Number.parseInt(vitals.td.split('/')[0]) || 0,
+      dbp: Number.parseInt(vitals.td.split('/')[1]) || 0,
+      hr: Number.parseFloat(vitals.nadi) || 0,
+      rr: Number.parseFloat(vitals.napas) || 0,
+      temp: Number.parseFloat(vitals.suhu) || 0,
+      glucose: Number.parseFloat(gulaDarah.nilai) || 0,
+      spo2: Number.parseFloat(vitals.spo2) || 0,
     }),
-    [gulaDarah.nilai, vitals.nadi, vitals.napas, vitals.suhu, vitals.td],
-  );
+    [gulaDarah.nilai, vitals.nadi, vitals.napas, vitals.spo2, vitals.suhu, vitals.td]
+  )
 
   return (
     <div
       style={{
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
       }}
     >
       <div
         className="architecture-grid"
-        style={{ gridTemplateColumns: "1fr", gap: 40, maxWidth: 1400 }}
+        style={{ gridTemplateColumns: '1fr', gap: 40, maxWidth: 1400 }}
       >
-        <div
-          className="page-header"
-          style={{ maxWidth: "100%", width: "100%", marginBottom: 24 }}
-        >
+        <div className="page-header" style={{ maxWidth: '100%', width: '100%', marginBottom: 24 }}>
           <div className="page-title">
             Clinical Mind
             <br />
             Algorithm
           </div>
           <div className="page-subtitle">
-            Workflow klinis terintegrasi untuk Poli Umum Dewasa Puskesmas
-            Balowerti
+            Workflow klinis terintegrasi untuk Poli Umum Dewasa Puskesmas Balowerti
           </div>
           <div className="page-header-divider" />
           <div
             className="page-header-badges"
-            style={{ marginTop: 14, justifyContent: "space-between", gap: 16 }}
+            style={{ marginTop: 14, justifyContent: 'space-between', gap: 16 }}
           >
             <div
               className="meta-header"
               style={{
                 color: headerColor,
-                display: "flex",
-                alignItems: "center",
+                display: 'flex',
+                alignItems: 'center',
                 gap: 16,
                 margin: 0,
               }}
             >
               {headerText}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {isDoctor && (
                 <button
                   onClick={() => void handleToggleDoctorOnline()}
                   disabled={togglingOnline}
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
+                    display: 'inline-flex',
+                    alignItems: 'center',
                     gap: 6,
-                    padding: "3px 12px",
+                    padding: '3px 12px',
                     borderRadius: 2,
-                    cursor: "pointer",
+                    cursor: 'pointer',
                     fontSize: 12,
-                    letterSpacing: "0.08em",
+                    letterSpacing: '0.08em',
                     fontWeight: 600,
-                    border: `1px solid ${isOnline ? "#4ADE80" : "rgba(255,255,255,0.15)"}`,
-                    background: isOnline
-                      ? "rgba(74,222,128,0.12)"
-                      : "rgba(255,255,255,0.04)",
-                    color: isOnline ? "#4ADE80" : "#777",
-                    transition: "all 0.2s",
+                    border: `1px solid ${isOnline ? '#4ADE80' : 'rgba(255,255,255,0.15)'}`,
+                    background: isOnline ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: isOnline ? '#4ADE80' : '#777',
+                    transition: 'all 0.2s',
                     opacity: togglingOnline ? 0.6 : 1,
                   }}
                 >
@@ -4665,26 +4743,24 @@ export default function EMRPage() {
                     style={{
                       width: 7,
                       height: 7,
-                      borderRadius: "50%",
-                      background: isOnline ? "#4ADE80" : "#555",
-                      boxShadow: isOnline
-                        ? "0 0 0 3px rgba(74,222,128,0.25)"
-                        : "none",
+                      borderRadius: '50%',
+                      background: isOnline ? '#4ADE80' : '#555',
+                      boxShadow: isOnline ? '0 0 0 3px rgba(74,222,128,0.25)' : 'none',
                     }}
                   />
-                  {togglingOnline ? "..." : isOnline ? "ONLINE" : "OFFLINE"}
+                  {togglingOnline ? '...' : isOnline ? 'ONLINE' : 'OFFLINE'}
                 </button>
               )}
               <span
                 style={{
                   fontSize: 13,
-                  color: "#ffffff",
-                  border: "1px solid var(--c-asesmen)",
-                  padding: "1px 10px",
+                  color: '#ffffff',
+                  border: '1px solid var(--c-asesmen)',
+                  padding: '1px 10px',
                   borderRadius: 2,
-                  animation: "smoothBlink 2s infinite",
-                  background: "var(--c-asesmen)",
-                  letterSpacing: "0.05em",
+                  animation: 'smoothBlink 2s infinite',
+                  background: 'var(--c-asesmen)',
+                  letterSpacing: '0.05em',
                   flexShrink: 0,
                 }}
               >
@@ -4698,24 +4774,21 @@ export default function EMRPage() {
           <div
             onClick={() => setTriageReceived(false)}
             style={{
-              background: "rgba(230,126,34,0.12)",
-              border: "1px solid #E67E22",
+              background: 'rgba(230,126,34,0.12)',
+              border: '1px solid #E67E22',
               borderRadius: 4,
-              padding: "10px 16px",
+              padding: '10px 16px',
               marginBottom: 10,
-              cursor: "pointer",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            <span style={{ fontSize: 13, color: "#E67E22", fontWeight: 600 }}>
-              Data triase diterima dari perawat — keluhan & TTV sudah terisi
-              otomatis
+            <span style={{ fontSize: 13, color: '#E67E22', fontWeight: 600 }}>
+              Data triase diterima dari perawat — keluhan & TTV sudah terisi otomatis
             </span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              klik untuk tutup
-            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>klik untuk tutup</span>
           </div>
         )}
 
@@ -4724,49 +4797,44 @@ export default function EMRPage() {
           role="tablist"
           aria-label="Workflow Clinical Mind Algorithm"
         >
-          {workflowTabs.map((tab) => {
-            const isActive = workflowTab === tab.id;
+          {workflowTabs.map(tab => {
+            const isActive = workflowTab === tab.id
             return (
               <button
                 key={tab.id}
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                className={`emr-workflow-tab${isActive ? " is-active" : ""}`}
+                className={`emr-workflow-tab${isActive ? ' is-active' : ''}`}
                 onClick={() => setWorkflowTab(tab.id)}
               >
                 <span className="emr-workflow-tab-role">{tab.role}</span>
                 <span>{tab.label}</span>
                 <span className="emr-workflow-tab-hint">{tab.hint}</span>
               </button>
-            );
+            )
           })}
         </div>
         <div className="emr-workflow-note">
           {isTriageTab
-            ? "Pengkajian awal oleh perawat: keluhan utama, RPS singkat, tanda-tanda vital, dan data objektif awal sebelum pasien bertemu dokter."
+            ? 'Pengkajian awal oleh perawat: keluhan utama, RPS singkat, tanda-tanda vital, dan data objektif awal sebelum pasien bertemu dokter.'
             : isReviewTab
-              ? "Anamnesa dokter (Subjektif): riwayat perjalanan penyakit, riwayat penyakit dahulu, sosial, keluarga, dan pemeriksaan lanjutan."
+              ? 'Anamnesa dokter (Subjektif): riwayat perjalanan penyakit, riwayat penyakit dahulu, sosial, keluarga, dan pemeriksaan lanjutan.'
               : isAssessmentTab
-                ? "Asesmen klinis (Objektif + Asesmen): pemeriksaan fisik, Iskandar CDSS, differential diagnosis, dan keputusan klinis."
-                : "Tata laksana (Plan): terapi, edukasi pasien, monitoring, dan rencana rujukan bila diperlukan."}
+                ? 'Asesmen klinis (Objektif + Asesmen): pemeriksaan fisik, Iskandar CDSS, differential diagnosis, dan keputusan klinis.'
+                : 'Tata laksana (Plan): terapi, edukasi pasien, monitoring, dan rencana rujukan bila diperlukan.'}
         </div>
 
         {/* ─── Left: Clinical Stream ─── */}
-        <div
-          className="clinical-stream"
-          style={{ maxWidth: "100%", paddingBottom: 40 }}
-        >
+        <div className="clinical-stream" style={{ maxWidth: '100%', paddingBottom: 40 }}>
           <div className="stream-line" />
 
           <section
             ref={row1SectionRef}
-            className={`emr-phase${activeViewPhase === "row1" ? " is-active" : activeViewPhase !== null ? " is-dimmed" : ""}`}
-            style={{ display: showIntakeSection ? undefined : "none" }}
+            className={`emr-phase${activeViewPhase === 'row1' ? ' is-active' : activeViewPhase !== null ? ' is-dimmed' : ''}`}
+            style={{ display: showIntakeSection ? undefined : 'none' }}
           >
-            <div className="emr-phase-label">
-              Row 1 / Intake &amp; Synthesis
-            </div>
+            <div className="emr-phase-label">Row 1 / Intake &amp; Synthesis</div>
 
             {/* Patient Profile Context Bar */}
             <div className="emr-context-bar">
@@ -4777,47 +4845,41 @@ export default function EMRPage() {
                   name="patient-age"
                   type="number"
                   value={patientAge}
-                  onChange={(e) => setPatientAge(parseInt(e.target.value) || 0)}
+                  onChange={e => setPatientAge(Number.parseInt(e.target.value) || 0)}
                   style={{
-                    background: "transparent",
-                    border: "none",
-                    borderBottom: "1px dashed var(--line-base)",
-                    color: "var(--text-main)",
-                    width: "40px",
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px dashed var(--line-base)',
+                    color: 'var(--text-main)',
+                    width: '40px',
                     fontSize: 14,
-                    outline: "none",
-                    textAlign: "center",
+                    outline: 'none',
+                    textAlign: 'center',
                   }}
                 />
-                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                  thn
-                </span>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>thn</span>
               </div>
               <div className="emr-context-segment">
                 <span className="emr-context-label">GENDER</span>
-                <div style={{ display: "flex", gap: 4 }}>
-                  {(["L", "P"] as const).map((g) => (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['L', 'P'] as const).map(g => (
                     <button
                       key={g}
                       onClick={() => {
-                        setPatientGender(g);
-                        if (g === "L") setIsPregnant(false);
+                        setPatientGender(g)
+                        if (g === 'L') setIsPregnant(false)
                       }}
                       style={{
-                        background:
-                          patientGender === g
-                            ? "var(--c-asesmen)"
-                            : "transparent",
-                        border: `1px solid ${patientGender === g ? "var(--c-asesmen)" : "var(--line-base)"}`,
-                        color:
-                          patientGender === g ? "white" : "var(--text-muted)",
+                        background: patientGender === g ? 'var(--c-asesmen)' : 'transparent',
+                        border: `1px solid ${patientGender === g ? 'var(--c-asesmen)' : 'var(--line-base)'}`,
+                        color: patientGender === g ? 'white' : 'var(--text-muted)',
                         fontSize: 13,
-                        padding: "2px 8px",
+                        padding: '2px 8px',
                         borderRadius: 2,
-                        cursor: "pointer",
+                        cursor: 'pointer',
                       }}
                     >
-                      {g === "L" ? "Laki-laki" : "Perempuan"}
+                      {g === 'L' ? 'Laki-laki' : 'Perempuan'}
                     </button>
                   ))}
                 </div>
@@ -4826,43 +4888,46 @@ export default function EMRPage() {
                 <span className="emr-context-label">HAMIL</span>
                 <label
                   style={{
-                    display: "flex",
-                    alignItems: "center",
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 6,
-                    cursor: patientGender === "P" ? "pointer" : "not-allowed",
-                    opacity: patientGender === "P" ? 1 : 0.45,
+                    cursor: patientGender === 'P' ? 'pointer' : 'not-allowed',
+                    opacity: patientGender === 'P' ? 1 : 0.45,
                   }}
                 >
                   <input
                     id="is-pregnant"
                     name="is-pregnant"
                     type="checkbox"
-                    checked={patientGender === "P" ? isPregnant : false}
-                    disabled={patientGender !== "P"}
-                    onChange={(e) => setIsPregnant(e.target.checked)}
+                    checked={patientGender === 'P' ? isPregnant : false}
+                    disabled={patientGender !== 'P'}
+                    onChange={e => setIsPregnant(e.target.checked)}
                   />
-                  <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                    Sedang hamil
-                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Sedang hamil</span>
                 </label>
               </div>
             </div>
 
             {/* 01. Anamnesa */}
-            <div style={{ display: "flex", gap: 32, alignItems: "flex-start" }}>
+            <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
               <div className="stream-section" style={{ flex: 1, minWidth: 0 }}>
                 <div className="section-title">01. Anamnesa</div>
                 <div className="blueprint-wrapper">
-                  <span className="data-label">Keluhan Utama</span>
-                  <div
-                    className="patient-narrative"
-                    style={{ position: "relative" }}
-                  >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="data-label" style={{ flex: 1 }}>Keluhan Utama</span>
+                    {audreySTT.isSupported && (
+                      <AudreyMicButton
+                        state={audreySTT.state}
+                        onPress={audreySTT.state === 'listening' ? audreySTT.stop : audreySTT.start}
+                      />
+                    )}
+                  </div>
+                  <div className="patient-narrative" style={{ position: 'relative' }}>
                     <span
                       className="input-draft"
                       style={{
                         borderBottomColor: draftBorderColor,
-                        display: "block",
+                        display: 'block',
                       }}
                     >
                       <input
@@ -4870,43 +4935,53 @@ export default function EMRPage() {
                         name="keluhan-utama"
                         type="text"
                         value={keluhanUtama}
-                        onChange={(e) => {
-                          const val = sanitizeClinicalInput(e.target.value);
-                          keluhanRef.current.utama = val;
-                          setKeluhanUtama(val);
+                        onChange={e => {
+                          const val = sanitizeClinicalInput(e.target.value)
+                          keluhanRef.current.utama = val
+                          setKeluhanUtama(val)
                           if (!val.trim()) {
-                            setKeluhanAsli("");
+                            setKeluhanAsli('')
                             setAnamnesaEntities({
-                              utama: "",
-                              onset: "",
-                              faktor: "",
-                            });
+                              utama: '',
+                              onset: '',
+                              faktor: '',
+                            })
                           }
-                          triggerAutocomplete(val);
+                          triggerAutocomplete(val)
                         }}
                         placeholder="contoh: demam, batuk, nyeri pinggang"
                         style={{
-                          background: "transparent",
-                          border: "none",
-                          outline: "none",
-                          fontSize: "inherit",
+                          background: 'transparent',
+                          border: 'none',
+                          outline: 'none',
+                          fontSize: 'inherit',
                           fontWeight: 400,
-                          color: keluhanUtama
-                            ? "var(--text-main)"
-                            : "var(--text-muted)",
-                          width: "100%",
+                          color: keluhanUtama ? 'var(--text-main)' : 'var(--text-muted)',
+                          width: '100%',
                           padding: 0,
-                          display: "block",
+                          display: 'block',
                         }}
                       />
                     </span>
+                    {/* STT interim preview */}
+                    {sttInterimPreview && (
+                      <div style={{
+                        fontSize: 11,
+                        color: 'var(--audrey-amber, #C4956A)',
+                        fontStyle: 'italic',
+                        marginTop: 4,
+                        opacity: 0.8,
+                      }}>
+                        {sttInterimPreview}...
+                      </div>
+                    )}
                     {/* Clinical Chain Panel */}
                     <div style={{ marginTop: 16 }}>
                       {clinicalChain ? (
                         <div
                           style={{
-                            display: "flex",
-                            flexDirection: "column",
+                            display: 'flex',
+                            flexDirection: 'column',
                             gap: 16,
                           }}
                         >
@@ -4917,45 +4992,45 @@ export default function EMRPage() {
                             clinicalChain.red_flags.length > 0) && (
                             <div
                               style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr 1fr",
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr 1fr',
                                 gap: 0,
-                                alignItems: "start",
-                                border: "1px solid var(--line-base)",
+                                alignItems: 'start',
+                                border: '1px solid var(--line-base)',
                                 borderRadius: 3,
                               }}
                             >
                               {/* Kolom 1 — SIFAT */}
                               <div
                                 style={{
-                                  borderRight: "1px solid var(--line-base)",
+                                  borderRight: '1px solid var(--line-base)',
                                 }}
                               >
                                 <div
                                   onClick={() => setSifatOpen(!sifatOpen)}
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 8,
-                                    padding: "10px 16px",
-                                    cursor: "pointer",
-                                    userSelect: "none",
+                                    padding: '10px 16px',
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
                                   }}
                                 >
                                   <span
                                     style={{
                                       fontSize: 11,
-                                      color: "var(--text-muted)",
+                                      color: 'var(--text-muted)',
                                     }}
                                   >
-                                    {sifatOpen ? "▼" : "▶"}
+                                    {sifatOpen ? '▼' : '▶'}
                                   </span>
                                   <span
                                     style={{
                                       fontSize: 11,
-                                      color: "var(--text-muted)",
-                                      letterSpacing: "0.12em",
-                                      textTransform: "uppercase",
+                                      color: 'var(--text-muted)',
+                                      letterSpacing: '0.12em',
+                                      textTransform: 'uppercase',
                                       flexShrink: 0,
                                     }}
                                   >
@@ -4963,74 +5038,64 @@ export default function EMRPage() {
                                   </span>
                                   <div
                                     style={{
-                                      display: "flex",
+                                      display: 'flex',
                                       gap: 2,
-                                      marginLeft: "auto",
+                                      marginLeft: 'auto',
                                     }}
                                   >
-                                    {(
-                                      ["narasi", "formal", "klinis"] as const
-                                    ).map((tab) => {
-                                      const isActive = activeSifatTab === tab;
+                                    {(['narasi', 'formal', 'klinis'] as const).map(tab => {
+                                      const isActive = activeSifatTab === tab
                                       return (
                                         <button
                                           key={tab}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!isActive)
-                                              setActiveSifatTab(tab);
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            if (!isActive) setActiveSifatTab(tab)
                                           }}
                                           style={{
                                             fontSize: 10,
-                                            padding: "1px 7px",
-                                            border: "none",
+                                            padding: '1px 7px',
+                                            border: 'none',
                                             borderRadius: 2,
-                                            cursor: isActive
-                                              ? "default"
-                                              : "pointer",
+                                            cursor: isActive ? 'default' : 'pointer',
                                             background: isActive
-                                              ? "var(--c-asesmen)"
-                                              : "transparent",
-                                            color: isActive
-                                              ? "#fff"
-                                              : "var(--text-muted)",
-                                            transition:
-                                              "background 0.2s, color 0.2s",
-                                            letterSpacing: "0.06em",
-                                            textTransform: "uppercase",
+                                              ? 'var(--c-asesmen)'
+                                              : 'transparent',
+                                            color: isActive ? '#fff' : 'var(--text-muted)',
+                                            transition: 'background 0.2s, color 0.2s',
+                                            letterSpacing: '0.06em',
+                                            textTransform: 'uppercase',
                                           }}
                                         >
                                           {tab}
                                         </button>
-                                      );
+                                      )
                                     })}
                                   </div>
                                 </div>
                                 <div
-                                  className={`clinical-reveal-panel${sifatOpen ? " is-open" : ""}`}
+                                  className={`clinical-reveal-panel${sifatOpen ? ' is-open' : ''}`}
                                   style={{ maxHeight: sifatOpen ? 400 : 0 }}
                                 >
                                   <div
                                     key={sifatKey}
                                     style={{
-                                      display: "flex",
-                                      flexDirection: "column",
+                                      display: 'flex',
+                                      flexDirection: 'column',
                                       gap: 9,
-                                      padding: "0 16px 14px",
-                                      borderTop: "1px solid var(--line-base)",
+                                      padding: '0 16px 14px',
+                                      borderTop: '1px solid var(--line-base)',
                                       paddingTop: 10,
                                     }}
                                   >
-                                    {(
-                                      clinicalChain.sifat[activeSifatTab] ?? []
-                                    ).map((s, i) => (
+                                    {(clinicalChain.sifat[activeSifatTab] ?? []).map((s, i) => (
                                       <span
                                         key={`${activeSifatTab}-${s}`}
                                         onMouseDown={() => appendToRps(s)}
                                         style={{
                                           fontSize: 14,
-                                          color: "var(--text-main)",
-                                          cursor: "pointer",
+                                          color: 'var(--text-main)',
+                                          cursor: 'pointer',
                                           animation: `fadeSlideIn 0.4s ease both`,
                                           animationDelay: `${i * 80}ms`,
                                         }}
@@ -5045,34 +5110,34 @@ export default function EMRPage() {
                               {/* Kolom 2 — LOKASI */}
                               <div
                                 style={{
-                                  borderRight: "1px solid var(--line-base)",
+                                  borderRight: '1px solid var(--line-base)',
                                 }}
                               >
                                 <div
                                   onClick={() => setLokasiOpen(!lokasiOpen)}
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 8,
-                                    padding: "10px 16px",
-                                    cursor: "pointer",
-                                    userSelect: "none",
+                                    padding: '10px 16px',
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
                                   }}
                                 >
                                   <span
                                     style={{
                                       fontSize: 11,
-                                      color: "var(--text-muted)",
+                                      color: 'var(--text-muted)',
                                     }}
                                   >
-                                    {lokasiOpen ? "▼" : "▶"}
+                                    {lokasiOpen ? '▼' : '▶'}
                                   </span>
                                   <span
                                     style={{
                                       fontSize: 11,
-                                      color: "var(--text-muted)",
-                                      letterSpacing: "0.12em",
-                                      textTransform: "uppercase",
+                                      color: 'var(--text-muted)',
+                                      letterSpacing: '0.12em',
+                                      textTransform: 'uppercase',
                                       flexShrink: 0,
                                     }}
                                   >
@@ -5080,16 +5145,16 @@ export default function EMRPage() {
                                   </span>
                                 </div>
                                 <div
-                                  className={`clinical-reveal-panel${lokasiOpen ? " is-open" : ""}`}
+                                  className={`clinical-reveal-panel${lokasiOpen ? ' is-open' : ''}`}
                                   style={{ maxHeight: lokasiOpen ? 400 : 0 }}
                                 >
                                   <div
                                     style={{
-                                      display: "flex",
-                                      flexDirection: "column",
+                                      display: 'flex',
+                                      flexDirection: 'column',
                                       gap: 9,
-                                      padding: "0 16px 14px",
-                                      borderTop: "1px solid var(--line-base)",
+                                      padding: '0 16px 14px',
+                                      borderTop: '1px solid var(--line-base)',
                                       paddingTop: 10,
                                     }}
                                   >
@@ -5099,8 +5164,8 @@ export default function EMRPage() {
                                         onMouseDown={() => appendToRps(loc)}
                                         style={{
                                           fontSize: 14,
-                                          color: "var(--text-main)",
-                                          cursor: "pointer",
+                                          color: 'var(--text-main)',
+                                          cursor: 'pointer',
                                           animation: `fadeSlideIn 0.4s ease both`,
                                           animationDelay: `${i * 80}ms`,
                                         }}
@@ -5117,108 +5182,91 @@ export default function EMRPage() {
                                 <div
                                   onClick={() => setPenyertaOpen(!penyertaOpen)}
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 8,
-                                    padding: "10px 16px",
-                                    cursor: "pointer",
-                                    userSelect: "none",
+                                    padding: '10px 16px',
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
                                   }}
                                 >
                                   <span
                                     style={{
                                       fontSize: 11,
-                                      color: "var(--text-muted)",
+                                      color: 'var(--text-muted)',
                                     }}
                                   >
-                                    {penyertaOpen ? "▼" : "▶"}
+                                    {penyertaOpen ? '▼' : '▶'}
                                   </span>
-                                  <div style={{ display: "flex", gap: 2 }}>
-                                    {(["penyerta", "bahaya"] as const).map(
-                                      (tab) => {
-                                        const isActive = activeChainTab === tab;
-                                        const label =
-                                          tab === "penyerta"
-                                            ? "Penyerta"
-                                            : "⚠ Bahaya";
-                                        const activeColor =
-                                          tab === "bahaya"
-                                            ? "var(--c-critical)"
-                                            : "var(--c-asesmen)";
-                                        return (
-                                          <button
-                                            key={tab}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (!isActive)
-                                                setActiveChainTab(tab);
-                                            }}
-                                            style={{
-                                              fontSize: 10,
-                                              padding: "1px 7px",
-                                              border: "none",
-                                              borderRadius: 2,
-                                              background: isActive
-                                                ? activeColor
-                                                : "transparent",
-                                              color: isActive
-                                                ? "#fff"
-                                                : "var(--text-muted)",
-                                              cursor: isActive
-                                                ? "default"
-                                                : "pointer",
-                                              letterSpacing: "0.06em",
-                                              textTransform: "uppercase",
-                                              transition:
-                                                "background 0.2s, color 0.2s",
-                                            }}
-                                          >
-                                            {label}
-                                          </button>
-                                        );
-                                      },
-                                    )}
+                                  <div style={{ display: 'flex', gap: 2 }}>
+                                    {(['penyerta', 'bahaya'] as const).map(tab => {
+                                      const isActive = activeChainTab === tab
+                                      const label = tab === 'penyerta' ? 'Penyerta' : '⚠ Bahaya'
+                                      const activeColor =
+                                        tab === 'bahaya' ? 'var(--c-critical)' : 'var(--c-asesmen)'
+                                      return (
+                                        <button
+                                          key={tab}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            if (!isActive) setActiveChainTab(tab)
+                                          }}
+                                          style={{
+                                            fontSize: 10,
+                                            padding: '1px 7px',
+                                            border: 'none',
+                                            borderRadius: 2,
+                                            background: isActive ? activeColor : 'transparent',
+                                            color: isActive ? '#fff' : 'var(--text-muted)',
+                                            cursor: isActive ? 'default' : 'pointer',
+                                            letterSpacing: '0.06em',
+                                            textTransform: 'uppercase',
+                                            transition: 'background 0.2s, color 0.2s',
+                                          }}
+                                        >
+                                          {label}
+                                        </button>
+                                      )
+                                    })}
                                   </div>
                                 </div>
                                 <div
-                                  className={`clinical-reveal-panel${penyertaOpen ? " is-open" : ""}`}
+                                  className={`clinical-reveal-panel${penyertaOpen ? ' is-open' : ''}`}
                                   style={{ maxHeight: penyertaOpen ? 400 : 0 }}
                                 >
                                   <div
                                     key={chainTabKey}
                                     style={{
-                                      display: "flex",
-                                      flexDirection: "column",
+                                      display: 'flex',
+                                      flexDirection: 'column',
                                       gap: 9,
-                                      padding: "0 16px 14px",
-                                      borderTop: "1px solid var(--line-base)",
+                                      padding: '0 16px 14px',
+                                      borderTop: '1px solid var(--line-base)',
                                       paddingTop: 10,
                                     }}
                                   >
-                                    {activeChainTab === "penyerta"
-                                      ? clinicalChain.logical_chain.map(
-                                          (s, i) => (
-                                            <span
-                                              key={s}
-                                              onMouseDown={() => appendToRps(s)}
-                                              style={{
-                                                fontSize: 14,
-                                                color: "var(--text-main)",
-                                                cursor: "pointer",
-                                                animation: `fadeSlideIn 0.4s ease both`,
-                                                animationDelay: `${i * 80}ms`,
-                                              }}
-                                            >
-                                              {s}
-                                            </span>
-                                          ),
-                                        )
+                                    {activeChainTab === 'penyerta'
+                                      ? clinicalChain.logical_chain.map((s, i) => (
+                                          <span
+                                            key={s}
+                                            onMouseDown={() => appendToRps(s)}
+                                            style={{
+                                              fontSize: 14,
+                                              color: 'var(--text-main)',
+                                              cursor: 'pointer',
+                                              animation: `fadeSlideIn 0.4s ease both`,
+                                              animationDelay: `${i * 80}ms`,
+                                            }}
+                                          >
+                                            {s}
+                                          </span>
+                                        ))
                                       : clinicalChain.red_flags.map((rf, i) => (
                                           <span
                                             key={rf}
                                             style={{
                                               fontSize: 14,
-                                              color: "var(--text-main)",
+                                              color: 'var(--text-main)',
                                               animation: `fadeSlideIn 0.4s ease both`,
                                               animationDelay: `${i * 80}ms`,
                                             }}
@@ -5236,9 +5284,9 @@ export default function EMRPage() {
                         <div
                           style={{
                             fontSize: 11,
-                            color: "var(--c-asesmen)",
-                            letterSpacing: "0.1em",
-                            animation: "pulse 1.5s ease-in-out infinite",
+                            color: 'var(--c-asesmen)',
+                            letterSpacing: '0.1em',
+                            animation: 'pulse 1.5s ease-in-out infinite',
                           }}
                         >
                           synthesizing...
@@ -5247,9 +5295,9 @@ export default function EMRPage() {
                         <div
                           style={{
                             fontSize: 11,
-                            color: "var(--text-muted)",
+                            color: 'var(--text-muted)',
                             opacity: 0.35,
-                            letterSpacing: "0.05em",
+                            letterSpacing: '0.05em',
                           }}
                         >
                           ketik keluhan untuk saran klinis
@@ -5260,31 +5308,31 @@ export default function EMRPage() {
                     {keluhanUtama.trim() && !isTyping && (
                       <div
                         style={{
-                          display: "flex",
-                          justifyContent: "flex-end",
+                          display: 'flex',
+                          justifyContent: 'flex-end',
                           marginTop: 6,
                         }}
                       >
                         <div
                           onClick={handleSenAutoClick}
                           style={{
-                            background: "var(--c-asesmen)",
-                            color: "#ffffff",
+                            background: 'var(--c-asesmen)',
+                            color: '#ffffff',
                             fontSize: 12,
                             fontWeight: 600,
-                            padding: "4px 12px",
+                            padding: '4px 12px',
                             borderRadius: 3,
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.08em",
-                            transition: "opacity 0.2s ease",
-                            whiteSpace: "nowrap",
+                            cursor: 'pointer',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                            transition: 'opacity 0.2s ease',
+                            whiteSpace: 'nowrap',
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = "0.85";
+                          onMouseEnter={e => {
+                            e.currentTarget.style.opacity = '0.85'
                           }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = "1";
+                          onMouseLeave={e => {
+                            e.currentTarget.style.opacity = '1'
                           }}
                         >
                           ✧ AUTO SENTRA
@@ -5294,17 +5342,17 @@ export default function EMRPage() {
                   </div>
                   <span
                     style={{
-                      color: "var(--text-muted)",
-                      fontStyle: "italic",
+                      color: 'var(--text-muted)',
+                      fontStyle: 'italic',
                       fontSize: 13,
                       marginTop: 4,
-                      display: "block",
+                      display: 'block',
                       paddingLeft: 0,
                     }}
                   >
                     {keluhanUtama
-                      ? "— isi satu frasa inti, lalu biarkan AI membantu membentuk RPS"
-                      : "..."}
+                      ? '— isi satu frasa inti, lalu biarkan AI membantu membentuk RPS'
+                      : '...'}
                   </span>
 
                   <div
@@ -5314,27 +5362,25 @@ export default function EMRPage() {
                       marginTop: 20,
                       paddingTop: 8,
                       borderTop: highlightReviewHandoff
-                        ? "1px solid rgba(230, 126, 34, 0.22)"
-                        : "1px solid transparent",
-                      transition: "border-color 0.42s ease, opacity 0.42s ease",
+                        ? '1px solid rgba(230, 126, 34, 0.22)'
+                        : '1px solid transparent',
+                      transition: 'border-color 0.42s ease, opacity 0.42s ease',
                       opacity: highlightReviewHandoff ? 1 : 0.92,
                     }}
                   >
                     <span
                       className="data-label"
                       style={{
-                        display: "block",
+                        display: 'block',
                         marginTop: 0,
-                        color: highlightReviewHandoff
-                          ? "var(--c-asesmen)"
-                          : undefined,
+                        color: highlightReviewHandoff ? 'var(--c-asesmen)' : undefined,
                       }}
                     >
                       Riwayat Penyakit Sekarang
                     </span>
                   </div>
                   <div className="patient-narrative">
-                    <span className="input-draft" style={{ display: "block" }}>
+                    <span className="input-draft" style={{ display: 'block' }}>
                       {words.length > 0 ? (
                         words.map((word, i) => (
                           <span
@@ -5342,7 +5388,7 @@ export default function EMRPage() {
                             className="blur-word"
                             style={{ animationDelay: `${i * 80}ms` }}
                           >
-                            {word}{" "}
+                            {word}{' '}
                           </span>
                         ))
                       ) : (
@@ -5351,66 +5397,59 @@ export default function EMRPage() {
                           name="riwayat-rps"
                           rows={4}
                           value={riwayat.rps}
-                          onChange={(e) => {
+                          onChange={e => {
                             updateRpsDraft(e.target.value, {
-                              mode: "edited",
-                              sourceKeluhan:
-                                keluhanUtama.trim() ||
-                                rpsDraftState.sourceKeluhan,
+                              mode: 'edited',
+                              sourceKeluhan: keluhanUtama.trim() || rpsDraftState.sourceKeluhan,
                               stale: false,
-                            });
-                            e.target.style.height = "auto";
-                            e.target.style.height =
-                              e.target.scrollHeight + "px";
+                            })
+                            e.target.style.height = 'auto'
+                            e.target.style.height = e.target.scrollHeight + 'px'
                           }}
-                          onInput={(e) => {
-                            const t = e.currentTarget;
-                            t.style.height = "auto";
-                            t.style.height = t.scrollHeight + "px";
+                          onInput={e => {
+                            const t = e.currentTarget
+                            t.style.height = 'auto'
+                            t.style.height = t.scrollHeight + 'px'
                           }}
-                          ref={(el) => {
+                          ref={el => {
                             if (el) {
-                              el.style.height = "auto";
-                              el.style.height = el.scrollHeight + "px";
+                              el.style.height = 'auto'
+                              el.style.height = el.scrollHeight + 'px'
                             }
                           }}
                           placeholder="narasi keluhan sekarang, perjalanan penyakit, onset, progresivitas, faktor pencetus/peringan..."
                           style={{
-                            background: "transparent",
-                            border: "none",
-                            borderBottom: "1px dashed var(--line-base)",
-                            outline: "none",
-                            resize: "none",
-                            overflow: "hidden",
+                            background: 'transparent',
+                            border: 'none',
+                            borderBottom: '1px dashed var(--line-base)',
+                            outline: 'none',
+                            resize: 'none',
+                            overflow: 'hidden',
                             fontSize: 16,
                             fontWeight: 300,
                             lineHeight: 1.7,
-                            color: riwayat.rps
-                              ? "var(--text-main)"
-                              : "var(--text-muted)",
-                            width: "100%",
+                            color: riwayat.rps ? 'var(--text-main)' : 'var(--text-muted)',
+                            width: '100%',
                             paddingBottom: 8,
                           }}
                         />
                       )}
                     </span>
                   </div>
-                  <div
-                    className={`emr-assist-note${rpsDraftState.stale ? " is-warning" : ""}`}
-                  >
+                  <div className={`emr-assist-note${rpsDraftState.stale ? ' is-warning' : ''}`}>
                     <span>
                       {rpsDraftState.stale
-                        ? "RPS belum sinkron dengan keluhan utama terbaru. Perbarui narasi atau jalankan AUTO SENTRA lagi."
-                        : rpsDraftState.mode === "auto"
-                          ? `Narasi dibentuk AI dari keluhan utama: ${rpsDraftState.sourceKeluhan || "-"}`
-                          : rpsDraftState.mode === "edited"
-                            ? "RPS sedang dalam mode edit dokter. AI assist tetap bisa dipakai tanpa mengunci isi narasi."
-                            : "Gunakan AUTO SENTRA untuk membentuk narasi awal, lalu edit seperlunya."}
+                        ? 'RPS belum sinkron dengan keluhan utama terbaru. Perbarui narasi atau jalankan AUTO SENTRA lagi.'
+                        : rpsDraftState.mode === 'auto'
+                          ? `Narasi dibentuk AI dari keluhan utama: ${rpsDraftState.sourceKeluhan || '-'}`
+                          : rpsDraftState.mode === 'edited'
+                            ? 'RPS sedang dalam mode edit dokter. AI assist tetap bisa dipakai tanpa mengunci isi narasi.'
+                            : 'Gunakan AUTO SENTRA untuk membentuk narasi awal, lalu edit seperlunya.'}
                     </span>
                     {keluhanUtama.trim() && (
                       <button
                         type="button"
-                        onClick={(e) => handleSenAutoClick(e)}
+                        onClick={e => handleSenAutoClick(e)}
                         disabled={isTyping || !keluhanUtama.trim()}
                         className="emr-assist-note-action"
                       >
@@ -5419,38 +5458,29 @@ export default function EMRPage() {
                     )}
                   </div>
 
-                  <span
-                    className="data-label"
-                    style={{ display: "block", marginTop: 24 }}
-                  >
+                  <span className="data-label" style={{ display: 'block', marginTop: 24 }}>
                     Keluhan Tambahan
                   </span>
                   <div className="patient-narrative">
-                    <span className="input-draft" style={{ display: "block" }}>
+                    <span className="input-draft" style={{ display: 'block' }}>
                       <input
                         id="keluhan-tambahan"
                         name="keluhan-tambahan"
                         type="text"
                         value={keluhanTambahan}
-                        onChange={(e) => {
-                          keluhanRef.current.tambahan = sanitizeClinicalInput(
-                            e.target.value,
-                          );
-                          setKeluhanTambahan(
-                            sanitizeClinicalInput(e.target.value),
-                          );
+                        onChange={e => {
+                          keluhanRef.current.tambahan = sanitizeClinicalInput(e.target.value)
+                          setKeluhanTambahan(sanitizeClinicalInput(e.target.value))
                         }}
                         placeholder="keluhan penyerta, gejala sistemik..."
                         style={{
-                          background: "transparent",
-                          border: "none",
-                          outline: "none",
-                          fontSize: "inherit",
+                          background: 'transparent',
+                          border: 'none',
+                          outline: 'none',
+                          fontSize: 'inherit',
                           fontWeight: 300,
-                          color: keluhanTambahan
-                            ? "var(--text-main)"
-                            : "var(--text-muted)",
-                          width: "100%",
+                          color: keluhanTambahan ? 'var(--text-main)' : 'var(--text-muted)',
+                          width: '100%',
                           paddingBottom: 4,
                         }}
                       />
@@ -5462,18 +5492,18 @@ export default function EMRPage() {
                       {/* 3 Field Pemeriksaan */}
                       <div
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr 1fr",
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr',
                           gap: 16,
                           marginTop: 24,
-                          alignItems: "start",
+                          alignItems: 'start',
                         }}
                       >
                         {/* Pemeriksaan Fisik */}
                         <div>
                           <span
                             className="data-label"
-                            style={{ display: "block", marginBottom: 8 }}
+                            style={{ display: 'block', marginBottom: 8 }}
                           >
                             Pemeriksaan Fisik
                           </span>
@@ -5483,32 +5513,31 @@ export default function EMRPage() {
                               name="pemeriksaan-fisik-usulan"
                               rows={1}
                               value={pemeriksaanFisikUsulan}
-                              onChange={(e) => {
-                                setPemeriksaanFisikUsulan(e.target.value);
-                                e.target.style.height = "auto";
-                                e.target.style.height =
-                                  e.target.scrollHeight + "px";
+                              onChange={e => {
+                                setPemeriksaanFisikUsulan(e.target.value)
+                                e.target.style.height = 'auto'
+                                e.target.style.height = e.target.scrollHeight + 'px'
                               }}
-                              onInput={(e) => {
-                                const t = e.target as HTMLTextAreaElement;
-                                t.style.height = "auto";
-                                t.style.height = t.scrollHeight + "px";
+                              onInput={e => {
+                                const t = e.target as HTMLTextAreaElement
+                                t.style.height = 'auto'
+                                t.style.height = t.scrollHeight + 'px'
                               }}
                               placeholder="auskultasi, palpasi..."
                               style={{
-                                background: "transparent",
-                                border: "none",
-                                borderBottom: "1px dashed var(--line-base)",
-                                outline: "none",
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: '1px dashed var(--line-base)',
+                                outline: 'none',
                                 fontSize: 13,
                                 fontWeight: 300,
                                 color: pemeriksaanFisikUsulan
-                                  ? "var(--text-main)"
-                                  : "var(--text-muted)",
-                                width: "100%",
+                                  ? 'var(--text-main)'
+                                  : 'var(--text-muted)',
+                                width: '100%',
                                 paddingBottom: 4,
-                                resize: "none",
-                                overflow: "hidden",
+                                resize: 'none',
+                                overflow: 'hidden',
                               }}
                             />
                           </div>
@@ -5517,7 +5546,7 @@ export default function EMRPage() {
                         <div>
                           <span
                             className="data-label"
-                            style={{ display: "block", marginBottom: 8 }}
+                            style={{ display: 'block', marginBottom: 8 }}
                           >
                             Hasil Lab
                           </span>
@@ -5527,32 +5556,29 @@ export default function EMRPage() {
                               name="hasil-lab"
                               rows={1}
                               value={hasilLab}
-                              onChange={(e) => {
-                                setHasilLab(e.target.value);
-                                e.target.style.height = "auto";
-                                e.target.style.height =
-                                  e.target.scrollHeight + "px";
+                              onChange={e => {
+                                setHasilLab(e.target.value)
+                                e.target.style.height = 'auto'
+                                e.target.style.height = e.target.scrollHeight + 'px'
                               }}
-                              onInput={(e) => {
-                                const t = e.target as HTMLTextAreaElement;
-                                t.style.height = "auto";
-                                t.style.height = t.scrollHeight + "px";
+                              onInput={e => {
+                                const t = e.target as HTMLTextAreaElement
+                                t.style.height = 'auto'
+                                t.style.height = t.scrollHeight + 'px'
                               }}
                               placeholder="Hb, WBC, HbA1c..."
                               style={{
-                                background: "transparent",
-                                border: "none",
-                                borderBottom: "1px dashed var(--line-base)",
-                                outline: "none",
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: '1px dashed var(--line-base)',
+                                outline: 'none',
                                 fontSize: 13,
                                 fontWeight: 300,
-                                color: hasilLab
-                                  ? "var(--text-main)"
-                                  : "var(--text-muted)",
-                                width: "100%",
+                                color: hasilLab ? 'var(--text-main)' : 'var(--text-muted)',
+                                width: '100%',
                                 paddingBottom: 4,
-                                resize: "none",
-                                overflow: "hidden",
+                                resize: 'none',
+                                overflow: 'hidden',
                               }}
                             />
                           </div>
@@ -5561,7 +5587,7 @@ export default function EMRPage() {
                         <div>
                           <span
                             className="data-label"
-                            style={{ display: "block", marginBottom: 8 }}
+                            style={{ display: 'block', marginBottom: 8 }}
                           >
                             Pemeriksaan Penunjang
                           </span>
@@ -5571,32 +5597,31 @@ export default function EMRPage() {
                               name="pemeriksaan-penunjang"
                               rows={1}
                               value={pemeriksaanPenunjang}
-                              onChange={(e) => {
-                                setPemeriksaanPenunjang(e.target.value);
-                                e.target.style.height = "auto";
-                                e.target.style.height =
-                                  e.target.scrollHeight + "px";
+                              onChange={e => {
+                                setPemeriksaanPenunjang(e.target.value)
+                                e.target.style.height = 'auto'
+                                e.target.style.height = e.target.scrollHeight + 'px'
                               }}
-                              onInput={(e) => {
-                                const t = e.target as HTMLTextAreaElement;
-                                t.style.height = "auto";
-                                t.style.height = t.scrollHeight + "px";
+                              onInput={e => {
+                                const t = e.target as HTMLTextAreaElement
+                                t.style.height = 'auto'
+                                t.style.height = t.scrollHeight + 'px'
                               }}
                               placeholder="EKG, Foto Thorax, USG..."
                               style={{
-                                background: "transparent",
-                                border: "none",
-                                borderBottom: "1px dashed var(--line-base)",
-                                outline: "none",
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: '1px dashed var(--line-base)',
+                                outline: 'none',
                                 fontSize: 13,
                                 fontWeight: 300,
                                 color: pemeriksaanPenunjang
-                                  ? "var(--text-main)"
-                                  : "var(--text-muted)",
-                                width: "100%",
+                                  ? 'var(--text-main)'
+                                  : 'var(--text-muted)',
+                                width: '100%',
                                 paddingBottom: 4,
-                                resize: "none",
-                                overflow: "hidden",
+                                resize: 'none',
+                                overflow: 'hidden',
                               }}
                             />
                           </div>
@@ -5611,236 +5636,199 @@ export default function EMRPage() {
                           <div style={{ marginTop: 16 }}>
                             <span
                               className="data-label"
-                              style={{ display: "block", marginBottom: 14 }}
+                              style={{ display: 'block', marginBottom: 14 }}
                             >
                               Usulan Pemeriksaan
                             </span>
                             <div
                               style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr 1fr",
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr 1fr',
                                 gap: 0,
-                                alignItems: "start",
-                                border: "1px solid var(--line-base)",
+                                alignItems: 'start',
+                                border: '1px solid var(--line-base)',
                                 borderRadius: 3,
                               }}
                             >
-                              {(["fisik", "lab", "penunjang"] as const).map(
-                                (cat, ci) => {
-                                  const items = (
-                                    clinicalChain.pemeriksaan[cat] ?? []
-                                  ).slice(0, 5);
-                                  const appendTo =
-                                    cat === "fisik"
-                                      ? (val: string) =>
-                                          appendToClinicalField(
-                                            setPemeriksaanFisikUsulan,
-                                            val,
-                                          )
-                                      : cat === "lab"
-                                        ? (val: string) =>
-                                            appendToClinicalField(
-                                              setHasilLab,
-                                              val,
-                                            )
-                                        : (val: string) =>
-                                            appendToClinicalField(
-                                              setPemeriksaanPenunjang,
-                                              val,
-                                            );
-                                  const isOpen =
-                                    cat === "fisik"
-                                      ? usulanFisikOpen
-                                      : cat === "lab"
-                                        ? usulanLabOpen
-                                        : usulanPenunjangOpen;
-                                  const setOpen =
-                                    cat === "fisik"
-                                      ? setUsulanFisikOpen
-                                      : cat === "lab"
-                                        ? setUsulanLabOpen
-                                        : setUsulanPenunjangOpen;
-                                  return (
+                              {(['fisik', 'lab', 'penunjang'] as const).map((cat, ci) => {
+                                const items = (clinicalChain.pemeriksaan[cat] ?? []).slice(0, 5)
+                                const appendTo =
+                                  cat === 'fisik'
+                                    ? (val: string) =>
+                                        appendToClinicalField(setPemeriksaanFisikUsulan, val)
+                                    : cat === 'lab'
+                                      ? (val: string) => appendToClinicalField(setHasilLab, val)
+                                      : (val: string) =>
+                                          appendToClinicalField(setPemeriksaanPenunjang, val)
+                                const isOpen =
+                                  cat === 'fisik'
+                                    ? usulanFisikOpen
+                                    : cat === 'lab'
+                                      ? usulanLabOpen
+                                      : usulanPenunjangOpen
+                                const setOpen =
+                                  cat === 'fisik'
+                                    ? setUsulanFisikOpen
+                                    : cat === 'lab'
+                                      ? setUsulanLabOpen
+                                      : setUsulanPenunjangOpen
+                                return (
+                                  <div
+                                    key={cat}
+                                    style={{
+                                      borderRight:
+                                        ci < 2 ? '1px solid var(--line-base)' : undefined,
+                                    }}
+                                  >
                                     <div
-                                      key={cat}
+                                      onClick={() => setOpen(!isOpen)}
                                       style={{
-                                        borderRight:
-                                          ci < 2
-                                            ? "1px solid var(--line-base)"
-                                            : undefined,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        padding: '10px 16px',
+                                        cursor: 'pointer',
+                                        userSelect: 'none',
                                       }}
                                     >
-                                      <div
-                                        onClick={() => setOpen(!isOpen)}
+                                      <span
                                         style={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 8,
-                                          padding: "10px 16px",
-                                          cursor: "pointer",
-                                          userSelect: "none",
+                                          fontSize: 11,
+                                          color: 'var(--text-muted)',
                                         }}
                                       >
-                                        <span
-                                          style={{
-                                            fontSize: 11,
-                                            color: "var(--text-muted)",
-                                          }}
-                                        >
-                                          {isOpen ? "▼" : "▶"}
-                                        </span>
-                                        <span
-                                          style={{
-                                            fontSize: 11,
-                                            color: "var(--text-muted)",
-                                            letterSpacing: "0.12em",
-                                            textTransform: "uppercase",
-                                          }}
-                                        >
-                                          {cat === "fisik"
-                                            ? "Fisik"
-                                            : cat === "lab"
-                                              ? "Laboratorium"
-                                              : "Penunjang"}
-                                        </span>
-                                      </div>
-                                      <div
-                                        className={`clinical-reveal-panel${isOpen ? " is-open" : ""}`}
-                                        style={{ maxHeight: isOpen ? 400 : 0 }}
+                                        {isOpen ? '▼' : '▶'}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontSize: 11,
+                                          color: 'var(--text-muted)',
+                                          letterSpacing: '0.12em',
+                                          textTransform: 'uppercase',
+                                        }}
                                       >
-                                        <div
-                                          style={{
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: 6,
-                                            padding: "0 16px 14px",
-                                            borderTop:
-                                              "1px solid var(--line-base)",
-                                            paddingTop: 10,
-                                          }}
-                                        >
-                                          {items.length > 0 ? (
-                                            items.map((item) => {
-                                              const subs = getPemSubItems(item);
-                                              const isExpanded =
-                                                expandedPemItem === item;
-                                              return (
-                                                <div key={item}>
+                                        {cat === 'fisik'
+                                          ? 'Fisik'
+                                          : cat === 'lab'
+                                            ? 'Laboratorium'
+                                            : 'Penunjang'}
+                                      </span>
+                                    </div>
+                                    <div
+                                      className={`clinical-reveal-panel${isOpen ? ' is-open' : ''}`}
+                                      style={{ maxHeight: isOpen ? 400 : 0 }}
+                                    >
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: 6,
+                                          padding: '0 16px 14px',
+                                          borderTop: '1px solid var(--line-base)',
+                                          paddingTop: 10,
+                                        }}
+                                      >
+                                        {items.length > 0 ? (
+                                          items.map(item => {
+                                            const subs = getPemSubItems(item)
+                                            const isExpanded = expandedPemItem === item
+                                            return (
+                                              <div key={item}>
+                                                <span
+                                                  style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                  }}
+                                                >
+                                                  {subs.length > 0 && (
+                                                    <span
+                                                      onMouseDown={e => {
+                                                        e.stopPropagation()
+                                                        setExpandedPemItem(isExpanded ? null : item)
+                                                      }}
+                                                      style={{
+                                                        fontSize: 10,
+                                                        color: 'var(--c-asesmen)',
+                                                        transition: 'transform 0.2s',
+                                                        display: 'inline-block',
+                                                        transform: isExpanded
+                                                          ? 'rotate(90deg)'
+                                                          : 'rotate(0deg)',
+                                                        cursor: 'pointer',
+                                                        padding: '0 2px',
+                                                      }}
+                                                    >
+                                                      ▶
+                                                    </span>
+                                                  )}
                                                   <span
+                                                    onMouseDown={() => {
+                                                      if (subs.length > 0) {
+                                                        appendTo(subs.join(', '))
+                                                      } else {
+                                                        appendTo(item)
+                                                      }
+                                                    }}
+                                                    onContextMenu={e => handleMedContext(e, item)}
                                                     style={{
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: 4,
+                                                      fontSize: 14,
+                                                      color: 'var(--text-main)',
+                                                      cursor: 'pointer',
                                                     }}
                                                   >
-                                                    {subs.length > 0 && (
+                                                    {item}
+                                                  </span>
+                                                </span>
+                                                {isExpanded && (
+                                                  <div
+                                                    style={{
+                                                      marginTop: 6,
+                                                      marginLeft: 16,
+                                                      display: 'flex',
+                                                      flexDirection: 'column',
+                                                      gap: 5,
+                                                    }}
+                                                  >
+                                                    {subs.map(sub => (
                                                       <span
-                                                        onMouseDown={(e) => {
-                                                          e.stopPropagation();
-                                                          setExpandedPemItem(
-                                                            isExpanded
-                                                              ? null
-                                                              : item,
-                                                          );
+                                                        key={sub}
+                                                        onMouseDown={() => {
+                                                          appendTo(sub)
                                                         }}
+                                                        onContextMenu={e =>
+                                                          handleMedContext(e, sub)
+                                                        }
                                                         style={{
-                                                          fontSize: 10,
-                                                          color:
-                                                            "var(--c-asesmen)",
-                                                          transition:
-                                                            "transform 0.2s",
-                                                          display:
-                                                            "inline-block",
-                                                          transform: isExpanded
-                                                            ? "rotate(90deg)"
-                                                            : "rotate(0deg)",
-                                                          cursor: "pointer",
-                                                          padding: "0 2px",
+                                                          fontSize: 13,
+                                                          color: 'var(--c-asesmen)',
+                                                          cursor: 'pointer',
                                                         }}
                                                       >
-                                                        ▶
+                                                        + {sub}
                                                       </span>
-                                                    )}
-                                                    <span
-                                                      onMouseDown={() => {
-                                                        if (subs.length > 0) {
-                                                          appendTo(
-                                                            subs.join(", "),
-                                                          );
-                                                        } else {
-                                                          appendTo(item);
-                                                        }
-                                                      }}
-                                                      onContextMenu={(e) =>
-                                                        handleMedContext(
-                                                          e,
-                                                          item,
-                                                        )
-                                                      }
-                                                      style={{
-                                                        fontSize: 14,
-                                                        color:
-                                                          "var(--text-main)",
-                                                        cursor: "pointer",
-                                                      }}
-                                                    >
-                                                      {item}
-                                                    </span>
-                                                  </span>
-                                                  {isExpanded && (
-                                                    <div
-                                                      style={{
-                                                        marginTop: 6,
-                                                        marginLeft: 16,
-                                                        display: "flex",
-                                                        flexDirection: "column",
-                                                        gap: 5,
-                                                      }}
-                                                    >
-                                                      {subs.map((sub) => (
-                                                        <span
-                                                          key={sub}
-                                                          onMouseDown={() => {
-                                                            appendTo(sub);
-                                                          }}
-                                                          onContextMenu={(e) =>
-                                                            handleMedContext(
-                                                              e,
-                                                              sub,
-                                                            )
-                                                          }
-                                                          style={{
-                                                            fontSize: 13,
-                                                            color:
-                                                              "var(--c-asesmen)",
-                                                            cursor: "pointer",
-                                                          }}
-                                                        >
-                                                          + {sub}
-                                                        </span>
-                                                      ))}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              );
-                                            })
-                                          ) : (
-                                            <span
-                                              style={{
-                                                fontSize: 12,
-                                                color: "var(--text-muted)",
-                                                opacity: 0.4,
-                                              }}
-                                            >
-                                              —
-                                            </span>
-                                          )}
-                                        </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )
+                                          })
+                                        ) : (
+                                          <span
+                                            style={{
+                                              fontSize: 12,
+                                              color: 'var(--text-muted)',
+                                              opacity: 0.4,
+                                            }}
+                                          >
+                                            —
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
-                                  );
-                                },
-                              )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )}
@@ -5853,36 +5841,29 @@ export default function EMRPage() {
                 style={{
                   width: 280,
                   flexShrink: 0,
-                  position: "sticky",
+                  position: 'sticky',
                   top: 80,
-                  display: isReviewTab ? "flex" : "none",
-                  flexDirection: "column",
+                  display: isReviewTab ? 'flex' : 'none',
+                  flexDirection: 'column',
                   gap: 24,
                 }}
               >
                 {/* 01A. Audrey Synthesia */}
                 <div className="stream-section">
-                  <div className="section-title audrey-section-title">
-                    01A. Audrey Synthesia
-                  </div>
+                  <div className="section-title audrey-section-title">01A. Audrey Synthesia</div>
                   <div
-                    className={`blueprint-wrapper audrey-panel${audreyIsThinking ? " is-thinking" : ""}`}
+                    className={`blueprint-wrapper audrey-panel${audreyIsThinking ? ' is-thinking' : ''}`}
                     style={{ paddingTop: 18, paddingBottom: 18 }}
                   >
                     <div
                       className="extraction-header audrey-extraction-header"
-                      style={{ color: "#5B8DB8", marginBottom: 14 }}
+                      style={{ color: '#5B8DB8', marginBottom: 14 }}
                     >
-                      <span className="audrey-heading-text">
-                        Audrey Synthesia Algorithm
-                      </span>
+                      <span className="audrey-heading-text">Audrey Synthesia Algorithm</span>
                       <span
                         className="audrey-heading-state"
                         style={{
-                          animation:
-                            showEmrLoader || isTyping
-                              ? "smoothBlink 2s infinite"
-                              : "none",
+                          animation: showEmrLoader || isTyping ? 'smoothBlink 2s infinite' : 'none',
                           color: audreyStateColor,
                           opacity: showEmrLoader || isTyping ? 0.9 : 0.65,
                         }}
@@ -5891,7 +5872,7 @@ export default function EMRPage() {
                       </span>
                     </div>
                     <div
-                      className={`audrey-trace-line${audreyIsThinking ? " is-thinking" : ""}`}
+                      className={`audrey-trace-line${audreyIsThinking ? ' is-thinking' : ''}`}
                       aria-hidden="true"
                     >
                       <span className="audrey-trace-beam" />
@@ -5899,38 +5880,29 @@ export default function EMRPage() {
                     <div className="extracted-list">
                       {[
                         {
-                          label: "Keluhan Utama",
-                          meta: anamnesaEntities.utama || "PENDING",
+                          label: 'Keluhan Utama',
+                          meta: anamnesaEntities.utama || 'PENDING',
                         },
                         {
-                          label: "Onset / Durasi",
-                          meta: anamnesaEntities.onset || "PENDING",
+                          label: 'Onset / Durasi',
+                          meta: anamnesaEntities.onset || 'PENDING',
                         },
                         {
-                          label: "Faktor Pemberatan",
-                          meta: anamnesaEntities.faktor || "PENDING",
+                          label: 'Faktor Pemberatan',
+                          meta: anamnesaEntities.faktor || 'PENDING',
                         },
                       ].map((item, i) => (
                         <div
                           key={`audrey-synthesia-${i}`}
-                          className={`entity-tag-item audrey-synth-item${anamnesaVisible[i] ? " visible" : ""}${audreyIsThinking ? " is-thinking" : ""}`}
-                          style={
-                            anamnesaVisible[i]
-                              ? {}
-                              : { opacity: 0.2, transform: "none" }
-                          }
+                          className={`entity-tag-item audrey-synth-item${anamnesaVisible[i] ? ' visible' : ''}${audreyIsThinking ? ' is-thinking' : ''}`}
+                          style={anamnesaVisible[i] ? {} : { opacity: 0.2, transform: 'none' }}
                         >
-                          <span className="audrey-entity-label">
-                            {item.label}
-                          </span>
+                          <span className="audrey-entity-label">{item.label}</span>
                           <span
                             className="tag-meta"
                             style={{
-                              color:
-                                item.meta !== "PENDING"
-                                  ? "#5B8DB8"
-                                  : "var(--text-muted)",
-                              opacity: item.meta !== "PENDING" ? 1 : 0.5,
+                              color: item.meta !== 'PENDING' ? '#5B8DB8' : 'var(--text-muted)',
+                              opacity: item.meta !== 'PENDING' ? 1 : 0.5,
                             }}
                           >
                             {item.meta}
@@ -5945,98 +5917,77 @@ export default function EMRPage() {
 
             {/* 02. Riwayat */}
             <div
-              className={`stream-section${activeViewPhase === "row2" ? " stream-section-stagger-primary" : ""}`}
+              className={`stream-section${activeViewPhase === 'row2' ? ' stream-section-stagger-primary' : ''}`}
               style={{
-                display: isReviewTab ? undefined : "none",
+                display: isReviewTab ? undefined : 'none',
               }}
             >
-              <div className="section-title">
-                02. Riwayat Dahulu, Keluarga &amp; Alergi
-              </div>
-              {showEmrLoader && (
-                <div className="emr-loader">
-                  [SYSTEM: RETRIEVING EMR DATA...]
-                </div>
-              )}
+              <div className="section-title">02. Riwayat Dahulu, Keluarga &amp; Alergi</div>
+              {showEmrLoader && <div className="emr-loader">[SYSTEM: RETRIEVING EMR DATA...]</div>}
 
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 20 }}
-              >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {/* RPD — chip selector */}
                 <div className="history-item">
-                  <div
-                    className="history-item-title"
-                    style={{ marginBottom: 8 }}
-                  >
+                  <div className="history-item-title" style={{ marginBottom: 8 }}>
                     Riwayat Penyakit Dahulu (RPD)
                     {rpdSelected.size > 0 && (
                       <span
                         style={{
                           marginLeft: 8,
                           fontSize: 13,
-                          color: "var(--c-asesmen)",
-                          letterSpacing: "0.08em",
+                          color: 'var(--c-asesmen)',
+                          letterSpacing: '0.08em',
                         }}
                       >
                         {rpdSelected.size} dipilih
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {RPD_OPTIONS.map((opt) => {
-                      const active = rpdSelected.has(opt);
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {RPD_OPTIONS.map(opt => {
+                      const active = rpdSelected.has(opt)
                       return (
                         <button
                           key={opt}
                           onClick={() => toggleRpd(opt)}
                           style={{
                             fontSize: 14,
-                            padding: "4px 10px",
-                            cursor: "pointer",
-                            border: `1px solid ${active ? "var(--c-asesmen)" : "var(--line-base)"}`,
-                            background: active
-                              ? "rgba(212,122,87,0.12)"
-                              : "transparent",
-                            color: active
-                              ? "var(--c-asesmen)"
-                              : "var(--text-muted)",
+                            padding: '4px 10px',
+                            cursor: 'pointer',
+                            border: `1px solid ${active ? 'var(--c-asesmen)' : 'var(--line-base)'}`,
+                            background: active ? 'rgba(212,122,87,0.12)' : 'transparent',
+                            color: active ? 'var(--c-asesmen)' : 'var(--text-muted)',
                             borderRadius: 2,
-                            transition: "all 0.15s",
+                            transition: 'all 0.15s',
                           }}
                         >
                           {opt}
                         </button>
-                      );
+                      )
                     })}
                   </div>
                 </div>
 
                 {/* RPK */}
                 <div className="history-item">
-                  <div className="history-item-title">
-                    Riwayat Penyakit Keluarga (RPK)
-                  </div>
+                  <div className="history-item-title">Riwayat Penyakit Keluarga (RPK)</div>
                   <input
                     id="riwayat-rpk"
                     name="riwayat-rpk"
                     type="text"
                     value={riwayat.rpk}
-                    onChange={(e) =>
-                      setRiwayat((p) => ({ ...p, rpk: e.target.value }))
-                    }
+                    onChange={e => setRiwayat(p => ({ ...p, rpk: e.target.value }))}
                     placeholder="DM, jantung, kanker, HT dalam keluarga..."
                     style={{
-                      background: "transparent",
-                      border: "none",
-                      borderBottom: "1px dashed var(--line-base)",
-                      outline: "none",
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px dashed var(--line-base)',
+                      outline: 'none',
                       fontSize: 15,
                       fontWeight: 300,
-                      color: riwayat.rpk
-                        ? "var(--text-main)"
-                        : "var(--text-muted)",
-                      fontStyle: riwayat.rpk ? "normal" : "italic",
-                      width: "100%",
+                      color: riwayat.rpk ? 'var(--text-main)' : 'var(--text-muted)',
+                      fontStyle: riwayat.rpk ? 'normal' : 'italic',
+                      width: '100%',
                       paddingBottom: 4,
                       marginTop: 4,
                     }}
@@ -6045,49 +5996,42 @@ export default function EMRPage() {
 
                 {/* Alergi — chip selector */}
                 <div className="history-item">
-                  <div
-                    className="history-item-title"
-                    style={{ marginBottom: 8 }}
-                  >
+                  <div className="history-item-title" style={{ marginBottom: 8 }}>
                     Alergi Tercatat
                     {alergiSelected.size > 0 && (
                       <span
                         style={{
                           marginLeft: 8,
                           fontSize: 13,
-                          color: "var(--c-critical)",
-                          letterSpacing: "0.08em",
+                          color: 'var(--c-critical)',
+                          letterSpacing: '0.08em',
                         }}
                       >
                         ⚠ {alergiSelected.size} alergi
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {ALERGI_OPTIONS.map((opt) => {
-                      const active = alergiSelected.has(opt);
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {ALERGI_OPTIONS.map(opt => {
+                      const active = alergiSelected.has(opt)
                       return (
                         <button
                           key={opt}
                           onClick={() => toggleAlergi(opt)}
                           style={{
                             fontSize: 14,
-                            padding: "4px 10px",
-                            cursor: "pointer",
-                            border: `1px solid ${active ? "var(--c-critical)" : "var(--line-base)"}`,
-                            background: active
-                              ? "rgba(220,53,69,0.1)"
-                              : "transparent",
-                            color: active
-                              ? "var(--c-critical)"
-                              : "var(--text-muted)",
+                            padding: '4px 10px',
+                            cursor: 'pointer',
+                            border: `1px solid ${active ? 'var(--c-critical)' : 'var(--line-base)'}`,
+                            background: active ? 'rgba(220,53,69,0.1)' : 'transparent',
+                            color: active ? 'var(--c-critical)' : 'var(--text-muted)',
                             borderRadius: 2,
-                            transition: "all 0.15s",
+                            transition: 'all 0.15s',
                           }}
                         >
                           {opt}
                         </button>
-                      );
+                      )
                     })}
                   </div>
                 </div>
@@ -6109,49 +6053,44 @@ export default function EMRPage() {
 
           <section
             ref={row2SectionRef}
-            className={`emr-phase${activeViewPhase === "row2" ? " is-active" : activeViewPhase !== null ? " is-dimmed" : ""}`}
-            style={{ display: showWorkupSection ? undefined : "none" }}
+            className={`emr-phase${activeViewPhase === 'row2' ? ' is-active' : activeViewPhase !== null ? ' is-dimmed' : ''}`}
+            style={{ display: showWorkupSection ? undefined : 'none' }}
           >
-            <div className="emr-phase-label">
-              Row 2 / Objective &amp; Clinical Workup
-            </div>
+            <div className="emr-phase-label">Row 2 / Objective &amp; Clinical Workup</div>
 
             {/* 04. Pemeriksaan Fisik */}
-            <div
-              className="stream-section"
-              style={{ display: isReviewTab ? undefined : "none" }}
-            >
+            <div className="stream-section" style={{ display: isReviewTab ? undefined : 'none' }}>
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
                   gap: 10,
-                  width: "100%",
+                  width: '100%',
                   padding: 0,
                 }}
               >
                 <span className="section-title" style={{ margin: 0 }}>
                   04. Pemeriksaan Fisik Head-to-Toe
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <button
                     type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      applyExamAutoSentra();
+                    onClick={event => {
+                      event.stopPropagation()
+                      applyExamAutoSentra()
                     }}
                     disabled={!canAutoAssistExam}
                     style={{
                       fontSize: 11,
-                      letterSpacing: "0.1em",
-                      padding: "5px 10px",
-                      background: "transparent",
-                      border: "1px solid var(--c-asesmen)",
-                      color: "var(--c-asesmen)",
+                      letterSpacing: '0.1em',
+                      padding: '5px 10px',
+                      background: 'transparent',
+                      border: '1px solid var(--c-asesmen)',
+                      color: 'var(--c-asesmen)',
                       opacity: canAutoAssistExam ? 0.92 : 0.35,
-                      cursor: canAutoAssistExam ? "pointer" : "not-allowed",
+                      cursor: canAutoAssistExam ? 'pointer' : 'not-allowed',
                       borderRadius: 3,
                     }}
                   >
@@ -6159,20 +6098,20 @@ export default function EMRPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setExamOpen((o) => !o)}
+                    onClick={() => setExamOpen(o => !o)}
                     aria-expanded={examOpen}
                     aria-controls="exam-head-to-toe-panel"
                     style={{
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
                       padding: 0,
                       fontSize: 13,
-                      letterSpacing: "0.12em",
-                      color: "var(--text-muted)",
+                      letterSpacing: '0.12em',
+                      color: 'var(--text-muted)',
                     }}
                   >
-                    {examOpen ? "[ TUTUP ▲ ]" : "[ BUKA ▼ ]"}
+                    {examOpen ? '[ TUTUP ▲ ]' : '[ BUKA ▼ ]'}
                   </button>
                 </span>
               </div>
@@ -6180,25 +6119,20 @@ export default function EMRPage() {
                 style={{
                   marginTop: 6,
                   fontSize: 12,
-                  letterSpacing: "0.05em",
-                  color: "var(--text-muted)",
+                  letterSpacing: '0.05em',
+                  color: 'var(--text-muted)',
                   opacity: 0.82,
                 }}
               >
-                AUTO SENTRA akan mengisi template pemeriksaan 04 dengan format
-                normal audit-friendly, lalu menambahkan fokus klinis yang
-                relevan terhadap keluhan.
+                AUTO SENTRA akan mengisi template pemeriksaan 04 dengan format normal
+                audit-friendly, lalu menambahkan fokus klinis yang relevan terhadap keluhan.
               </div>
               {examOpen && (
-                <div
-                  id="exam-head-to-toe-panel"
-                  className="exam-list"
-                  style={{ marginTop: 12 }}
-                >
+                <div id="exam-head-to-toe-panel" className="exam-list" style={{ marginTop: 12 }}>
                   {examFields.map(({ key, label }, i) => (
                     <div
                       key={key}
-                      className={`exam-row${examAutofillKeys.includes(key) ? " is-autofilled" : ""}`}
+                      className={`exam-row${examAutofillKeys.includes(key) ? ' is-autofilled' : ''}`}
                       style={{ animationDelay: `${i * 0.03}s` }}
                     >
                       <span className="exam-organ">{label}</span>
@@ -6207,22 +6141,18 @@ export default function EMRPage() {
                         name={`exam-${key}`}
                         type="text"
                         value={exam[key]}
-                        onChange={(e) =>
-                          setExam((p) => ({ ...p, [key]: e.target.value }))
-                        }
+                        onChange={e => setExam(p => ({ ...p, [key]: e.target.value }))}
                         placeholder="—"
                         className="exam-result"
                         style={{
-                          background: "transparent",
-                          border: "none",
-                          borderBottom: "1px dashed var(--line-base)",
-                          outline: "none",
-                          color: exam[key]
-                            ? "var(--text-main)"
-                            : "var(--text-muted)",
-                          width: "100%",
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: '1px dashed var(--line-base)',
+                          outline: 'none',
+                          color: exam[key] ? 'var(--text-main)' : 'var(--text-muted)',
+                          width: '100%',
                           paddingBottom: 2,
-                          fontStyle: exam[key] ? "normal" : "italic",
+                          fontStyle: exam[key] ? 'normal' : 'italic',
                           fontSize: 13,
                         }}
                       />
@@ -6234,22 +6164,20 @@ export default function EMRPage() {
 
             {/* 03. Tanda Vital */}
             <div
-              className={`stream-section${activeViewPhase === "row2" ? " stream-section-stagger-secondary" : ""}`}
+              className={`stream-section${activeViewPhase === 'row2' ? ' stream-section-stagger-secondary' : ''}`}
               style={{}}
             >
-              <div className="section-title">
-                03. Tanda Vital &amp; Objektif
-              </div>
+              <div className="section-title">03. Tanda Vital &amp; Objektif</div>
               <div
                 style={{
-                  display: "flex",
+                  display: 'flex',
                   gap: 6,
-                  alignItems: "center",
+                  alignItems: 'center',
                   marginBottom: 16,
                   marginTop: -16,
                 }}
               >
-                <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {/* Auto TTV dari keluhan */}
                   <button
                     onClick={() => inferTTV()}
@@ -6257,52 +6185,43 @@ export default function EMRPage() {
                     title="Buat saran TTV awal berdasarkan konteks klinis"
                     style={{
                       fontSize: 13,
-                      letterSpacing: "0.08em",
-                      padding: "5px 14px",
-                      background: "var(--c-asesmen)",
-                      border: "1px solid var(--c-asesmen)",
-                      color: "#ffffff",
+                      letterSpacing: '0.08em',
+                      padding: '5px 14px',
+                      background: 'var(--c-asesmen)',
+                      border: '1px solid var(--c-asesmen)',
+                      color: '#ffffff',
                       fontWeight: 600,
-                      cursor: keluhanUtama.trim() ? "pointer" : "not-allowed",
+                      cursor: keluhanUtama.trim() ? 'pointer' : 'not-allowed',
                       opacity: keluhanUtama.trim() ? 1 : 0.35,
-                      textTransform: "uppercase",
+                      textTransform: 'uppercase',
                       borderRadius: 3,
                     }}
                   >
                     ✧ AUTO TTV
                   </button>
                   {/* Separator */}
-                  <span style={{ color: "var(--line-base)", fontSize: 13 }}>
-                    |
-                  </span>
+                  <span style={{ color: 'var(--line-base)', fontSize: 13 }}>|</span>
                   {/* Skenario presets */}
-                  {(["hipertensi", "hiperglikemi", "hipoglikemi"] as const).map(
-                    (key) => (
-                      <button
-                        key={key}
-                        onClick={() => autoFillScenario(key)}
-                        style={{
-                          fontSize: 13,
-                          letterSpacing: "0.1em",
-                          padding: "3px 8px",
-                          background:
-                            activeScenario === key
-                              ? "rgba(212,122,87,0.12)"
-                              : "transparent",
-                          border: `1px solid ${activeScenario === key ? "var(--c-asesmen)" : "var(--line-base)"}`,
-                          color:
-                            activeScenario === key
-                              ? "var(--c-asesmen)"
-                              : "var(--text-muted)",
-                          cursor: "pointer",
-                          textTransform: "uppercase",
-                          transition: "all 0.15s",
-                        }}
-                      >
-                        {AUTOGEN_SCENARIOS[key].label}
-                      </button>
-                    ),
-                  )}
+                  {(['hipertensi', 'hiperglikemi', 'hipoglikemi'] as const).map(key => (
+                    <button
+                      key={key}
+                      onClick={() => autoFillScenario(key)}
+                      style={{
+                        fontSize: 13,
+                        letterSpacing: '0.1em',
+                        padding: '3px 8px',
+                        background:
+                          activeScenario === key ? 'rgba(212,122,87,0.12)' : 'transparent',
+                        border: `1px solid ${activeScenario === key ? 'var(--c-asesmen)' : 'var(--line-base)'}`,
+                        color: activeScenario === key ? 'var(--c-asesmen)' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        textTransform: 'uppercase',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {AUTOGEN_SCENARIOS[key].label}
+                    </button>
+                  ))}
                 </span>
               </div>
               <div className="vitals-context-strip">
@@ -6313,9 +6232,7 @@ export default function EMRPage() {
                     name="body-weight-kg"
                     type="text"
                     value={bodyWeightKg}
-                    onChange={(e) =>
-                      setBodyWeightKg(e.target.value.replace(/[^0-9.]/g, ""))
-                    }
+                    onChange={e => setBodyWeightKg(e.target.value.replace(/[^0-9.]/g, ''))}
                     placeholder="opsional"
                     className="vitals-context-input"
                   />
@@ -6325,69 +6242,65 @@ export default function EMRPage() {
                   <CustomSelect
                     id="recent-activity"
                     value={recentActivity}
-                    onChange={(v) => setRecentActivity(v as RecentActivity)}
+                    onChange={v => setRecentActivity(v as RecentActivity)}
                     options={[
-                      { value: "resting", label: "Istirahat" },
-                      { value: "walking", label: "Baru berjalan" },
-                      { value: "post_exertion", label: "Setelah aktivitas" },
+                      { value: 'resting', label: 'Istirahat' },
+                      { value: 'walking', label: 'Baru berjalan' },
+                      { value: 'post_exertion', label: 'Setelah aktivitas' },
                     ]}
                   />
                 </div>
                 <div className="vitals-context-field">
-                  <span className="vitals-context-label">
-                    Respons fisiologis
-                  </span>
+                  <span className="vitals-context-label">Respons fisiologis</span>
                   <CustomSelect
                     id="stress-state"
                     value={stressState}
-                    onChange={(v) => setStressState(v as StressState)}
+                    onChange={v => setStressState(v as StressState)}
                     options={[
-                      { value: "calm", label: "Tenang" },
-                      { value: "anxious", label: "Cemas" },
-                      { value: "pain", label: "Nyeri" },
-                      { value: "severe_pain", label: "Nyeri berat" },
+                      { value: 'calm', label: 'Tenang' },
+                      { value: 'anxious', label: 'Cemas' },
+                      { value: 'pain', label: 'Nyeri' },
+                      { value: 'severe_pain', label: 'Nyeri berat' },
                     ]}
                   />
                 </div>
                 <div className="vitals-context-field vitals-context-field-wide">
                   <span className="vitals-context-label">Obat relevan</span>
                   <div className="vitals-chip-group">
-                    {MEDICATION_OPTIONS.map((option) => {
-                      const isActive = medicationFlags.has(option.key);
+                    {MEDICATION_OPTIONS.map(option => {
+                      const isActive = medicationFlags.has(option.key)
                       return (
                         <button
                           key={option.key}
                           type="button"
                           onClick={() => toggleMedicationFlag(option.key)}
-                          className={`vitals-chip${isActive ? " is-active" : ""}`}
+                          className={`vitals-chip${isActive ? ' is-active' : ''}`}
                         >
                           {option.label}
                         </button>
-                      );
+                      )
                     })}
                   </div>
                 </div>
               </div>
               <div className="vitals-assist-note">
-                AUTO TTV memberi estimasi awal untuk nadi, napas, suhu, serta
-                default GCS dan SpO2 pada poli umum dewasa. Tekanan darah dan
-                MAP tetap wajib diukur manual. Jika keluhan mengarah ke sesak,
-                SpO2 kembali wajib diukur manual.
+                AUTO TTV memberi estimasi awal untuk nadi, napas, suhu, serta default GCS dan SpO2
+                pada poli umum dewasa. Tekanan darah dan MAP tetap wajib diukur manual. Jika keluhan
+                mengarah ke sesak, SpO2 kembali wajib diukur manual.
               </div>
               <div className="vitals-matrix">
                 {vitalFields.map(({ key, label, unit }) => (
                   <div
                     key={key}
-                    className={`vital-item${isCritical(vitals[key], key) ? " v-critical" : ""}`}
+                    className={`vital-item${isCritical(vitals[key], key) ? ' v-critical' : ''}`}
                     style={
                       flashingVital === key
                         ? {
-                            boxShadow:
-                              "0 0 0 1.5px #22C55E, 0 0 14px 2px rgba(34,197,94,0.4)",
+                            boxShadow: '0 0 0 1.5px #22C55E, 0 0 14px 2px rgba(34,197,94,0.4)',
                             borderRadius: 4,
-                            transition: "box-shadow 0.1s",
+                            transition: 'box-shadow 0.1s',
                           }
-                        : { transition: "box-shadow 0.25s" }
+                        : { transition: 'box-shadow 0.25s' }
                     }
                   >
                     <div className="v-label-row">
@@ -6401,12 +6314,12 @@ export default function EMRPage() {
                     <span
                       className="v-value"
                       style={{
-                        display: "flex",
-                        alignItems: "baseline",
+                        display: 'flex',
+                        alignItems: 'baseline',
                         gap: 2,
                         animation: vitals[key]
-                          ? "vitalReveal 0.35s cubic-bezier(0.22,1,0.36,1) both"
-                          : "none",
+                          ? 'vitalReveal 0.35s cubic-bezier(0.22,1,0.36,1) both'
+                          : 'none',
                       }}
                     >
                       <input
@@ -6414,52 +6327,44 @@ export default function EMRPage() {
                         name={`vital-${key}`}
                         type="text"
                         value={vitals[key]}
-                        onChange={(e) => {
+                        onChange={e => {
                           const nextValue =
-                            key === "td"
+                            key === 'td'
                               ? normalizeBloodPressureInput(e.target.value)
-                              : e.target.value;
-                          setVitals((p) => ({ ...p, [key]: nextValue }));
-                          setVitalMeta((prev) => ({
+                              : e.target.value
+                          setVitals(p => ({ ...p, [key]: nextValue }))
+                          setVitalMeta(prev => ({
                             ...prev,
                             [key]: nextValue.trim()
                               ? {
-                                  mode: "measured",
-                                  confidence: "high",
+                                  mode: 'measured',
+                                  confidence: 'high',
                                   note: `${label} diisi manual oleh petugas.`,
                                 }
-                              : key === "td" || key === "map"
+                              : key === 'td' || key === 'map'
                                 ? {
-                                    mode: "manual_required",
+                                    mode: 'manual_required',
                                     note: `${label} perlu diukur manual sebelum finalisasi klinis.`,
                                   }
-                                : { mode: "empty" },
-                          }));
+                                : { mode: 'empty' },
+                          }))
                         }}
-                        placeholder={
-                          vitalMeta[key].mode === "manual_required"
-                            ? "ukur"
-                            : "—"
-                        }
+                        placeholder={vitalMeta[key].mode === 'manual_required' ? 'ukur' : '—'}
                         style={{
-                          background: "transparent",
-                          border: "none",
-                          borderBottom: vitals[key]
-                            ? "none"
-                            : "1px dashed var(--line-base)",
-                          outline: "none",
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: vitals[key] ? 'none' : '1px dashed var(--line-base)',
+                          outline: 'none',
                           fontSize: 28,
                           fontWeight: 300,
                           color: isCritical(vitals[key], key)
-                            ? "var(--c-critical)"
+                            ? 'var(--c-critical)'
                             : vitals[key]
-                              ? "var(--text-main)"
-                              : "var(--text-muted)",
-                          width: vitals[key]
-                            ? `${vitals[key].length + 1}ch`
-                            : "3ch",
-                          minWidth: "2.5ch",
-                          letterSpacing: "-1px",
+                              ? 'var(--text-main)'
+                              : 'var(--text-muted)',
+                          width: vitals[key] ? `${vitals[key].length + 1}ch` : '3ch',
+                          minWidth: '2.5ch',
+                          letterSpacing: '-1px',
                           padding: 0,
                         }}
                       />
@@ -6467,7 +6372,7 @@ export default function EMRPage() {
                     </span>
                     {vitalMeta[key].note && (
                       <span
-                        className={`v-meta-note${vitalMeta[key].mode === "manual_required" ? " is-manual" : ""}`}
+                        className={`v-meta-note${vitalMeta[key].mode === 'manual_required' ? ' is-manual' : ''}`}
                       >
                         {vitalMeta[key].note}
                       </span>
@@ -6479,7 +6384,7 @@ export default function EMRPage() {
                 <div
                   className="vital-item"
                   style={{
-                    borderTop: "1px dashed var(--line-base)",
+                    borderTop: '1px dashed var(--line-base)',
                     paddingTop: 12,
                     marginTop: 4,
                   }}
@@ -6487,76 +6392,64 @@ export default function EMRPage() {
                   <span className="v-label">Gula Darah</span>
                   <span
                     className="v-value"
-                    style={{ display: "flex", alignItems: "baseline", gap: 6 }}
+                    style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}
                   >
                     <input
                       id="vital-gula-darah"
                       name="vital-gula-darah"
                       type="text"
                       value={gulaDarah.nilai}
-                      onChange={(e) =>
-                        setGulaDarah((p) => ({ ...p, nilai: e.target.value }))
-                      }
+                      onChange={e => setGulaDarah(p => ({ ...p, nilai: e.target.value }))}
                       placeholder="—"
                       style={{
-                        background: "transparent",
-                        border: "none",
-                        borderBottom: gulaDarah.nilai
-                          ? "none"
-                          : "1px dashed var(--line-base)",
-                        outline: "none",
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: gulaDarah.nilai ? 'none' : '1px dashed var(--line-base)',
+                        outline: 'none',
                         fontSize: 28,
                         fontWeight: 300,
                         color: gulaDarah.nilai
-                          ? parseFloat(gulaDarah.nilai) < 70 ||
-                            parseFloat(gulaDarah.nilai) > 200
-                            ? "var(--c-critical)"
-                            : "var(--text-main)"
-                          : "var(--text-muted)",
-                        width: gulaDarah.nilai
-                          ? `${gulaDarah.nilai.length + 1}ch`
-                          : "3ch",
-                        minWidth: "2.5ch",
-                        letterSpacing: "-1px",
+                          ? Number.parseFloat(gulaDarah.nilai) < 70 ||
+                            Number.parseFloat(gulaDarah.nilai) > 200
+                            ? 'var(--c-critical)'
+                            : 'var(--text-main)'
+                          : 'var(--text-muted)',
+                        width: gulaDarah.nilai ? `${gulaDarah.nilai.length + 1}ch` : '3ch',
+                        minWidth: '2.5ch',
+                        letterSpacing: '-1px',
                         padding: 0,
                       }}
                     />
                     <span
                       style={{
-                        display: "flex",
-                        flexDirection: "column",
+                        display: 'flex',
+                        flexDirection: 'column',
                         gap: 2,
                       }}
                     >
                       <span
                         style={{
                           fontSize: 13,
-                          color: "var(--text-muted)",
+                          color: 'var(--text-muted)',
                           marginBottom: 6,
                         }}
                       >
                         mg/dL
                       </span>
-                      <span style={{ display: "flex", gap: 3 }}>
-                        {(["GDS", "GDP", "2JPP"] as const).map((t) => (
+                      <span style={{ display: 'flex', gap: 3 }}>
+                        {(['GDS', 'GDP', '2JPP'] as const).map(t => (
                           <button
                             key={t}
-                            onClick={() =>
-                              setGulaDarah((p) => ({ ...p, tipe: t }))
-                            }
+                            onClick={() => setGulaDarah(p => ({ ...p, tipe: t }))}
                             style={{
                               fontSize: 15,
-                              padding: "5px 12px",
-                              cursor: "pointer",
-                              border: `1px solid ${gulaDarah.tipe === t ? "var(--c-asesmen)" : "var(--line-base)"}`,
+                              padding: '5px 12px',
+                              cursor: 'pointer',
+                              border: `1px solid ${gulaDarah.tipe === t ? 'var(--c-asesmen)' : 'var(--line-base)'}`,
                               background:
-                                gulaDarah.tipe === t
-                                  ? "rgba(212,122,87,0.12)"
-                                  : "transparent",
+                                gulaDarah.tipe === t ? 'rgba(212,122,87,0.12)' : 'transparent',
                               color:
-                                gulaDarah.tipe === t
-                                  ? "var(--c-asesmen)"
-                                  : "var(--text-muted)",
+                                gulaDarah.tipe === t ? 'var(--c-asesmen)' : 'var(--text-muted)',
                             }}
                           >
                             {t}
@@ -6568,57 +6461,136 @@ export default function EMRPage() {
                 </div>
               </div>
 
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: '14px 16px',
+                  border: '1px solid rgba(212,122,87,0.28)',
+                  background: 'rgba(212,122,87,0.06)',
+                  borderRadius: 6,
+                  display: 'grid',
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        color: 'var(--c-asesmen)',
+                      }}
+                    >
+                      Structured Red Flags
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Centang observasi klinis yang benar-benar terlihat, supaya alert tidak
+                      bergantung pada inferensi teks saja.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStructuredSignsDraft(createInitialStructuredSigns())}
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      padding: '6px 10px',
+                      border: '1px solid var(--line-base)',
+                      background: 'transparent',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      borderRadius: 3,
+                    }}
+                  >
+                    Reset Flags
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: 14,
+                  }}
+                >
+                  {renderStructuredSection(
+                    'respiratoryDistress',
+                    'Distress Napas',
+                    STRUCTURED_SIGN_CONFIG.respiratoryDistress
+                  )}
+                  {renderStructuredSection(
+                    'hmod',
+                    'HMOD / HTN Emergency',
+                    STRUCTURED_SIGN_CONFIG.hmod
+                  )}
+                  {renderStructuredSection('dkaHhs', 'DKA / HHS Signs', STRUCTURED_SIGN_CONFIG.dkaHhs)}
+                  {renderStructuredSection(
+                    'perfusionShock',
+                    'Perfusion / Shock',
+                    STRUCTURED_SIGN_CONFIG.perfusionShock
+                  )}
+                </div>
+              </div>
+
               {/* Gate 2/3/4 Screening Alerts — sama persis visual treatment Assist */}
               {screeningAlerts.length > 0 && (
                 <div
                   style={{
-                    marginTop: "16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
+                    marginTop: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
                   }}
                 >
-                  {screeningAlerts.map((alert) => {
-                    const isCrit = alert.severity === "critical";
-                    const isHigh = alert.severity === "high";
+                  {screeningAlerts.map(alert => {
+                    const isCrit = alert.severity === 'critical'
+                    const isHigh = alert.severity === 'high'
                     return (
                       <div
                         key={alert.id}
                         style={{
-                          padding: "12px 16px",
-                          borderRadius: "8px",
-                          border: `1px solid ${isCrit ? "#ef4444" : isHigh ? "#f97316" : "#eab308"}`,
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          border: `1px solid ${isCrit ? '#ef4444' : isHigh ? '#f97316' : '#eab308'}`,
                           background: isCrit
-                            ? "linear-gradient(135deg, rgba(220,38,38,0.15), rgba(153,27,27,0.15))"
+                            ? 'linear-gradient(135deg, rgba(220,38,38,0.15), rgba(153,27,27,0.15))'
                             : isHigh
-                              ? "rgba(249,115,22,0.10)"
-                              : "rgba(234,179,8,0.08)",
-                          animation: isCrit
-                            ? "pulse-border 2s infinite"
-                            : undefined,
+                              ? 'rgba(249,115,22,0.10)'
+                              : 'rgba(234,179,8,0.08)',
+                          animation: isCrit ? 'pulse-border 2s infinite' : undefined,
                         }}
                       >
                         <div
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            marginBottom: "6px",
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '6px',
                           }}
                         >
-                          <span style={{ fontSize: "16px" }}>
-                            {isCrit ? "🚑" : isHigh ? "🚨" : "⚠️"}
+                          <span style={{ fontSize: '16px' }}>
+                            {isCrit ? '🚑' : isHigh ? '🚨' : '⚠️'}
                           </span>
                           {isCrit && (
                             <span
                               style={{
-                                background: "#ef4444",
-                                color: "white",
-                                fontSize: "13px",
+                                background: '#ef4444',
+                                color: 'white',
+                                fontSize: '13px',
                                 fontWeight: 700,
-                                letterSpacing: "0.5px",
-                                padding: "2px 6px",
-                                borderRadius: "3px",
+                                letterSpacing: '0.5px',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
                               }}
                             >
                               EMERGENCY
@@ -6627,12 +6599,8 @@ export default function EMRPage() {
                           <span
                             style={{
                               fontWeight: 700,
-                              fontSize: "13px",
-                              color: isCrit
-                                ? "#ef4444"
-                                : isHigh
-                                  ? "#f97316"
-                                  : "#eab308",
+                              fontSize: '13px',
+                              color: isCrit ? '#ef4444' : isHigh ? '#f97316' : '#eab308',
                             }}
                           >
                             {alert.title}
@@ -6640,26 +6608,26 @@ export default function EMRPage() {
                         </div>
                         <div
                           style={{
-                            fontSize: "13px",
-                            color: "var(--text-muted)",
-                            marginBottom: "6px",
+                            fontSize: '13px',
+                            color: 'var(--text-muted)',
+                            marginBottom: '6px',
                           }}
                         >
                           {alert.reasoning}
                         </div>
                         <div
                           style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "2px",
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px',
                           }}
                         >
                           {alert.recommendations.slice(0, 3).map((r, i) => (
                             <div
                               key={i}
                               style={{
-                                fontSize: "13px",
-                                color: "var(--text-base)",
+                                fontSize: '13px',
+                                color: 'var(--text-base)',
                               }}
                             >
                               ⚡ {r}
@@ -6667,17 +6635,218 @@ export default function EMRPage() {
                           ))}
                         </div>
                       </div>
-                    );
+                    )
                   })}
                 </div>
               )}
+
+              {compositeDeterioration &&
+                (compositeDeterioration.compositeAlerts.length > 0 ||
+                  compositeDeterioration.watchers.length > 0) && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                          color: 'var(--text-main)',
+                        }}
+                      >
+                        Composite Deterioration
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        {compositeDeterioration.compositeAlerts.length > 0
+                          ? `${compositeDeterioration.compositeAlerts.length} composite alert`
+                          : '0 composite alert'}
+                        {compositeDeterioration.watchers.length > 0
+                          ? ` · ${compositeDeterioration.watchers.length} watcher`
+                          : ''}
+                        {encounterMeasurements.length > 0
+                          ? ` · ${encounterMeasurements.length} snapshot / ${ENCOUNTER_BASELINE_WINDOW_MINUTES}m`
+                          : ''}
+                      </div>
+                    </div>
+
+                    {compositeDeterioration.compositeAlerts.map(alert => {
+                      const accent = getCompositeSeverityColor(alert.severity)
+                      return (
+                        <div
+                          key={alert.id}
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            border: `1px solid ${accent}`,
+                            background:
+                              alert.severity === 'critical'
+                                ? 'linear-gradient(135deg, rgba(220,38,38,0.12), rgba(153,27,27,0.12))'
+                                : alert.severity === 'high'
+                                  ? 'rgba(249,115,22,0.08)'
+                                  : 'rgba(234,179,8,0.08)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              marginBottom: 6,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                fontSize: '13px',
+                                color: accent,
+                              }}
+                            >
+                              {alert.title}
+                            </span>
+                            <span
+                              style={{
+                                border: `1px solid ${accent}`,
+                                color: accent,
+                                fontSize: 11,
+                                padding: '2px 6px',
+                                borderRadius: 999,
+                              }}
+                            >
+                              {getCompositeConfidenceLabel(alert.confidence)}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '13px',
+                              color: 'var(--text-muted)',
+                              marginBottom: '6px',
+                            }}
+                          >
+                            {alert.summary}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 3,
+                              marginBottom: 6,
+                            }}
+                          >
+                            {alert.evidence.slice(0, 3).map((evidence, index) => (
+                              <div
+                                key={`${alert.id}-evidence-${index}`}
+                                style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-base)',
+                                }}
+                              >
+                                {evidence}
+                              </div>
+                            ))}
+                          </div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 2,
+                            }}
+                          >
+                            {alert.recommendedActions.slice(0, 2).map((action, index) => (
+                              <div
+                                key={`${alert.id}-action-${index}`}
+                                style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-soft)',
+                                }}
+                              >
+                                {action}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {compositeDeterioration.watchers.length > 0 && (
+                      <div
+                        style={{
+                          border: '1px solid rgba(234,179,8,0.35)',
+                          background: 'rgba(234,179,8,0.06)',
+                          borderRadius: 8,
+                          padding: '10px 12px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: '#eab308',
+                            marginBottom: 6,
+                          }}
+                        >
+                          Watchers
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 8,
+                          }}
+                        >
+                          {compositeDeterioration.watchers.map(alert => (
+                            <div key={alert.id}>
+                              <div
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  color: 'var(--text-main)',
+                                }}
+                              >
+                                {alert.title}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-muted)',
+                                }}
+                              >
+                                {alert.summary}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
               {labOpen && (
                 <div className="lab-expansion open">
                   {labItems.map((item, i) => (
                     <div
                       key={i}
-                      className={`lab-item${labSelected[i] ? " selected" : ""}`}
+                      className={`lab-item${labSelected[i] ? ' selected' : ''}`}
                       onClick={() => toggleLab(i)}
                     >
                       <div className="lab-item-left">{item.name}</div>
@@ -6689,34 +6858,33 @@ export default function EMRPage() {
               {isTriageTab && (
                 <div className="emr-phase-footer">
                   <div className="emr-phase-footer-copy">
-                    Data triase awal sudah terkumpul. Teruskan ke dokter setelah
-                    keluhan utama, TTV, dan objektif awal terasa cukup untuk
-                    review klinis.
+                    Data triase awal sudah terkumpul. Teruskan ke dokter setelah keluhan utama, TTV,
+                    dan objektif awal terasa cukup untuk review klinis.
                   </div>
                   {onlineDoctors.length > 0 ? (
                     <div
                       style={{
-                        display: "flex",
-                        alignItems: "center",
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: 10,
                         marginTop: 8,
                       }}
                     >
                       <select
                         value={selectedDoctor}
-                        onChange={(e) => setSelectedDoctor(e.target.value)}
+                        onChange={e => setSelectedDoctor(e.target.value)}
                         style={{
-                          background: "var(--bg-card)",
-                          color: "var(--text-main)",
-                          border: "1px solid var(--line-base)",
+                          background: 'var(--bg-card)',
+                          color: 'var(--text-main)',
+                          border: '1px solid var(--line-base)',
                           borderRadius: 3,
-                          padding: "6px 10px",
+                          padding: '6px 10px',
                           fontSize: 13,
                           flex: 1,
                         }}
                       >
                         <option value="">Pilih Dokter Jaga...</option>
-                        {onlineDoctors.map((d) => (
+                        {onlineDoctors.map(d => (
                           <option key={d.userId} value={d.userId}>
                             {d.name} (online)
                           </option>
@@ -6726,8 +6894,10 @@ export default function EMRPage() {
                         label="Send to Doctor"
                         tone="blue"
                         onClick={() => {
-                          if (!selectedDoctor || !socketRef.current) return;
-                          socketRef.current.emit("emr:triage-send", {
+                          if (!selectedDoctor || !socketRef.current) return
+                          const liveAlertPayload = buildRealtimeAlertPayload()
+                          const structuredSigns = liveAlertPayload.structuredSigns as StructuredTriageSigns
+                          socketRef.current.emit('emr:triage-send', {
                             targetUserId: selectedDoctor,
                             data: {
                               keluhanUtama,
@@ -6736,30 +6906,36 @@ export default function EMRPage() {
                               gulaDarah,
                               patientAge,
                               patientGender,
+                              triageContext: {
+                                ...triageSignalContext,
+                                structuredSigns,
+                              },
+                              encounterBaseline: liveAlertPayload.encounterBaseline,
+                              structuredSigns,
+                              screeningAlerts,
+                              compositeDeterioration,
                             },
-                          });
-                          moveToWorkflowTab("review");
+                          })
+                          moveToWorkflowTab('review')
                         }}
                       />
                     </div>
                   ) : (
                     <div
                       style={{
-                        display: "flex",
-                        alignItems: "center",
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: 10,
                         marginTop: 8,
                       }}
                     >
-                      <span
-                        style={{ fontSize: 11, color: "var(--text-muted)" }}
-                      >
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         Tidak ada dokter online
                       </span>
                       <EmrPhaseFooterButton
                         label="Lanjut Lokal"
                         tone="blue"
-                        onClick={() => moveToWorkflowTab("review")}
+                        onClick={() => moveToWorkflowTab('review')}
                       />
                     </div>
                   )}
@@ -6782,14 +6958,13 @@ export default function EMRPage() {
             {isReviewTab && (
               <div className="emr-phase-footer">
                 <div className="emr-phase-footer-copy">
-                  Review dokter selesai. Lanjutkan ke assessment untuk
-                  menjalankan Iskandar, membaca differential, dan menetapkan
-                  keputusan klinis.
+                  Review dokter selesai. Lanjutkan ke assessment untuk menjalankan Iskandar, membaca
+                  differential, dan menetapkan keputusan klinis.
                 </div>
                 <EmrPhaseFooterButton
                   label="Proceed to Assessment"
                   tone="blue"
-                  onClick={() => moveToWorkflowTab("assessment")}
+                  onClick={() => moveToWorkflowTab('assessment')}
                 />
               </div>
             )}
@@ -6797,36 +6972,32 @@ export default function EMRPage() {
 
           <section
             ref={row3SectionRef}
-            className={`emr-phase${activeViewPhase === "row3" ? " is-active" : activeViewPhase !== null ? " is-dimmed" : ""}`}
-            style={{ display: showDecisionSection ? undefined : "none" }}
+            className={`emr-phase${activeViewPhase === 'row3' ? ' is-active' : activeViewPhase !== null ? ' is-dimmed' : ''}`}
+            style={{ display: showDecisionSection ? undefined : 'none' }}
           >
-            <div className="stream-section" style={{ maxWidth: "100%" }}>
+            <div className="stream-section" style={{ maxWidth: '100%' }}>
               <div className="emr-phase-label" style={{ marginBottom: 20 }}>
-                {isAssessmentTab
-                  ? "Row 3 / Assessment & Decision"
-                  : "Row 4 / Therapy & Sign-Off"}
+                {isAssessmentTab ? 'Row 3 / Assessment & Decision' : 'Row 4 / Therapy & Sign-Off'}
               </div>
 
               {isAssessmentTab && (
                 <>
                   <div
                     ref={assessmentEntryPanelRef}
-                    className={`blueprint-wrapper emr-decision-entry assessment-phase-shell emr-row3-spotlight${row3Spotlight === "prognosis" ? " is-shadowed" : ""}`}
+                    className={`blueprint-wrapper emr-decision-entry assessment-phase-shell emr-row3-spotlight${row3Spotlight === 'prognosis' ? ' is-shadowed' : ''}`}
                   >
                     <div className="assessment-phase-grid">
                       <div className="assessment-command-panel">
                         <div className="assessment-command-header">
                           <div style={{ minWidth: 0 }}>
-                            <div className="assessment-command-kicker">
-                              Assessment Workspace
-                            </div>
+                            <div className="assessment-command-kicker">Assessment Workspace</div>
                             <div className="assessment-command-title">
-                              Ringkas asesmen klinis, jalankan Iskandar, lalu
-                              putuskan diagnosis kerja tanpa bolak-balik scroll.
+                              Ringkas asesmen klinis, jalankan Iskandar, lalu putuskan diagnosis
+                              kerja tanpa bolak-balik scroll.
                             </div>
                           </div>
                           <div
-                            className={`assessment-command-badge${cdssLoading ? " is-loading" : cdssResult ? " is-ready" : assessmentConclusion.trim() ? " is-armed" : ""}`}
+                            className={`assessment-command-badge${cdssLoading ? ' is-loading' : cdssResult ? ' is-ready' : assessmentConclusion.trim() ? ' is-armed' : ''}`}
                           >
                             {assessmentStageBadge}
                           </div>
@@ -6840,29 +7011,25 @@ export default function EMRPage() {
                           className="omni-input assessment-omni-input"
                           placeholder="Ketik kesimpulan asesmen atau ketik '/' untuk perintah..."
                           value={assessmentConclusion}
-                          onChange={(e) => {
-                            setAssessmentConclusion(e.target.value);
+                          onChange={e => {
+                            setAssessmentConclusion(e.target.value)
                             setAssessmentConclusionMeta({
-                              mode: "edited",
+                              mode: 'edited',
                               signature: assessmentAutoDraftSignature,
-                            });
+                            })
                           }}
                           style={{ marginTop: 0, marginBottom: 0 }}
                         />
 
                         <div className="assessment-command-note">
-                          Tulis problem representation singkat dulu. Setelah itu
-                          engine akan membaca konteks objektif, differential,
-                          dan guardrail sebelum hasil ditampilkan.
+                          Tulis problem representation singkat dulu. Setelah itu engine akan membaca
+                          konteks objektif, differential, dan guardrail sebelum hasil ditampilkan.
                         </div>
-                        {assessmentConclusionMeta.mode === "auto" &&
+                        {assessmentConclusionMeta.mode === 'auto' &&
                           assessmentConclusion.trim() && (
-                            <div
-                              className="assessment-synthesis-chip"
-                              aria-live="polite"
-                            >
-                              Sintesis dokter aktif • engine membaca ringkasan
-                              klinis ini sebagai konteks prioritas
+                            <div className="assessment-synthesis-chip" aria-live="polite">
+                              Sintesis dokter aktif • engine membaca ringkasan klinis ini sebagai
+                              konteks prioritas
                             </div>
                           )}
 
@@ -6874,22 +7041,18 @@ export default function EMRPage() {
                             style={{
                               flex: 1,
                               cursor:
-                                cdssLoading || !keluhanUtama.trim()
-                                  ? "not-allowed"
-                                  : "pointer",
+                                cdssLoading || !keluhanUtama.trim() ? 'not-allowed' : 'pointer',
                               opacity: !keluhanUtama.trim() ? 0.4 : 1,
                             }}
                           >
-                            {cdssLoading
-                              ? "⏳ MEMPROSES CDSS..."
-                              : "▶ JALANKAN CDSS ENGINE"}
+                            {cdssLoading ? '⏳ MEMPROSES CDSS...' : '▶ JALANKAN CDSS ENGINE'}
                           </button>
                           <button
                             onClick={resetEmrDraft}
                             className="assessment-reset-button"
                             style={{
-                              cursor: "pointer",
-                              whiteSpace: "nowrap",
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
                             }}
                           >
                             ↺ RESET
@@ -6899,22 +7062,17 @@ export default function EMRPage() {
 
                       <div className="assessment-side-panel">
                         <div className="assessment-side-block">
-                          <div className="assessment-side-title">
-                            Clinical Readiness
-                          </div>
+                          <div className="assessment-side-title">Clinical Readiness</div>
                           <div className="assessment-readiness-grid">
                             <div className="assessment-readiness-item">
-                              <span className="assessment-readiness-label">
-                                Ringkasan keluhan
-                              </span>
+                              <span className="assessment-readiness-label">Ringkasan keluhan</span>
                               <strong className="assessment-readiness-title">
-                                {readinessComplaintHeadline ||
-                                  "Belum ada ringkasan gejala"}
+                                {readinessComplaintHeadline || 'Belum ada ringkasan gejala'}
                               </strong>
                               <small className="assessment-readiness-copy">
                                 {readinessComplaintHeadline
-                                  ? `Onset: ${readinessOnsetLabel ?? "Perlu digali"} | Triage: `
-                                  : "Isi keluhan utama dan gejala penyerta agar ringkasan klinis terbentuk."}
+                                  ? `Onset: ${readinessOnsetLabel ?? 'Perlu digali'} | Triage: `
+                                  : 'Isi keluhan utama dan gejala penyerta agar ringkasan klinis terbentuk.'}
                                 {readinessComplaintHeadline && (
                                   <span
                                     style={{
@@ -6928,39 +7086,33 @@ export default function EMRPage() {
                               </small>
                             </div>
                             <div className="assessment-readiness-item">
-                              <span className="assessment-readiness-label">
-                                Sintesis klinis
-                              </span>
+                              <span className="assessment-readiness-label">Sintesis klinis</span>
                               <strong
-                                className={`assessment-readiness-title${assessmentConclusion.trim() ? "" : " is-accent"}`}
+                                className={`assessment-readiness-title${assessmentConclusion.trim() ? '' : ' is-accent'}`}
                               >
                                 {assessmentConclusion.trim()
-                                  ? assessmentConclusionMeta.mode === "auto"
-                                    ? "Sintesis awal otomatis siap"
-                                    : "Sintesis siap diproses"
-                                  : "+ Tambahkan Sintesis"}
+                                  ? assessmentConclusionMeta.mode === 'auto'
+                                    ? 'Sintesis awal otomatis siap'
+                                    : 'Sintesis siap diproses'
+                                  : '+ Tambahkan Sintesis'}
                               </strong>
                               <small className="assessment-readiness-copy">
                                 {assessmentConclusion.trim()
                                   ? assessmentConclusion.trim()
-                                  : "Diperlukan untuk optimasi reasoning engine. Ketik ringkasan klinis..."}
+                                  : 'Diperlukan untuk optimasi reasoning engine. Ketik ringkasan klinis...'}
                               </small>
                               {!assessmentConclusion.trim() && (
                                 <button
                                   type="button"
                                   className="assessment-readiness-cta"
-                                  onClick={() =>
-                                    assessmentConclusionInputRef.current?.focus()
-                                  }
+                                  onClick={() => assessmentConclusionInputRef.current?.focus()}
                                 >
                                   FOKUS KE INPUT
                                 </button>
                               )}
                             </div>
                             <div className="assessment-readiness-item">
-                              <span className="assessment-readiness-label">
-                                Output CDSS
-                              </span>
+                              <span className="assessment-readiness-label">Output CDSS</span>
                               <strong className="assessment-readiness-title">
                                 {readinessOutputTitle}
                               </strong>
@@ -6969,9 +7121,7 @@ export default function EMRPage() {
                               </small>
                             </div>
                             <div className="assessment-readiness-item">
-                              <span className="assessment-readiness-label">
-                                Keputusan dokter
-                              </span>
+                              <span className="assessment-readiness-label">Keputusan dokter</span>
                               <strong className="assessment-readiness-title">
                                 {readinessDecisionTitle}
                               </strong>
@@ -7001,20 +7151,19 @@ export default function EMRPage() {
                         <div
                           className="extraction-header"
                           style={{
-                            color: "var(--c-asesmen)",
+                            color: 'var(--c-asesmen)',
                             marginBottom: 12,
-                            justifyContent: "flex-end",
+                            justifyContent: 'flex-end',
                           }}
                         >
                           <span
                             style={{
                               fontSize: 13,
-                              letterSpacing: "0.1em",
-                              color: "var(--text-muted)",
+                              letterSpacing: '0.1em',
+                              color: 'var(--text-muted)',
                             }}
                           >
-                            {cdssResult.processing_time_ms}ms ·{" "}
-                            {cdssResult.source.toUpperCase()}
+                            {cdssResult.processing_time_ms}ms · {cdssResult.source.toUpperCase()}
                           </span>
                         </div>
                       )}
@@ -7022,11 +7171,11 @@ export default function EMRPage() {
                       {cdssLoading && (
                         <div
                           style={{
-                            padding: "12px 0",
+                            padding: '12px 0',
                             fontSize: 13,
-                            color: "var(--text-muted)",
-                            letterSpacing: "0.1em",
-                            animation: "smoothBlink 1s infinite",
+                            color: 'var(--text-muted)',
+                            letterSpacing: '0.1em',
+                            animation: 'smoothBlink 1s infinite',
                           }}
                         >
                           MENJALANKAN ISKANDAR DIAGNOSIS ENGINE V2...
@@ -7036,9 +7185,9 @@ export default function EMRPage() {
                       {cdssError && (
                         <div
                           style={{
-                            padding: "8px 0",
+                            padding: '8px 0',
                             fontSize: 13,
-                            color: "var(--c-critical)",
+                            color: 'var(--c-critical)',
                           }}
                         >
                           {cdssError}
@@ -7053,45 +7202,24 @@ export default function EMRPage() {
                             <aside className="cdss-result-sidebar">
                               <div className="cdss-summary-grid">
                                 <div className="cdss-summary-tile">
-                                  <span className="cdss-summary-label">
-                                    Output tervalidasi
-                                  </span>
+                                  <span className="cdss-summary-label">Output tervalidasi</span>
                                   <strong>
-                                    {
-                                      cdssResult.validation_summary
-                                        .total_validated
-                                    }
-                                    /{cdssResult.validation_summary.total_raw}
+                                    {cdssResult.validation_summary.total_validated}/
+                                    {cdssResult.validation_summary.total_raw}
                                   </strong>
                                 </div>
                                 <div className="cdss-summary-tile">
-                                  <span className="cdss-summary-label">
-                                    Diagnosis kerja
-                                  </span>
-                                  <strong>
-                                    {
-                                      cdssResult.validation_summary
-                                        .recommended_count
-                                    }
-                                  </strong>
+                                  <span className="cdss-summary-label">Diagnosis kerja</span>
+                                  <strong>{cdssResult.validation_summary.recommended_count}</strong>
                                 </div>
                                 <div className="cdss-summary-tile">
-                                  <span className="cdss-summary-label">
-                                    Perlu review
-                                  </span>
-                                  <strong>
-                                    {cdssResult.validation_summary.review_count}
-                                  </strong>
+                                  <span className="cdss-summary-label">Perlu review</span>
+                                  <strong>{cdssResult.validation_summary.review_count}</strong>
                                 </div>
                                 <div className="cdss-summary-tile">
-                                  <span className="cdss-summary-label">
-                                    Must-not-miss
-                                  </span>
+                                  <span className="cdss-summary-label">Must-not-miss</span>
                                   <strong>
-                                    {
-                                      cdssResult.validation_summary
-                                        .must_not_miss_count
-                                    }
+                                    {cdssResult.validation_summary.must_not_miss_count}
                                   </strong>
                                 </div>
                               </div>
@@ -7099,83 +7227,71 @@ export default function EMRPage() {
                               {requiresEmergencyAck && (
                                 <div
                                   style={{
-                                    padding: "10px 12px",
+                                    padding: '10px 12px',
                                     marginBottom: 8,
-                                    border: "1px solid var(--c-critical)",
-                                    background: "transparent",
+                                    border: '1px solid var(--c-critical)',
+                                    background: 'transparent',
                                   }}
                                 >
                                   <div
                                     style={{
                                       fontSize: 13,
-                                      letterSpacing: "0.08em",
-                                      color: "var(--c-critical)",
+                                      letterSpacing: '0.08em',
+                                      color: 'var(--c-critical)',
                                       marginBottom: 6,
                                     }}
                                   >
                                     PROTOKOL EMERGENCY: ACK WAJIB
                                   </div>
-                                  {Object.keys(safetyChecklist).map(
-                                    (item, idx) => (
-                                      <label
-                                        key={`${item}-${idx}`}
-                                        style={{
-                                          display: "flex",
-                                          gap: 6,
-                                          alignItems: "flex-start",
-                                          fontSize: 13,
-                                          color: "var(--text-main)",
-                                          marginBottom: 4,
-                                        }}
-                                      >
-                                        <input
-                                          id={`safety-${idx}`}
-                                          name={`safety-${idx}`}
-                                          type="checkbox"
-                                          checked={Boolean(
-                                            safetyChecklist[item],
-                                          )}
-                                          onChange={(e) =>
-                                            setSafetyChecklist((prev) => ({
-                                              ...prev,
-                                              [item]: e.target.checked,
-                                            }))
-                                          }
-                                        />
-                                        <span>{item}</span>
-                                      </label>
-                                    ),
-                                  )}
+                                  {Object.keys(safetyChecklist).map((item, idx) => (
+                                    <label
+                                      key={`${item}-${idx}`}
+                                      style={{
+                                        display: 'flex',
+                                        gap: 6,
+                                        alignItems: 'flex-start',
+                                        fontSize: 13,
+                                        color: 'var(--text-main)',
+                                        marginBottom: 4,
+                                      }}
+                                    >
+                                      <input
+                                        id={`safety-${idx}`}
+                                        name={`safety-${idx}`}
+                                        type="checkbox"
+                                        checked={Boolean(safetyChecklist[item])}
+                                        onChange={e =>
+                                          setSafetyChecklist(prev => ({
+                                            ...prev,
+                                            [item]: e.target.checked,
+                                          }))
+                                        }
+                                      />
+                                      <span>{item}</span>
+                                    </label>
+                                  ))}
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      void acknowledgeEmergencyProtocol()
-                                    }
-                                    disabled={
-                                      !allSafetyChecklistChecked() || ackSaving
-                                    }
+                                    onClick={() => void acknowledgeEmergencyProtocol()}
+                                    disabled={!allSafetyChecklistChecked() || ackSaving}
                                     style={{
                                       marginTop: 6,
-                                      border: "1px solid var(--c-critical)",
-                                      color: "#fff",
+                                      border: '1px solid var(--c-critical)',
+                                      color: '#fff',
                                       background:
-                                        ackSaving ||
-                                        !allSafetyChecklistChecked()
-                                          ? "rgba(220,53,69,0.5)"
-                                          : "var(--c-critical)",
+                                        ackSaving || !allSafetyChecklistChecked()
+                                          ? 'rgba(220,53,69,0.5)'
+                                          : 'var(--c-critical)',
                                       fontSize: 13,
-                                      letterSpacing: "0.08em",
-                                      padding: "4px 8px",
+                                      letterSpacing: '0.08em',
+                                      padding: '4px 8px',
                                       cursor:
-                                        ackSaving ||
-                                        !allSafetyChecklistChecked()
-                                          ? "not-allowed"
-                                          : "pointer",
+                                        ackSaving || !allSafetyChecklistChecked()
+                                          ? 'not-allowed'
+                                          : 'pointer',
                                     }}
                                   >
-                                    {ackSaving
-                                      ? "MENYIMPAN ACK..."
-                                      : "ACK PROTOKOL EMERGENCY"}
+                                    {ackSaving ? 'MENYIMPAN ACK...' : 'ACK PROTOKOL EMERGENCY'}
                                   </button>
                                 </div>
                               )}
@@ -7185,30 +7301,29 @@ export default function EMRPage() {
                                 <div
                                   key={i}
                                   style={{
-                                    padding: "8px 10px",
+                                    padding: '8px 10px',
                                     marginBottom: 6,
-                                    border: `1px solid ${rf.severity === "emergency" ? "var(--c-critical)" : "#E8A838"}`,
-                                    background: "transparent",
+                                    border: `1px solid ${rf.severity === 'emergency' ? 'var(--c-critical)' : '#E8A838'}`,
+                                    background: 'transparent',
                                   }}
                                 >
                                   <div
                                     style={{
                                       fontSize: 13,
-                                      letterSpacing: "0.1em",
+                                      letterSpacing: '0.1em',
                                       color:
-                                        rf.severity === "emergency"
-                                          ? "var(--c-critical)"
-                                          : "#E8A838",
+                                        rf.severity === 'emergency'
+                                          ? 'var(--c-critical)'
+                                          : '#E8A838',
                                       marginBottom: 4,
                                     }}
                                   >
-                                    ⚠ {rf.severity.toUpperCase()} —{" "}
-                                    {rf.condition}
+                                    ⚠ {rf.severity.toUpperCase()} — {rf.condition}
                                   </div>
                                   <div
                                     style={{
                                       fontSize: 13,
-                                      color: "var(--text-muted)",
+                                      color: 'var(--text-muted)',
                                     }}
                                   >
                                     {rf.action}
@@ -7218,37 +7333,30 @@ export default function EMRPage() {
 
                               {/* Traffic Light alert (dari alerts[]) */}
                               {cdssResult.alerts
-                                .filter(
-                                  (a) =>
-                                    a.type === "red_flag" ||
-                                    a.type === "vital_sign",
-                                )
+                                .filter(a => a.type === 'red_flag' || a.type === 'vital_sign')
                                 .slice(0, 1)
-                                .map((a) => (
+                                .map(a => (
                                   <div
                                     key={a.id}
                                     style={{
-                                      padding: "6px 0",
+                                      padding: '6px 0',
                                       marginBottom: 8,
                                       fontSize: 13,
-                                      letterSpacing: "0.08em",
+                                      letterSpacing: '0.08em',
                                     }}
                                   >
                                     <span
                                       style={{
                                         color:
-                                          a.severity === "high" ||
-                                          a.severity === "emergency"
-                                            ? "var(--c-critical)"
-                                            : "#E8A838",
+                                          a.severity === 'high' || a.severity === 'emergency'
+                                            ? 'var(--c-critical)'
+                                            : '#E8A838',
                                         marginRight: 6,
                                       }}
                                     >
                                       ● {a.severity.toUpperCase()}
                                     </span>
-                                    <span
-                                      style={{ color: "var(--text-muted)" }}
-                                    >
+                                    <span style={{ color: 'var(--text-muted)' }}>
                                       {a.title} — {a.message}
                                     </span>
                                   </div>
@@ -7256,50 +7364,42 @@ export default function EMRPage() {
 
                               {/* Validation summary */}
                               {(cdssResult.validation_summary.total_raw > 0 ||
-                                cdssResult.validation_summary.warnings.length >
-                                  0) && (
+                                cdssResult.validation_summary.warnings.length > 0) && (
                                 <div className="cdss-callout-block cdss-validation-grid">
                                   <div className="cdss-validation-main">
                                     <div
                                       style={{
                                         fontSize: 13,
-                                        color: "var(--text-muted)",
-                                        letterSpacing: "0.06em",
+                                        color: 'var(--text-muted)',
+                                        letterSpacing: '0.06em',
                                       }}
                                     >
-                                      {
-                                        cdssResult.validation_summary
-                                          .total_validated
-                                      }
-                                      /{cdssResult.validation_summary.total_raw}{" "}
-                                      tervalidasi
+                                      {cdssResult.validation_summary.total_validated}/
+                                      {cdssResult.validation_summary.total_raw} tervalidasi
                                       {` · ${cdssResult.validation_summary.recommended_count} recommended`}
                                       {` · ${cdssResult.validation_summary.review_count} review`}
                                       {` · ${cdssResult.validation_summary.must_not_miss_count} must-not-miss`}
-                                      {cdssResult.validation_summary
-                                        .unverified_codes.length > 0 &&
+                                      {cdssResult.validation_summary.unverified_codes.length > 0 &&
                                         ` · ${cdssResult.validation_summary.unverified_codes.length} kode perlu review`}
                                     </div>
-                                    {cdssResult.validation_summary
-                                      .requires_more_data && (
+                                    {cdssResult.validation_summary.requires_more_data && (
                                       <div
                                         style={{
                                           marginTop: 6,
                                           fontSize: 12,
-                                          color: "#E8A838",
+                                          color: '#E8A838',
                                         }}
                                       >
-                                        Engine masih butuh data tambahan sebelum
-                                        diagnosis kerja dianggap cukup kuat.
+                                        Engine masih butuh data tambahan sebelum diagnosis kerja
+                                        dianggap cukup kuat.
                                       </div>
                                     )}
-                                    {cdssResult.validation_summary.warnings
-                                      .length > 0 && (
+                                    {cdssResult.validation_summary.warnings.length > 0 && (
                                       <div
                                         style={{
                                           marginTop: 6,
-                                          display: "flex",
-                                          flexDirection: "column",
+                                          display: 'flex',
+                                          flexDirection: 'column',
                                           gap: 4,
                                         }}
                                       >
@@ -7310,27 +7410,21 @@ export default function EMRPage() {
                                               key={`validation-warning-${idx}`}
                                               style={{
                                                 fontSize: 12,
-                                                color: "var(--text-muted)",
+                                                color: 'var(--text-muted)',
                                               }}
                                             >
-                                              •{" "}
-                                              {summarizeValidationWarning(
-                                                warning,
-                                              )}
+                                              • {summarizeValidationWarning(warning)}
                                             </div>
                                           ))}
-                                        {cdssResult.validation_summary.warnings
-                                          .length > 4 && (
+                                        {cdssResult.validation_summary.warnings.length > 4 && (
                                           <div
                                             style={{
                                               fontSize: 12,
-                                              color: "var(--text-muted)",
+                                              color: 'var(--text-muted)',
                                               opacity: 0.8,
                                             }}
                                           >
-                                            +
-                                            {cdssResult.validation_summary
-                                              .warnings.length - 4}{" "}
+                                            +{cdssResult.validation_summary.warnings.length - 4}{' '}
                                             warning validasi lainnya
                                           </div>
                                         )}
@@ -7342,21 +7436,19 @@ export default function EMRPage() {
                                           Next Best Questions
                                         </div>
                                         <div className="cdss-validation-questions-list">
-                                          {importantBestQuestions
-                                            .slice(0, 3)
-                                            .map((question) => (
-                                              <div
-                                                key={question.id}
-                                                className="cdss-validation-question-item"
-                                              >
-                                                <div className="cdss-validation-question-label">
-                                                  {question.title}
-                                                </div>
-                                                <div className="cdss-validation-question-prompt">
-                                                  {question.prompt}
-                                                </div>
+                                          {importantBestQuestions.slice(0, 3).map(question => (
+                                            <div
+                                              key={question.id}
+                                              className="cdss-validation-question-item"
+                                            >
+                                              <div className="cdss-validation-question-label">
+                                                {question.title}
                                               </div>
-                                            ))}
+                                              <div className="cdss-validation-question-prompt">
+                                                {question.prompt}
+                                              </div>
+                                            </div>
+                                          ))}
                                         </div>
                                       </div>
                                     )}
@@ -7366,7 +7458,7 @@ export default function EMRPage() {
                                       Vital Sign Singkat
                                     </div>
                                     {compactVitalsSignals.length > 0 ? (
-                                      compactVitalsSignals.map((item) => (
+                                      compactVitalsSignals.map(item => (
                                         <div
                                           key={item.label}
                                           className="cdss-validation-vital-item"
@@ -7396,26 +7488,23 @@ export default function EMRPage() {
                                   <div
                                     style={{
                                       fontSize: 12,
-                                      letterSpacing: "0.08em",
-                                      color: "var(--c-asesmen)",
+                                      letterSpacing: '0.08em',
+                                      color: 'var(--c-asesmen)',
                                       marginBottom: 6,
                                     }}
                                   >
                                     RECOMMENDED
                                   </div>
                                   {recommendedSuggestions.length > 0 ? (
-                                    recommendedSuggestions.map(
-                                      renderSuggestionCard,
-                                    )
+                                    recommendedSuggestions.map(renderSuggestionCard)
                                   ) : (
                                     <div
                                       style={{
                                         fontSize: 12,
-                                        color: "var(--text-muted)",
+                                        color: 'var(--text-muted)',
                                       }}
                                     >
-                                      Belum ada suggestion yang cukup kuat
-                                      menjadi diagnosis kerja.
+                                      Belum ada suggestion yang cukup kuat menjadi diagnosis kerja.
                                     </div>
                                   )}
                                 </div>
@@ -7423,8 +7512,8 @@ export default function EMRPage() {
                                   <div
                                     style={{
                                       fontSize: 12,
-                                      letterSpacing: "0.08em",
-                                      color: "#E8A838",
+                                      letterSpacing: '0.08em',
+                                      color: '#E8A838',
                                       marginBottom: 6,
                                     }}
                                   >
@@ -7436,11 +7525,10 @@ export default function EMRPage() {
                                     <div
                                       style={{
                                         fontSize: 12,
-                                        color: "var(--text-muted)",
+                                        color: 'var(--text-muted)',
                                       }}
                                     >
-                                      Tidak ada suggestion review aktif untuk
-                                      kasus ini.
+                                      Tidak ada suggestion review aktif untuk kasus ini.
                                     </div>
                                   )}
                                 </div>
@@ -7448,26 +7536,24 @@ export default function EMRPage() {
                                   <div
                                     style={{
                                       fontSize: 12,
-                                      letterSpacing: "0.08em",
-                                      color: "var(--c-critical)",
+                                      letterSpacing: '0.08em',
+                                      color: 'var(--c-critical)',
                                       marginBottom: 6,
                                     }}
                                   >
                                     MUST-NOT-MISS
                                   </div>
                                   {mustNotMissSuggestions.length > 0 ? (
-                                    mustNotMissSuggestions.map(
-                                      renderSuggestionCard,
-                                    )
+                                    mustNotMissSuggestions.map(renderSuggestionCard)
                                   ) : (
                                     <div
                                       style={{
                                         fontSize: 12,
-                                        color: "var(--text-muted)",
+                                        color: 'var(--text-muted)',
                                       }}
                                     >
-                                      Tidak ada diagnosis berisiko tinggi yang
-                                      perlu dipisahkan saat ini.
+                                      Tidak ada diagnosis berisiko tinggi yang perlu dipisahkan saat
+                                      ini.
                                     </div>
                                   )}
                                 </div>
@@ -7478,7 +7564,7 @@ export default function EMRPage() {
                           {selectedDiagnosisDraft && (
                             <div
                               ref={selectedDiagnosisPanelRef}
-                              className={`cdss-selected-panel emr-row3-spotlight${row3Spotlight === "prognosis" ? " is-shadowed" : ""}`}
+                              className={`cdss-selected-panel emr-row3-spotlight${row3Spotlight === 'prognosis' ? ' is-shadowed' : ''}`}
                             >
                               <div className="cdss-selected-panel-head">
                                 <div className="cdss-selected-kicker">
@@ -7486,9 +7572,7 @@ export default function EMRPage() {
                                 </div>
                                 <div className="cdss-selected-diagnosis">
                                   {selectedDiagnosisDraft.diagnosis_name}
-                                  <span>
-                                    ({selectedDiagnosisDraft.icd10_code})
-                                  </span>
+                                  <span>({selectedDiagnosisDraft.icd10_code})</span>
                                 </div>
                                 {reviewAcceptanceReason && (
                                   <div className="cdss-selected-review-reason">
@@ -7502,16 +7586,14 @@ export default function EMRPage() {
                                   name="feedback-final-icd"
                                   type="text"
                                   value={feedbackFinalIcd}
-                                  onChange={(e) =>
-                                    setFeedbackFinalIcd(e.target.value)
-                                  }
+                                  onChange={e => setFeedbackFinalIcd(e.target.value)}
                                   placeholder="ICD final dokter"
                                   style={{
-                                    border: "1px solid var(--line-base)",
-                                    background: "transparent",
-                                    color: "var(--text-main)",
+                                    border: '1px solid var(--line-base)',
+                                    background: 'transparent',
+                                    color: 'var(--text-main)',
                                     fontSize: 13,
-                                    padding: "7px 8px",
+                                    padding: '7px 8px',
                                   }}
                                 />
                                 <input
@@ -7519,16 +7601,14 @@ export default function EMRPage() {
                                   name="feedback-override-reason"
                                   type="text"
                                   value={feedbackOverrideReason}
-                                  onChange={(e) =>
-                                    setFeedbackOverrideReason(e.target.value)
-                                  }
+                                  onChange={e => setFeedbackOverrideReason(e.target.value)}
                                   placeholder="Alasan override final (opsional)"
                                   style={{
-                                    border: "1px solid var(--line-base)",
-                                    background: "transparent",
-                                    color: "var(--text-main)",
+                                    border: '1px solid var(--line-base)',
+                                    background: 'transparent',
+                                    color: 'var(--text-main)',
                                     fontSize: 13,
-                                    padding: "7px 8px",
+                                    padding: '7px 8px',
                                   }}
                                 />
                                 <input
@@ -7536,24 +7616,22 @@ export default function EMRPage() {
                                   name="feedback-followup-note"
                                   type="text"
                                   value={feedbackFollowUpNote}
-                                  onChange={(e) =>
-                                    setFeedbackFollowUpNote(e.target.value)
-                                  }
+                                  onChange={e => setFeedbackFollowUpNote(e.target.value)}
                                   placeholder="Catatan follow-up (opsional)"
                                   style={{
-                                    gridColumn: "1 / -1",
-                                    border: "1px solid var(--line-base)",
-                                    background: "transparent",
-                                    color: "var(--text-main)",
+                                    gridColumn: '1 / -1',
+                                    border: '1px solid var(--line-base)',
+                                    background: 'transparent',
+                                    color: 'var(--text-main)',
                                     fontSize: 13,
-                                    padding: "7px 8px",
+                                    padding: '7px 8px',
                                   }}
                                 />
                                 <div className="cdss-selected-outcome-row">
                                   <label
                                     style={{
-                                      display: "flex",
-                                      alignItems: "center",
+                                      display: 'flex',
+                                      alignItems: 'center',
                                       gap: 4,
                                     }}
                                   >
@@ -7561,19 +7639,15 @@ export default function EMRPage() {
                                       id="outcome-membaik"
                                       name="feedback-outcome"
                                       type="radio"
-                                      checked={
-                                        feedbackOutcomeConfirmed === true
-                                      }
-                                      onChange={() =>
-                                        setFeedbackOutcomeConfirmed(true)
-                                      }
+                                      checked={feedbackOutcomeConfirmed === true}
+                                      onChange={() => setFeedbackOutcomeConfirmed(true)}
                                     />
                                     Outcome membaik
                                   </label>
                                   <label
                                     style={{
-                                      display: "flex",
-                                      alignItems: "center",
+                                      display: 'flex',
+                                      alignItems: 'center',
                                       gap: 4,
                                     }}
                                   >
@@ -7581,12 +7655,8 @@ export default function EMRPage() {
                                       id="outcome-tidak-membaik"
                                       name="feedback-outcome"
                                       type="radio"
-                                      checked={
-                                        feedbackOutcomeConfirmed === false
-                                      }
-                                      onChange={() =>
-                                        setFeedbackOutcomeConfirmed(false)
-                                      }
+                                      checked={feedbackOutcomeConfirmed === false}
+                                      onChange={() => setFeedbackOutcomeConfirmed(false)}
                                     />
                                     Outcome tidak membaik
                                   </label>
@@ -7594,14 +7664,12 @@ export default function EMRPage() {
                                 <button
                                   type="button"
                                   onClick={() => void submitOutcomeFeedback()}
-                                  disabled={
-                                    feedbackSaving || !feedbackFinalIcd.trim()
-                                  }
+                                  disabled={feedbackSaving || !feedbackFinalIcd.trim()}
                                   className="cdss-selected-save-btn"
                                 >
                                   {feedbackSaving
-                                    ? "MENYIMPAN FEEDBACK..."
-                                    : "SIMPAN FEEDBACK OUTCOME"}
+                                    ? 'MENYIMPAN FEEDBACK...'
+                                    : 'SIMPAN FEEDBACK OUTCOME'}
                                 </button>
                               </div>
                             </div>
@@ -7610,32 +7678,24 @@ export default function EMRPage() {
                           {selectedDiagnosisDraft && (
                             <div
                               ref={prognosisStageRef}
-                              className={`cdss-prognosis-stage emr-row3-spotlight${row3Spotlight === "entry" ? " is-shadowed" : ""}`}
+                              className={`cdss-prognosis-stage emr-row3-spotlight${row3Spotlight === 'entry' ? ' is-shadowed' : ''}`}
                             >
-                              <div className="cdss-prognosis-stage-label">
-                                PROGNOSIS LANJUTAN
-                              </div>
+                              <div className="cdss-prognosis-stage-label">PROGNOSIS LANJUTAN</div>
                               <ClinicalPrognosisChart
                                 vitals={prognosisVitals}
                                 keluhanUtama={keluhanUtama}
                                 patientAge={patientAge}
                                 patientGender={patientGender}
                                 bodyWeightKg={
-                                  bodyWeightKg.trim()
-                                    ? Number(bodyWeightKg)
-                                    : undefined
+                                  bodyWeightKg.trim() ? Number(bodyWeightKg) : undefined
                                 }
                                 chronicDiseases={Array.from(rpdSelected)}
-                                isPregnant={
-                                  patientGender === "P" ? isPregnant : false
-                                }
+                                isPregnant={patientGender === 'P' ? isPregnant : false}
                                 selectedDiagnosis={
                                   selectedDiagnosisDraft
                                     ? {
-                                        diagnosis_name:
-                                          selectedDiagnosisDraft.diagnosis_name,
-                                        icd10_code:
-                                          selectedDiagnosisDraft.icd10_code,
+                                        diagnosis_name: selectedDiagnosisDraft.diagnosis_name,
+                                        icd10_code: selectedDiagnosisDraft.icd10_code,
                                       }
                                     : null
                                 }
@@ -7653,32 +7713,30 @@ export default function EMRPage() {
                       style={{
                         order: 4,
                         opacity: trajectoryActive ? 1 : 0,
-                        transform: trajectoryActive
-                          ? "translateY(0)"
-                          : "translateY(10px)",
-                        transition: "all 0.8s ease",
-                        display: "flex",
+                        transform: trajectoryActive ? 'translateY(0)' : 'translateY(10px)',
+                        transition: 'all 0.8s ease',
+                        display: 'flex',
                       }}
                     >
                       <div
                         className="extraction-header"
                         style={{
-                          color: "var(--text-muted)",
-                          borderBottomColor: "var(--line-base)",
+                          color: 'var(--text-muted)',
+                          borderBottomColor: 'var(--line-base)',
                         }}
                       >
                         <span
                           style={{
-                            display: "flex",
-                            alignItems: "center",
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: 6,
                           }}
                         >
                           <span
                             className="ai-pulse-dot"
                             style={{
-                              background: "var(--text-muted)",
-                              animation: "none",
+                              background: 'var(--text-muted)',
+                              animation: 'none',
                               opacity: 0.3,
                             }}
                           />
@@ -7688,23 +7746,20 @@ export default function EMRPage() {
                       <div
                         className="insight-text-sidebar"
                         style={{
-                          color: "var(--text-muted)",
-                          fontStyle: "italic",
+                          color: 'var(--text-muted)',
+                          fontStyle: 'italic',
                         }}
                       >
                         {trajectoryVisitHistory.length > 0
                           ? `${trajectoryVisitHistory.length} kunjungan historis terbaru dimuat. Trajektori aktif dengan jendela analisis terakhir.`
-                          : "Belum ada riwayat kunjungan sebelumnya. Trajektori akan tersedia setelah data terkumpul."}
+                          : 'Belum ada riwayat kunjungan sebelumnya. Trajektori akan tersedia setelah data terkumpul.'}
                       </div>
                     </div>
                   )}
                 </div>
               )}
               {isFinalizeTab && selectedDiagnosisDraft && (
-                <div
-                  ref={finalizeAnchorRef}
-                  className="blueprint-wrapper finalize-assist-panel"
-                >
+                <div ref={finalizeAnchorRef} className="blueprint-wrapper finalize-assist-panel">
                   <div className="finalize-assist-header">
                     <span className="finalize-assist-kicker">FINALISASI</span>
                     <span className="finalize-assist-title">
@@ -7713,16 +7768,14 @@ export default function EMRPage() {
                   </div>
                   <div className="finalize-assist-hero">
                     <div className="finalize-assist-hero-main">
-                      <div className="finalize-assist-hero-label">
-                        Diagnosis final kerja
-                      </div>
+                      <div className="finalize-assist-hero-label">Diagnosis final kerja</div>
                       <div className="finalize-diagnosis-card">
                         <div className="finalize-diagnosis-card-head">
                           <div className="finalize-diagnosis-title-block">
                             <div className="finalize-assist-hero-title">
                               {selectedDiagnosisDraft?.diagnosis_name ??
                                 finalizationSuggestion?.diagnosis_name ??
-                                "Belum ada diagnosis yang dipilih"}
+                                'Belum ada diagnosis yang dipilih'}
                             </div>
                             <div className="finalize-diagnosis-chip-row">
                               {(selectedDiagnosisDraft?.icd10_code ??
@@ -7734,10 +7787,7 @@ export default function EMRPage() {
                               )}
                               {selectedDiagnosisDraft && (
                                 <span className="finalize-diagnosis-chip">
-                                  {Math.round(
-                                    selectedDiagnosisDraft.confidence * 100,
-                                  )}
-                                  % confidence
+                                  {Math.round(selectedDiagnosisDraft.confidence * 100)}% confidence
                                 </span>
                               )}
                               {selectedDiagnosisDraft && (
@@ -7750,9 +7800,7 @@ export default function EMRPage() {
                         </div>
                         {finalizationDiagnosisSummary && (
                           <div className="finalize-diagnosis-summary-block">
-                            <div className="finalize-diagnosis-summary-label">
-                              Ringkasan klinis
-                            </div>
+                            <div className="finalize-diagnosis-summary-label">Ringkasan klinis</div>
                             <div className="finalize-diagnosis-summary">
                               {finalizationDiagnosisSummary}
                             </div>
@@ -7764,35 +7812,33 @@ export default function EMRPage() {
                       <div
                         style={{
                           marginTop: 14,
-                          padding: "12px 14px",
+                          padding: '12px 14px',
                           borderRadius: 6,
                           border: manualDiagnosis
-                            ? "1px solid rgba(230,126,34,0.4)"
-                            : "1px solid var(--line-base)",
+                            ? '1px solid rgba(230,126,34,0.4)'
+                            : '1px solid var(--line-base)',
                           background: manualDiagnosis
-                            ? "rgba(230,126,34,0.04)"
-                            : "rgba(255,255,255,0.02)",
+                            ? 'rgba(230,126,34,0.04)'
+                            : 'rgba(255,255,255,0.02)',
                         }}
                       >
                         <div
                           style={{
                             fontSize: 9,
-                            letterSpacing: "0.15em",
-                            color: manualDiagnosis
-                              ? "#E67E22"
-                              : "var(--text-muted)",
+                            letterSpacing: '0.15em',
+                            color: manualDiagnosis ? '#E67E22' : 'var(--text-muted)',
                             fontWeight: 600,
                             marginBottom: 8,
                           }}
                         >
                           {manualDiagnosis
-                            ? "DIAGNOSIS MANUAL AKTIF"
-                            : "ATAU TULIS DIAGNOSIS MANUAL"}
+                            ? 'DIAGNOSIS MANUAL AKTIF'
+                            : 'ATAU TULIS DIAGNOSIS MANUAL'}
                         </div>
                         <div
                           style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 140px",
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 140px',
                             gap: 8,
                           }}
                         >
@@ -7800,31 +7846,31 @@ export default function EMRPage() {
                             type="text"
                             placeholder="Nama diagnosis..."
                             value={manualDiagnosis}
-                            onChange={(e) => setManualDiagnosis(e.target.value)}
+                            onChange={e => setManualDiagnosis(e.target.value)}
                             style={{
-                              padding: "7px 10px",
+                              padding: '7px 10px',
                               borderRadius: 4,
                               fontSize: 13,
-                              border: "1px solid var(--line-base)",
-                              background: "var(--bg-canvas)",
-                              color: "var(--text-main)",
-                              outline: "none",
+                              border: '1px solid var(--line-base)',
+                              background: 'var(--bg-canvas)',
+                              color: 'var(--text-main)',
+                              outline: 'none',
                             }}
                           />
                           <input
                             type="text"
                             placeholder="ICD-10 (opsional)"
                             value={manualIcd10}
-                            onChange={(e) => setManualIcd10(e.target.value)}
+                            onChange={e => setManualIcd10(e.target.value)}
                             style={{
-                              padding: "7px 10px",
+                              padding: '7px 10px',
                               borderRadius: 4,
                               fontSize: 13,
-                              border: "1px solid var(--line-base)",
-                              background: "var(--bg-canvas)",
-                              color: "var(--text-main)",
-                              outline: "none",
-                              fontFamily: "var(--font-geist-mono)",
+                              border: '1px solid var(--line-base)',
+                              background: 'var(--bg-canvas)',
+                              color: 'var(--text-main)',
+                              outline: 'none',
+                              fontFamily: 'var(--font-geist-mono)',
                             }}
                           />
                         </div>
@@ -7832,12 +7878,12 @@ export default function EMRPage() {
                           <div
                             style={{
                               fontSize: 10,
-                              color: "#E67E22",
+                              color: '#E67E22',
                               marginTop: 6,
                             }}
                           >
-                            Diagnosis manual akan digunakan pada laporan klinis,
-                            menggantikan saran CDSS.
+                            Diagnosis manual akan digunakan pada laporan klinis, menggantikan saran
+                            CDSS.
                           </div>
                         )}
                       </div>
@@ -7849,47 +7895,33 @@ export default function EMRPage() {
                     <div
                       className={`finalize-assist-care-mode is-${finalizationTherapyPlan.careMode.tone}`}
                     >
-                      <span className="finalize-assist-care-mode-label">
-                        Mode tatalaksana
-                      </span>
+                      <span className="finalize-assist-care-mode-label">Mode tatalaksana</span>
                       <strong>{finalizationTherapyPlan.careMode.label}</strong>
                       <small>{finalizationTherapyPlan.sourceLabel}</small>
                     </div>
                   </div>
                   <div className="finalize-assist-summary finalize-assist-summary-topline">
                     <div className="finalize-assist-summary-item finalize-assist-summary-item-assessment">
-                      <span className="finalize-assist-label">
-                        Assessment conclusion
-                      </span>
+                      <span className="finalize-assist-label">Assessment conclusion</span>
                       <div className="finalize-assist-assessment-copy">
                         {assessmentConclusion.trim() ||
-                          "Belum diisi. Lengkapi kesimpulan asesmen sebelum sign-off."}
+                          'Belum diisi. Lengkapi kesimpulan asesmen sebelum sign-off.'}
                       </div>
                     </div>
                     <div className="finalize-assist-summary-item finalize-assist-summary-item-meta">
-                      <span className="finalize-assist-label">
-                        Ringkasan tatalaksana
-                      </span>
+                      <span className="finalize-assist-label">Ringkasan tatalaksana</span>
                       <div className="finalize-assist-meta-grid">
                         <div className="finalize-assist-meta-row">
-                          <span className="finalize-assist-meta-key">
-                            Body system
-                          </span>
+                          <span className="finalize-assist-meta-key">Body system</span>
                           <strong>{finalizationTherapyPlan.bodySystem}</strong>
                         </div>
                         <div className="finalize-assist-meta-row">
-                          <span className="finalize-assist-meta-key">
-                            Kompetensi
-                          </span>
+                          <span className="finalize-assist-meta-key">Kompetensi</span>
                           <strong>{finalizationTherapyPlan.competence}</strong>
                         </div>
                         <div className="finalize-assist-meta-row">
-                          <span className="finalize-assist-meta-key">
-                            Cakupan formularium
-                          </span>
-                          <strong>
-                            {finalizationTherapyPlan.stockCoverageLabel}
-                          </strong>
+                          <span className="finalize-assist-meta-key">Cakupan formularium</span>
+                          <strong>{finalizationTherapyPlan.stockCoverageLabel}</strong>
                         </div>
                       </div>
                     </div>
@@ -7897,70 +7929,52 @@ export default function EMRPage() {
                   <div className="finalize-assist-grid finalize-assist-grid-primary">
                     <div className="finalize-assist-card finalize-assist-card-urgent">
                       <div className="finalize-assist-card-head">
-                        <div className="finalize-assist-card-title">
-                          Tindakan Sekarang
-                        </div>
+                        <div className="finalize-assist-card-title">Tindakan Sekarang</div>
                         <div className="finalize-assist-card-count">
                           {finalizationTherapyPlan.immediateActions.length}
                         </div>
                       </div>
                       <div className="finalize-assist-card-subtitle">
-                        Langkah yang perlu diputuskan atau dikerjakan segera
-                        pada fase tata laksana.
+                        Langkah yang perlu diputuskan atau dikerjakan segera pada fase tata laksana.
                       </div>
                       <div role="list" aria-label="Tindakan segera finalisasi">
-                        {finalizationTherapyPlan.immediateActions.map(
-                          (item, index) => (
+                        {finalizationTherapyPlan.immediateActions.map((item, index) => (
+                          <div
+                            key={`immediate-${index}`}
+                            className="finalize-assist-bullet"
+                            role="listitem"
+                          >
+                            • {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="finalize-assist-card finalize-assist-card-referral">
+                      <div className="finalize-assist-card-head">
+                        <div className="finalize-assist-card-title">Disposisi &amp; Rujukan</div>
+                        <div className="finalize-assist-card-count">
+                          {Math.max(finalizationTherapyPlan.referralDiagnoses.length, 2)}
+                        </div>
+                      </div>
+                      <div className="finalize-assist-card-subtitle">
+                        Menentukan apakah pasien tetap dikelola di Puskesmas atau perlu eskalasi
+                        layanan.
+                      </div>
+                      <div role="list" aria-label="Disposisi dan rujukan finalisasi">
+                        {finalizationTherapyPlan.referral.length > 0 ? (
+                          finalizationTherapyPlan.referral.map((item, index) => (
                             <div
-                              key={`immediate-${index}`}
+                              key={`referral-${index}`}
                               className="finalize-assist-bullet"
                               role="listitem"
                             >
                               • {item}
                             </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                    <div className="finalize-assist-card finalize-assist-card-referral">
-                      <div className="finalize-assist-card-head">
-                        <div className="finalize-assist-card-title">
-                          Disposisi &amp; Rujukan
-                        </div>
-                        <div className="finalize-assist-card-count">
-                          {Math.max(
-                            finalizationTherapyPlan.referralDiagnoses.length,
-                            2,
-                          )}
-                        </div>
-                      </div>
-                      <div className="finalize-assist-card-subtitle">
-                        Menentukan apakah pasien tetap dikelola di Puskesmas
-                        atau perlu eskalasi layanan.
-                      </div>
-                      <div
-                        role="list"
-                        aria-label="Disposisi dan rujukan finalisasi"
-                      >
-                        {finalizationTherapyPlan.referral.length > 0 ? (
-                          finalizationTherapyPlan.referral.map(
-                            (item, index) => (
-                              <div
-                                key={`referral-${index}`}
-                                className="finalize-assist-bullet"
-                                role="listitem"
-                              >
-                                • {item}
-                              </div>
-                            ),
-                          )
+                          ))
                         ) : (
-                          <div
-                            className="finalize-assist-bullet"
-                            role="listitem"
-                          >
-                            • Lanjutkan tatalaksana di Puskesmas bila respons
-                            klinis stabil dan tidak ada red flag baru.
+                          <div className="finalize-assist-bullet" role="listitem">
+                            • Lanjutkan tatalaksana di Puskesmas bila respons klinis stabil dan
+                            tidak ada red flag baru.
                           </div>
                         )}
                       </div>
@@ -7968,21 +7982,16 @@ export default function EMRPage() {
                         <div className="finalize-assist-section-kicker">
                           Diagnosis rujukan yang perlu dipikirkan
                         </div>
-                        <div
-                          role="list"
-                          aria-label="Diagnosis rujukan prioritas"
-                        >
-                          {finalizationTherapyPlan.referralDiagnoses.map(
-                            (item, index) => (
-                              <div
-                                key={`referral-diagnosis-${index}`}
-                                className="finalize-assist-bullet"
-                                role="listitem"
-                              >
-                                • {item}
-                              </div>
-                            ),
-                          )}
+                        <div role="list" aria-label="Diagnosis rujukan prioritas">
+                          {finalizationTherapyPlan.referralDiagnoses.map((item, index) => (
+                            <div
+                              key={`referral-diagnosis-${index}`}
+                              className="finalize-assist-bullet"
+                              role="listitem"
+                            >
+                              • {item}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -8001,10 +8010,9 @@ export default function EMRPage() {
                             </div>
                           </div>
                           <div className="finalize-pharmacology-subtitle">
-                            Formularium aktif dan susunan resep awal yang paling
-                            relevan untuk diagnosis kerja saat ini: Obat Utama,
-                            Obat Adjuvant, lalu Vitamin. Centang obat AI yang
-                            ingin dipakai di resep akhir.
+                            Formularium aktif dan susunan resep awal yang paling relevan untuk
+                            diagnosis kerja saat ini: Obat Utama, Obat Adjuvant, lalu Vitamin.
+                            Centang obat AI yang ingin dipakai di resep akhir.
                           </div>
                         </div>
                         {finalizationTherapyPlan.medications.length > 0 && (
@@ -8028,27 +8036,19 @@ export default function EMRPage() {
                               type="button"
                               className="finalize-pharmacology-selection-button is-secondary"
                               onClick={clearAllAIMedications}
-                              disabled={
-                                finalizationMedicationSummary.selected === 0
-                              }
+                              disabled={finalizationMedicationSummary.selected === 0}
                             >
                               Kosongkan semua
                             </button>
                             <button
                               type="button"
-                              className={`finalize-pharmacology-selection-button is-secondary${showSelectedAIMedicationsOnly ? " is-active" : ""}`}
-                              onClick={() =>
-                                setShowSelectedAIMedicationsOnly(
-                                  (prev) => !prev,
-                                )
-                              }
-                              disabled={
-                                finalizationMedicationSummary.selected === 0
-                              }
+                              className={`finalize-pharmacology-selection-button is-secondary${showSelectedAIMedicationsOnly ? ' is-active' : ''}`}
+                              onClick={() => setShowSelectedAIMedicationsOnly(prev => !prev)}
+                              disabled={finalizationMedicationSummary.selected === 0}
                             >
                               {showSelectedAIMedicationsOnly
-                                ? "Tampilkan semua"
-                                : "Hanya yang dipilih dokter"}
+                                ? 'Tampilkan semua'
+                                : 'Hanya yang dipilih dokter'}
                             </button>
                           </div>
                         )}
@@ -8062,34 +8062,27 @@ export default function EMRPage() {
                           {[...visibleFinalizationMedications]
                             .sort(
                               (a, b) =>
-                                (({ utama: 0, adjuvant: 1, vitamin: 2 })[
-                                  a.prescriptionSlot
-                                ] ?? 1) -
-                                ({ utama: 0, adjuvant: 1, vitamin: 2 }[
-                                  b.prescriptionSlot
-                                ] ?? 1),
+                                (({ utama: 0, adjuvant: 1, vitamin: 2 })[a.prescriptionSlot] ?? 1) -
+                                ({ utama: 0, adjuvant: 1, vitamin: 2 }[b.prescriptionSlot] ?? 1)
                             )
                             .map((item, index, sorted) => {
-                              const medicationKey =
-                                getFinalizationMedicationKey(item);
+                              const medicationKey = getFinalizationMedicationKey(item)
                               const isFirstInSlot =
                                 index === 0 ||
-                                sorted[index - 1].prescriptionSlot !==
-                                  item.prescriptionSlot;
+                                sorted[index - 1].prescriptionSlot !== item.prescriptionSlot
                               const slotLabel =
-                                item.prescriptionSlot === "utama"
-                                  ? "R/ 1. OBAT UTAMA"
-                                  : item.prescriptionSlot === "adjuvant"
-                                    ? "R/ 2. OBAT ADJUVANT"
-                                    : "R/ 3. VITAMIN";
+                                item.prescriptionSlot === 'utama'
+                                  ? 'R/ 1. OBAT UTAMA'
+                                  : item.prescriptionSlot === 'adjuvant'
+                                    ? 'R/ 2. OBAT ADJUVANT'
+                                    : 'R/ 3. VITAMIN'
                               const rxLabel =
-                                item.prescriptionSlot === "utama"
-                                  ? "R/1"
-                                  : item.prescriptionSlot === "adjuvant"
-                                    ? "R/2"
-                                    : "R/3";
-                              const isSelected =
-                                selectedAIMedicationKeySet.has(medicationKey);
+                                item.prescriptionSlot === 'utama'
+                                  ? 'R/1'
+                                  : item.prescriptionSlot === 'adjuvant'
+                                    ? 'R/2'
+                                    : 'R/3'
+                              const isSelected = selectedAIMedicationKeySet.has(medicationKey)
                               return (
                                 <Fragment key={`medication-${index}`}>
                                   {isFirstInSlot && (
@@ -8098,51 +8091,45 @@ export default function EMRPage() {
                                     </div>
                                   )}
                                   <div
-                                    className={`finalize-assist-medication-item finalize-pharmacology-item${isSelected ? " is-selected" : " is-recommended-only"}`}
+                                    className={`finalize-assist-medication-item finalize-pharmacology-item${isSelected ? ' is-selected' : ' is-recommended-only'}`}
                                     role="listitem"
                                   >
-                                    <div className="finalize-pharmacology-rx">
-                                      {rxLabel}
-                                    </div>
+                                    <div className="finalize-pharmacology-rx">{rxLabel}</div>
                                     <div className="finalize-pharmacology-body">
                                       <div className="finalize-assist-medication-head">
                                         <div className="finalize-pharmacology-title-stack">
                                           <strong>{item.name}</strong>
                                           <div className="finalize-pharmacology-selection-status-row">
                                             <span
-                                              className={`finalize-pharmacology-selection-status${isSelected ? " is-selected" : " is-recommended-only"}`}
+                                              className={`finalize-pharmacology-selection-status${isSelected ? ' is-selected' : ' is-recommended-only'}`}
                                             >
-                                              {isSelected
-                                                ? "Dipilih dokter"
-                                                : "Rekomendasi AI"}
+                                              {isSelected ? 'Dipilih dokter' : 'Rekomendasi AI'}
                                             </span>
                                           </div>
                                         </div>
                                         <div
                                           style={{
-                                            display: "flex",
-                                            alignItems: "center",
+                                            display: 'flex',
+                                            alignItems: 'center',
                                             gap: 10,
-                                            flexWrap: "wrap",
+                                            flexWrap: 'wrap',
                                           }}
                                         >
                                           <label
                                             style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
                                               gap: 6,
                                               fontSize: 12,
-                                              color: "var(--text-muted)",
-                                              cursor: "pointer",
+                                              color: 'var(--text-muted)',
+                                              cursor: 'pointer',
                                             }}
                                           >
                                             <input
                                               type="checkbox"
                                               checked={isSelected}
                                               onChange={() =>
-                                                toggleAIMedicationSelection(
-                                                  medicationKey,
-                                                )
+                                                toggleAIMedicationSelection(medicationKey)
                                               }
                                             />
                                             Pakai di resep
@@ -8185,9 +8172,8 @@ export default function EMRPage() {
                                             Cara
                                           </span>
                                           <strong>
-                                            {(item.route || "oral").replace(
-                                              /^\w/,
-                                              (c) => c.toUpperCase(),
+                                            {(item.route || 'oral').replace(/^\w/, c =>
+                                              c.toUpperCase()
                                             )}
                                           </strong>
                                         </div>
@@ -8205,21 +8191,14 @@ export default function EMRPage() {
                                             id={`medication-note-${index}`}
                                             name={`medication-note-${index}`}
                                             type="text"
-                                            value={
-                                              manualMedicationNotes[
-                                                medicationKey
-                                              ] ?? ""
-                                            }
+                                            value={manualMedicationNotes[medicationKey] ?? ''}
                                             maxLength={120}
-                                            onChange={(event) => {
-                                              const nextValue =
-                                                event.target.value;
-                                              setManualMedicationNotes(
-                                                (prev) => ({
-                                                  ...prev,
-                                                  [medicationKey]: nextValue,
-                                                }),
-                                              );
+                                            onChange={event => {
+                                              const nextValue = event.target.value
+                                              setManualMedicationNotes(prev => ({
+                                                ...prev,
+                                                [medicationKey]: nextValue,
+                                              }))
                                             }}
                                             className="finalize-pharmacology-manual-input"
                                             placeholder="isi manual"
@@ -8227,14 +8206,9 @@ export default function EMRPage() {
                                         </div>
                                       </div>
                                       <div className="finalize-assist-medication-meta finalize-pharmacology-meta">
-                                        {item.canonicalName && (
-                                          <span>{item.canonicalName}</span>
-                                        )}
+                                        {item.canonicalName && <span>{item.canonicalName}</span>}
                                         <span>
-                                          Golongan Obat:{" "}
-                                          {getMedicationCategoryLabel(
-                                            item.category,
-                                          )}
+                                          Golongan Obat: {getMedicationCategoryLabel(item.category)}
                                         </span>
                                       </div>
                                       {item.contraindications.length > 0 && (
@@ -8246,30 +8220,27 @@ export default function EMRPage() {
                                             role="list"
                                             aria-label={`Kontraindikasi ${item.name}`}
                                           >
-                                            {item.contraindications.map(
-                                              (warning, warningIndex) => (
-                                                <div
-                                                  key={`medication-warning-${index}-${warningIndex}`}
-                                                  className="finalize-pharmacology-contra-item"
-                                                  role="listitem"
-                                                >
-                                                  • {warning}
-                                                </div>
-                                              ),
-                                            )}
+                                            {item.contraindications.map((warning, warningIndex) => (
+                                              <div
+                                                key={`medication-warning-${index}-${warningIndex}`}
+                                                className="finalize-pharmacology-contra-item"
+                                                role="listitem"
+                                              >
+                                                • {warning}
+                                              </div>
+                                            ))}
                                           </div>
                                         </div>
                                       )}
                                     </div>
                                   </div>
                                 </Fragment>
-                              );
+                              )
                             })}
                           {showSelectedAIMedicationsOnly &&
                             visibleFinalizationMedications.length === 0 && (
                               <div className="finalize-pharmacology-filter-empty">
-                                Belum ada obat AI yang dipilih dokter untuk
-                                ditampilkan.
+                                Belum ada obat AI yang dipilih dokter untuk ditampilkan.
                               </div>
                             )}
                         </div>
@@ -8279,69 +8250,55 @@ export default function EMRPage() {
                             Belum ada obat spesifik yang terpetakan
                           </div>
                           <div className="finalize-pharmacology-empty-copy">
-                            Gunakan judgement klinis, formularium aktif, dan
-                            verifikasi kontraindikasi sebelum sign-off.
+                            Gunakan judgement klinis, formularium aktif, dan verifikasi
+                            kontraindikasi sebelum sign-off.
                           </div>
                         </div>
                       )}
                       {finalizationMedicationSummary.unmapped > 0 && (
                         <div className="finalize-pharmacology-footnote">
-                          {finalizationMedicationSummary.unmapped} item belum
-                          masuk formularium aktif dan tidak ditampilkan sebagai
-                          rekomendasi terapi.
+                          {finalizationMedicationSummary.unmapped} item belum masuk formularium
+                          aktif dan tidak ditampilkan sebagai rekomendasi terapi.
                         </div>
                       )}
                       {finalizationMedicationSummary.unavailable > 0 && (
                         <div className="finalize-pharmacology-footnote">
-                          {finalizationMedicationSummary.unavailable} item masih
-                          perlu verifikasi manual sebelum dipakai di resep
-                          akhir.
+                          {finalizationMedicationSummary.unavailable} item masih perlu verifikasi
+                          manual sebelum dipakai di resep akhir.
                         </div>
                       )}
 
                       {/* ── Resep Dokter (Manual) ── */}
                       <div
-                        className={`finalize-pharmacology-manual-card${manualMedications.length > 0 ? " is-active" : ""}`}
+                        className={`finalize-pharmacology-manual-card${manualMedications.length > 0 ? ' is-active' : ''}`}
                       >
                         <div className="finalize-pharmacology-manual-kicker">
-                          RESEP DOKTER{" "}
-                          {manualMedications.length > 0 &&
-                            `(${manualMedications.length}/4)`}
+                          RESEP DOKTER{' '}
+                          {manualMedications.length > 0 && `(${manualMedications.length}/4)`}
                         </div>
                         <div className="finalize-pharmacology-manual-copy">
-                          Ketik nama obat untuk memunculkan autocomplete
-                          formularium beserta dosis, frekuensi, dan waktu minum
-                          yang paling dekat.
+                          Ketik nama obat untuk memunculkan autocomplete formularium beserta dosis,
+                          frekuensi, dan waktu minum yang paling dekat.
                         </div>
 
                         {manualMedications.length > 0 && (
                           <div className="finalize-pharmacology-manual-chip-list">
                             {manualMedications.map((med, idx) => (
-                              <div
-                                key={med.id}
-                                className="finalize-pharmacology-manual-chip"
-                              >
+                              <div key={med.id} className="finalize-pharmacology-manual-chip">
                                 <div className="finalize-pharmacology-manual-chip-copy">
                                   <strong className="finalize-pharmacology-manual-chip-title">
                                     R/ {med.name}
                                   </strong>
                                   <span className="finalize-pharmacology-manual-chip-meta">
-                                    {[
-                                      med.dose,
-                                      med.frequency,
-                                      med.route,
-                                      med.timingHint,
-                                    ]
+                                    {[med.dose, med.frequency, med.route, med.timingHint]
                                       .filter(Boolean)
-                                      .join(" • ") || "Instruksi manual"}
+                                      .join(' • ') || 'Instruksi manual'}
                                   </span>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    setManualMedications((prev) =>
-                                      prev.filter((_, i) => i !== idx),
-                                    )
+                                    setManualMedications(prev => prev.filter((_, i) => i !== idx))
                                   }
                                   className="finalize-pharmacology-manual-chip-remove"
                                 >
@@ -8357,67 +8314,50 @@ export default function EMRPage() {
                             type="text"
                             placeholder="Nama obat, mis. Amoks..."
                             value={medInput}
-                            onChange={(e) => {
-                              setMedInput(e.target.value);
-                              setActiveMedicationSuggestionIndex(0);
+                            onChange={e => {
+                              setMedInput(e.target.value)
+                              setActiveMedicationSuggestionIndex(0)
                             }}
-                            onKeyDown={(e) => {
-                              if (
-                                e.key === "ArrowDown" &&
-                                manualMedicationSuggestions.length > 0
-                              ) {
-                                e.preventDefault();
-                                setActiveMedicationSuggestionIndex((prev) =>
-                                  prev >= manualMedicationSuggestions.length - 1
-                                    ? 0
-                                    : prev + 1,
-                                );
-                                return;
+                            onKeyDown={e => {
+                              if (e.key === 'ArrowDown' && manualMedicationSuggestions.length > 0) {
+                                e.preventDefault()
+                                setActiveMedicationSuggestionIndex(prev =>
+                                  prev >= manualMedicationSuggestions.length - 1 ? 0 : prev + 1
+                                )
+                                return
                               }
-                              if (
-                                e.key === "ArrowUp" &&
-                                manualMedicationSuggestions.length > 0
-                              ) {
-                                e.preventDefault();
-                                setActiveMedicationSuggestionIndex((prev) =>
-                                  prev <= 0
-                                    ? manualMedicationSuggestions.length - 1
-                                    : prev - 1,
-                                );
-                                return;
+                              if (e.key === 'ArrowUp' && manualMedicationSuggestions.length > 0) {
+                                e.preventDefault()
+                                setActiveMedicationSuggestionIndex(prev =>
+                                  prev <= 0 ? manualMedicationSuggestions.length - 1 : prev - 1
+                                )
+                                return
                               }
-                              if (
-                                e.key === "Escape" &&
-                                manualMedicationSuggestions.length > 0
-                              ) {
-                                e.preventDefault();
-                                setMedInput("");
-                                setActiveMedicationSuggestionIndex(0);
-                                return;
+                              if (e.key === 'Escape' && manualMedicationSuggestions.length > 0) {
+                                e.preventDefault()
+                                setMedInput('')
+                                setActiveMedicationSuggestionIndex(0)
+                                return
                               }
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                submitManualMedication();
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                submitManualMedication()
                               }
                             }}
                             disabled={manualMedications.length >= 4}
                             className="finalize-pharmacology-manual-entry"
                             role="combobox"
-                            aria-expanded={
-                              manualMedicationSuggestions.length > 0
-                            }
+                            aria-expanded={manualMedicationSuggestions.length > 0}
                             aria-controls="manual-medication-suggestion-list"
                             aria-activedescendant={
                               manualMedicationSuggestions.length > 0
-                                ? `manual-medication-suggestion-${manualMedicationSuggestions[activeMedicationSuggestionIndex]?.id ?? ""}`
+                                ? `manual-medication-suggestion-${manualMedicationSuggestions[activeMedicationSuggestionIndex]?.id ?? ''}`
                                 : undefined
                             }
                           />
                           <button
                             type="button"
-                            disabled={
-                              !medInput.trim() || manualMedications.length >= 4
-                            }
+                            disabled={!medInput.trim() || manualMedications.length >= 4}
                             onClick={submitManualMedication}
                             className="finalize-pharmacology-manual-add"
                           >
@@ -8433,50 +8373,36 @@ export default function EMRPage() {
                               role="listbox"
                               aria-label="Autocomplete obat manual"
                             >
-                              {manualMedicationSuggestions.map(
-                                (suggestion, index) => (
-                                  <button
-                                    key={suggestion.id}
-                                    id={`manual-medication-suggestion-${suggestion.id}`}
-                                    type="button"
-                                    className={`finalize-pharmacology-manual-suggestion${index === activeMedicationSuggestionIndex ? " is-active" : ""}`}
-                                    onClick={() =>
-                                      appendManualMedication(
-                                        createManualMedicationEntryFromSuggestion(
-                                          suggestion,
-                                        ),
-                                      )
-                                    }
-                                    onMouseDown={(event) =>
-                                      event.preventDefault()
-                                    }
-                                    onMouseEnter={() =>
-                                      setActiveMedicationSuggestionIndex(index)
-                                    }
-                                    role="option"
-                                    aria-selected={
-                                      index === activeMedicationSuggestionIndex
-                                    }
-                                  >
-                                    <span className="finalize-pharmacology-manual-suggestion-main">
-                                      <strong>{suggestion.name}</strong>
-                                      <span>
-                                        {[
-                                          suggestion.dose,
-                                          suggestion.frequency,
-                                          suggestion.route,
-                                        ]
-                                          .filter(Boolean)
-                                          .join(" • ")}
-                                      </span>
+                              {manualMedicationSuggestions.map((suggestion, index) => (
+                                <button
+                                  key={suggestion.id}
+                                  id={`manual-medication-suggestion-${suggestion.id}`}
+                                  type="button"
+                                  className={`finalize-pharmacology-manual-suggestion${index === activeMedicationSuggestionIndex ? ' is-active' : ''}`}
+                                  onClick={() =>
+                                    appendManualMedication(
+                                      createManualMedicationEntryFromSuggestion(suggestion)
+                                    )
+                                  }
+                                  onMouseDown={event => event.preventDefault()}
+                                  onMouseEnter={() => setActiveMedicationSuggestionIndex(index)}
+                                  role="option"
+                                  aria-selected={index === activeMedicationSuggestionIndex}
+                                >
+                                  <span className="finalize-pharmacology-manual-suggestion-main">
+                                    <strong>{suggestion.name}</strong>
+                                    <span>
+                                      {[suggestion.dose, suggestion.frequency, suggestion.route]
+                                        .filter(Boolean)
+                                        .join(' • ')}
                                     </span>
-                                    <span className="finalize-pharmacology-manual-suggestion-side">
-                                      <span>{suggestion.timingHint}</span>
-                                      <span>{suggestion.stockLabel}</span>
-                                    </span>
-                                  </button>
-                                ),
-                              )}
+                                  </span>
+                                  <span className="finalize-pharmacology-manual-suggestion-side">
+                                    <span>{suggestion.timingHint}</span>
+                                    <span>{suggestion.stockLabel}</span>
+                                  </span>
+                                </button>
+                              ))}
                             </div>
                           )}
 
@@ -8500,47 +8426,36 @@ export default function EMRPage() {
                       </div>
                     </div>
                     <div className="finalize-assist-card-subtitle">
-                      Satu meja kerja untuk observasi, intervensi suportif, dan
-                      guardrail sebelum sign-off dokter.
+                      Satu meja kerja untuk observasi, intervensi suportif, dan guardrail sebelum
+                      sign-off dokter.
                     </div>
                     <div className="finalize-clinical-table">
                       <div className="finalize-clinical-table-section">
-                        <div className="finalize-assist-section-kicker">
-                          Monitoring
-                        </div>
+                        <div className="finalize-assist-section-kicker">Monitoring</div>
                         <div role="list" aria-label="Monitoring finalisasi">
-                          {finalizationTherapyPlan.monitoring.map(
-                            (item, index) => (
-                              <div
-                                key={`monitoring-${index}`}
-                                className="finalize-assist-bullet"
-                                role="listitem"
-                              >
-                                • {item}
-                              </div>
-                            ),
-                          )}
+                          {finalizationTherapyPlan.monitoring.map((item, index) => (
+                            <div
+                              key={`monitoring-${index}`}
+                              className="finalize-assist-bullet"
+                              role="listitem"
+                            >
+                              • {item}
+                            </div>
+                          ))}
                         </div>
                       </div>
                       <div className="finalize-clinical-table-section">
-                        <div className="finalize-assist-section-kicker">
-                          Supportive Care
-                        </div>
-                        <div
-                          role="list"
-                          aria-label="Supportive care finalisasi"
-                        >
-                          {finalizationTherapyPlan.supportive.map(
-                            (item, index) => (
-                              <div
-                                key={`supportive-${index}`}
-                                className="finalize-assist-bullet"
-                                role="listitem"
-                              >
-                                • {item}
-                              </div>
-                            ),
-                          )}
+                        <div className="finalize-assist-section-kicker">Supportive Care</div>
+                        <div role="list" aria-label="Supportive care finalisasi">
+                          {finalizationTherapyPlan.supportive.map((item, index) => (
+                            <div
+                              key={`supportive-${index}`}
+                              className="finalize-assist-bullet"
+                              role="listitem"
+                            >
+                              • {item}
+                            </div>
+                          ))}
                         </div>
                       </div>
                       <div className="finalize-clinical-table-section">
@@ -8548,59 +8463,48 @@ export default function EMRPage() {
                           Safety Check Sebelum Sign-Off
                         </div>
                         <div role="list" aria-label="Safety check finalisasi">
-                          {finalizationTherapyPlan.safetyChecks.map(
-                            (item, index) => (
-                              <div
-                                key={`safety-${index}`}
-                                className="finalize-assist-bullet"
-                                role="listitem"
-                              >
-                                • {item}
-                              </div>
-                            ),
-                          )}
+                          {finalizationTherapyPlan.safetyChecks.map((item, index) => (
+                            <div
+                              key={`safety-${index}`}
+                              className="finalize-assist-bullet"
+                              role="listitem"
+                            >
+                              • {item}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="finalize-assist-note">
-                    {finalizationTherapyPlan.note}
-                  </div>
+                  <div className="finalize-assist-note">{finalizationTherapyPlan.note}</div>
                 </div>
               )}
               {isFinalizeTab && !selectedDiagnosisDraft && (
-                <div
-                  ref={finalizeAnchorRef}
-                  className="blueprint-wrapper finalize-assist-panel"
-                >
+                <div ref={finalizeAnchorRef} className="blueprint-wrapper finalize-assist-panel">
                   <div className="finalize-assist-header">
                     <span className="finalize-assist-kicker">FINALISASI</span>
                     <span className="finalize-assist-title">
                       {hasConsideredMustNotMissOnly
-                        ? "Risiko Tinggi Sudah Ditandai"
-                        : "Menunggu Diagnosis Dipilih"}
+                        ? 'Risiko Tinggi Sudah Ditandai'
+                        : 'Menunggu Diagnosis Dipilih'}
                     </span>
                   </div>
                   <div className="finalize-assist-note">
                     {hasConsideredMustNotMissOnly
-                      ? "Suggestion must-not-miss sudah dipertimbangkan, tetapi belum ada diagnosis kerja yang dipilih. Tetapkan diagnosis kerja manual di assessment bila diperlukan, lalu lanjutkan sign-off dengan judgement klinis."
-                      : "Pilih salah satu diagnosis pada fase assessment terlebih dahulu. Setelah diagnosis kerja dipilih, algoritme obat dan terapi akan muncul otomatis di area finalisasi."}
+                      ? 'Suggestion must-not-miss sudah dipertimbangkan, tetapi belum ada diagnosis kerja yang dipilih. Tetapkan diagnosis kerja manual di assessment bila diperlukan, lalu lanjutkan sign-off dengan judgement klinis.'
+                      : 'Pilih salah satu diagnosis pada fase assessment terlebih dahulu. Setelah diagnosis kerja dipilih, algoritme obat dan terapi akan muncul otomatis di area finalisasi.'}
                   </div>
                 </div>
               )}
               {(isAssessmentTab || isFinalizeTab) && (
                 <div
-                  className={`emr-phase-footer emr-phase-footer-finalize${isAssessmentTab ? " is-cta-only" : ""}`}
+                  className={`emr-phase-footer emr-phase-footer-finalize${isAssessmentTab ? ' is-cta-only' : ''}`}
                 >
                   {!isAssessmentTab && (
-                    <div
-                      className={`emr-signoff-panel is-${finalizationReadiness.tone}`}
-                    >
+                    <div className={`emr-signoff-panel is-${finalizationReadiness.tone}`}>
                       <div className="emr-signoff-panel-head">
                         <div>
-                          <div className="emr-signoff-panel-kicker">
-                            Sign-Off Readiness
-                          </div>
+                          <div className="emr-signoff-panel-kicker">Sign-Off Readiness</div>
                           <div className="emr-signoff-panel-title">
                             {finalizationReadiness.title}
                           </div>
@@ -8608,30 +8512,26 @@ export default function EMRPage() {
                         <div
                           className={`emr-signoff-panel-status is-${finalizationReadiness.tone}`}
                         >
-                          {finalizationReadiness.tone === "ready"
-                            ? "READY"
-                            : finalizationReadiness.tone === "review"
-                              ? "REVIEW"
-                              : "PENDING"}
+                          {finalizationReadiness.tone === 'ready'
+                            ? 'READY'
+                            : finalizationReadiness.tone === 'review'
+                              ? 'REVIEW'
+                              : 'PENDING'}
                         </div>
                       </div>
-                      <div className="emr-signoff-panel-copy">
-                        {finalizationReadiness.note}
-                      </div>
+                      <div className="emr-signoff-panel-copy">{finalizationReadiness.note}</div>
                       <div
                         className="emr-signoff-panel-grid"
                         role="list"
                         aria-label="Kesiapan sign-off finalisasi"
                       >
-                        {finalizationReadiness.checks.map((check) => (
+                        {finalizationReadiness.checks.map(check => (
                           <div
                             key={check.label}
                             className={`emr-signoff-check is-${check.state}`}
                             role="listitem"
                           >
-                            <span className="emr-signoff-check-label">
-                              {check.label}
-                            </span>
+                            <span className="emr-signoff-check-label">{check.label}</span>
                             <strong>{check.value}</strong>
                           </div>
                         ))}
@@ -8642,7 +8542,7 @@ export default function EMRPage() {
                     <EmrPhaseFooterButton
                       label="Finalize & Sign-Off"
                       tone="critical"
-                      onClick={() => moveToWorkflowTab("finalize")}
+                      onClick={() => moveToWorkflowTab('finalize')}
                     />
                   )}
                   {/* ── Bridge + Laporan — Neumorphic action buttons ── */}
@@ -8651,14 +8551,14 @@ export default function EMRPage() {
                       <button
                         onClick={sendToEpuskesmas}
                         disabled={isBridgeActionLocked(bridgeStatus)}
-                        className={`finalize-neu-btn${bridgeStatus === "completed" ? " is-done" : ""}`}
+                        className={`finalize-neu-btn${bridgeStatus === 'completed' ? ' is-done' : ''}`}
                       >
                         <span className="finalize-neu-btn-label">
-                          {bridgeStatus === "completed"
-                            ? "Terkirim"
-                            : bridgeStatus === "processing"
-                              ? "Mengisi..."
-                              : "ePuskesmas Bridge"}
+                          {bridgeStatus === 'completed'
+                            ? 'Terkirim'
+                            : bridgeStatus === 'processing'
+                              ? 'Mengisi...'
+                              : 'ePuskesmas Bridge'}
                         </span>
                       </button>
                       <button
@@ -8667,15 +8567,16 @@ export default function EMRPage() {
                         className="finalize-neu-btn"
                       >
                         <span className="finalize-neu-btn-label">
-                          {generatingReport
-                            ? "Generating..."
-                            : "Laporan Klinis"}
+                          {generatingReport ? 'Generating...' : 'Laporan Klinis'}
                         </span>
                       </button>
                     </div>
                   )}
                   {bridgeError && isFinalizeTab && (
-                    <div className="finalize-assist-bullet" style={{ color: "var(--c-critical, #f06a6a)", fontSize: 11, marginTop: 6 }}>
+                    <div
+                      className="finalize-assist-bullet"
+                      style={{ color: 'var(--c-critical, #f06a6a)', fontSize: 11, marginTop: 6 }}
+                    >
                       {bridgeError}
                     </div>
                   )}
@@ -8690,24 +8591,24 @@ export default function EMRPage() {
       {medTooltip && (
         <div
           style={{
-            position: "fixed",
+            position: 'fixed',
             left: medTooltip.x + 8,
             top: medTooltip.y - 8,
-            background: "var(--bg-surface, #2a2926)",
-            border: "1px solid var(--c-asesmen)",
+            background: 'var(--bg-surface, #2a2926)',
+            border: '1px solid var(--c-asesmen)',
             borderRadius: 4,
-            padding: "8px 12px",
+            padding: '8px 12px',
             fontSize: 13,
-            color: "var(--text-main)",
+            color: 'var(--text-main)',
             maxWidth: 340,
             zIndex: 9999,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-            pointerEvents: "none",
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            pointerEvents: 'none',
           }}
         >
           {medTooltip.text}
         </div>
       )}
     </div>
-  );
+  )
 }

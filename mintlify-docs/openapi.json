@@ -1,0 +1,2910 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AADI API Reference",
+    "description": "AI-Assisted Diagnosis Interface — Clinical & Crew API Reference",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://puskesmasbalowerti.com/api",
+      "description": "Production Server"
+    },
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Local Development"
+    }
+  ],
+  "paths": {
+    "/admin/dev-updates": {
+      "get": {
+        "summary": "GET /admin/dev-updates",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /admin/dev-updates",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/dev-updates/{id}": {
+      "delete": {
+        "summary": "DELETE /admin/dev-updates/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/institutions": {
+      "get": {
+        "summary": "GET /admin/institutions",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /admin/institutions",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/institutions/{id}": {
+      "put": {
+        "summary": "PUT /admin/institutions/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /admin/institutions/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/notam": {
+      "get": {
+        "summary": "GET /admin/notam",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /admin/notam",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/notam/{id}": {
+      "delete": {
+        "summary": "DELETE /admin/notam/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/overview": {
+      "get": {
+        "summary": "GET /admin/overview",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/registrations": {
+      "get": {
+        "summary": "GET /admin/registrations",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/registrations/{id}/approve": {
+      "post": {
+        "summary": "POST /admin/registrations/{id}/approve",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/registrations/{id}/reject": {
+      "post": {
+        "summary": "POST /admin/registrations/{id}/reject",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "summary": "GET /admin/users",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{username}/deactivate": {
+      "post": {
+        "summary": "POST /admin/users/{username}/deactivate",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{username}/logbook": {
+      "get": {
+        "summary": "GET /admin/users/{username}/logbook",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{username}/profile": {
+      "put": {
+        "summary": "PUT /admin/users/{username}/profile",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{username}/reactivate": {
+      "post": {
+        "summary": "POST /admin/users/{username}/reactivate",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{username}/reset-password": {
+      "post": {
+        "summary": "POST /admin/users/{username}/reset-password",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/admin/users/{username}": {
+      "get": {
+        "summary": "GET /admin/users/{username}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "PUT /admin/users/{username}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Masuk sebagai anggota kru",
+        "description": "Autentikasi dengan username/email dan password untuk membuat cookie sesi yang aman.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "Nama pengguna atau alamat email terdaftar."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Kata sandi anggota yang aman."
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ]
+              },
+              "example": {
+                "username": "dr.budi",
+                "password": "securepassword123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "POST /auth/logout",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "summary": "GET /auth/profile",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "PUT /auth/profile",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "summary": "POST /auth/register",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "summary": "GET /auth/session",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/cdss/autocomplete": {
+      "post": {
+        "summary": "POST /cdss/autocomplete",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/cdss/diagnose": {
+      "post": {
+        "summary": "Diagnosis keluhan pasien dengan penalaran klinis",
+        "description": "Kirim data pasien lengkap (keluhan subjektif, tanda vital objektif) untuk menerima diagnosis diferensial berbantuan Artificial Intelligence.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Nama lengkap pasien (untuk identifikasi rekam medis)"
+                  },
+                  "age": {
+                    "type": "string",
+                    "description": "String usia pasien (misalnya: '25 tahun')"
+                  },
+                  "complaints": {
+                    "type": "string",
+                    "description": "Keluhan subjektif utama yang dijelaskan oleh pasien."
+                  },
+                  "history": {
+                    "type": "string",
+                    "description": "Riwayat klinis pasien dan kondisi masa lalu yang relevan."
+                  },
+                  "vitals": {
+                    "type": "string",
+                    "description": "Tanda vital objektif (misalnya: 'TD 120/80, HR 80, Temp 36.5')."
+                  },
+                  "physicalExam": {
+                    "type": "string",
+                    "description": "Temuan dari pemeriksaan fisik."
+                  },
+                  "additionalInfo": {
+                    "type": "string",
+                    "description": "Konteks klinis tambahan apa pun (opsional)."
+                  }
+                },
+                "required": [
+                  "name",
+                  "age",
+                  "complaints",
+                  "history",
+                  "vitals",
+                  "physicalExam",
+                  "additionalInfo"
+                ]
+              },
+              "example": {
+                "name": "Budi Santoso",
+                "age": "45 tahun",
+                "complaints": "Nyeri dada kiri seperti tertekan, menjalar ke lengan kiri sejak 1 jam lalu.",
+                "history": "Riwayat hipertensi 5 tahun, tidak rutin minum obat.",
+                "vitals": "TD 150/90, HR 110, RR 24, SpO2 96%",
+                "physicalExam": "Akral dingin, ronchi halus basal paru (-).",
+                "additionalInfo": "Pasien merokok 1 pack per hari."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON berisi 'analysis' (penalaran) dan 'diagnosis' (rekomendasi).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/cdss/outcome-feedback": {
+      "post": {
+        "summary": "POST /cdss/outcome-feedback",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/cdss/quality-dashboard": {
+      "get": {
+        "summary": "GET /cdss/quality-dashboard",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/cdss/red-flag-ack": {
+      "post": {
+        "summary": "POST /cdss/red-flag-ack",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/cdss/suggestion-selected": {
+      "post": {
+        "summary": "POST /cdss/suggestion-selected",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/consult/accept": {
+      "post": {
+        "summary": "POST /consult/accept",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/consult": {
+      "post": {
+        "summary": "POST /consult",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/consult/transfer-to-emr": {
+      "post": {
+        "summary": "POST /consult/transfer-to-emr",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/crew/{username}": {
+      "get": {
+        "summary": "Ambil Profil Crew (ACARS)",
+        "description": "Mengambil profil anggota crew melalui Crew Access Portal untuk keperluan roster atau pesan instan (ACARS).",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/dev-updates/active": {
+      "get": {
+        "summary": "GET /dev-updates/active",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/doctors/online": {
+      "get": {
+        "summary": "GET /doctors/online",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/emr/bridge": {
+      "get": {
+        "summary": "GET /emr/bridge",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /emr/bridge",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/emr/bridge/{id}": {
+      "get": {
+        "summary": "GET /emr/bridge/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "PATCH /emr/bridge/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/emr/patient-sync": {
+      "get": {
+        "summary": "Daftar file relay patient-sync yang disimpan",
+        "description": "Mengembalikan metadata payload relay terbaru untuk ditinjau oleh dokter, termasuk nama tampilan pasien, stempel waktu receivedAt, jumlah kunjungan, dan snapshot tanda vital terperinci.",
+        "parameters": [
+          {
+            "name": "X-Crew-Access-Token",
+            "in": "header",
+            "required": true,
+            "description": "Token otomatisasi yang diberikan kepada klien relay hulu yang tepercaya.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON berisi item, jumlah (count), dan status ok.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "crewAccessToken": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Sinkronisasi payload triase dari asupan hulu ke alur EMR dashboard",
+        "description": "Menerima identitas pasien, tanda vital, konteks triase naratif, dan observasi structuredSigns opsional. Rute ini menghitung peringatan skrining, menyimpan tanda vital yang dinormalisasi jika memungkinkan, dan meneruskan payload ke antarmuka EMR yang menghadap dokter.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patient": {
+                    "type": "object",
+                    "description": "Payload demografi pasien dan identitas triase. Harus menyertakan RM atau pengidentifikasi pendaftaran yang setara jika tersedia."
+                  },
+                  "vitals": {
+                    "type": "object",
+                    "description": "Tanda vital triase terstruktur seperti sbp, dbp, hr, rr, temp, spo2, avpu, gcs, glucose, supplementalO2, dan konteks kehamilan."
+                  },
+                  "narrative": {
+                    "type": "object",
+                    "description": "Narasi triase teks bebas termasuk keluhan_utama, keluhan_tambahan, dan nilai cermin structuredSigns opsional (opsional)."
+                  },
+                  "medicalHistory": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Penyakit kronis yang diketahui atau diagnosis sebelumnya yang relevan (opsional)."
+                  },
+                  "visitHistory": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Snapshot kunjungan sebelumnya yang dinormalisasi untuk timeline dokter (opsional)."
+                  },
+                  "structuredSigns": {
+                    "type": "object",
+                    "description": "Observasi samping tempat tidur kelas satu opsional yang dikelompokkan ke dalam respiratoryDistress, hmod, dkaHhs, dan perfusionShock (opsional)."
+                  }
+                },
+                "required": [
+                  "patient",
+                  "vitals",
+                  "narrative",
+                  "medicalHistory",
+                  "visitHistory",
+                  "structuredSigns"
+                ]
+              },
+              "example": {
+                "patient": {
+                  "name": "Pasien Triage Demo",
+                  "rm": "RM-2026-0007",
+                  "dob": "1988-07-11",
+                  "age": 37,
+                  "gender": "P",
+                  "isPregnant": false
+                },
+                "vitals": {
+                  "sbp": 86,
+                  "dbp": 54,
+                  "hr": 128,
+                  "rr": 30,
+                  "temp": 38.6,
+                  "spo2": 89,
+                  "avpu": "V",
+                  "glucose": 312,
+                  "supplementalO2": true
+                },
+                "narrative": {
+                  "keluhan_utama": "Sesak napas dan lemas sejak pagi.",
+                  "keluhan_tambahan": "Mual, muntah, dan berdebar."
+                },
+                "structuredSigns": {
+                  "respiratoryDistress": {
+                    "accessoryMuscleUse": true,
+                    "retractions": true,
+                    "unableToSpeakFullSentences": true,
+                    "cyanosis": false,
+                    "distressObserved": true
+                  },
+                  "hmod": {
+                    "chest_pain": false,
+                    "pulmonary_edema": false,
+                    "neurological_deficit": false,
+                    "vision_changes": false,
+                    "severe_headache": false,
+                    "oliguria": true,
+                    "altered_mental_status": true
+                  },
+                  "dkaHhs": {
+                    "kussmaul_breathing": true,
+                    "acetone_breath": false,
+                    "nausea_vomiting": true,
+                    "abdominal_pain": false,
+                    "altered_mental_status": true,
+                    "severe_dehydration": true,
+                    "extreme_hyperglycemia": true,
+                    "seizures": false
+                  },
+                  "perfusionShock": {
+                    "dizziness": true,
+                    "presyncope": true,
+                    "syncope": false,
+                    "weakness": true,
+                    "clammySkin": true,
+                    "coldExtremities": true,
+                    "oliguria": true,
+                    "capillaryRefillSec": 4
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pengakuan relay dengan sync id yang dihasilkan dan nama file yang disimpan saat diterima.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "crewAccessToken": []
+          }
+        ]
+      }
+    },
+    "/emr/transfer/history": {
+      "get": {
+        "summary": "GET /emr/transfer/history",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/emr/transfer/run": {
+      "post": {
+        "summary": "Execute EMR data transfer",
+        "description": "Initiates the automation bridge to transfer patient clinical records to the external ePuskesmas system.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "payload": {
+                    "type": "object",
+                    "description": "The complete RME data object including anamnesa and vitals."
+                  },
+                  "pelayananId": {
+                    "type": "string",
+                    "description": "Internal ID for the clinical service record."
+                  }
+                },
+                "required": [
+                  "payload",
+                  "pelayananId"
+                ]
+              },
+              "example": {
+                "pelayananId": "srv-12345",
+                "payload": {
+                  "anamnesa": {
+                    "keluhanUtama": "Batuk berdahak 1 minggu",
+                    "riwayatPenyakit": "Tidak ada"
+                  },
+                  "pemeriksaanFisik": {
+                    "tensi": "120/80",
+                    "nadi": "80"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns 'transferId' and initial 'status'.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/emr/transfer/status": {
+      "get": {
+        "summary": "GET /emr/transfer/status",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/hub/roster": {
+      "get": {
+        "summary": "GET /hub/roster",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/hub/roster/{username}": {
+      "get": {
+        "summary": "GET /hub/roster/{username}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/icdx/lookup": {
+      "get": {
+        "summary": "Search and lookup ICD-10 codes with hybrid intelligence.",
+        "description": "* High-performance lookup covering:",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "The search query (disease name or partial code).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/institutions": {
+      "get": {
+        "summary": "GET /institutions",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/news": {
+      "get": {
+        "summary": "GET /news",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/notam/active": {
+      "get": {
+        "summary": "GET /notam/active",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/patients/{id}/trajectory": {
+      "get": {
+        "summary": "GET /patients/{id}/trajectory",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/perplexity": {
+      "post": {
+        "summary": "POST /perplexity",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/automation/history": {
+      "get": {
+        "summary": "GET /report/automation/history",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/automation/preflight": {
+      "get": {
+        "summary": "GET /report/automation/preflight",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/automation/run": {
+      "post": {
+        "summary": "POST /report/automation/run",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/automation/status": {
+      "get": {
+        "summary": "GET /report/automation/status",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/clinical": {
+      "get": {
+        "summary": "GET /report/clinical",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /report/clinical",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "DELETE /report/clinical",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/clinical/{id}/pdf": {
+      "get": {
+        "summary": "GET /report/clinical/{id}/pdf",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/files/download": {
+      "get": {
+        "summary": "GET /report/files/download",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report/files": {
+      "get": {
+        "summary": "GET /report/files",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/report": {
+      "get": {
+        "summary": "GET /report",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/staff": {
+      "get": {
+        "summary": "GET /staff",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/appointments": {
+      "get": {
+        "summary": "List telemedicine appointments.",
+        "description": "* Retrieves scheduled consultations with filtering by status and doctor ID.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create telemedicine appointment.",
+        "description": "* Schedules a new consultation and generates a secure WhatsApp invitation.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "patientId": {
+                    "type": "string",
+                    "description": "Internal patient record ID."
+                  },
+                  "doctorId": {
+                    "type": "string",
+                    "description": "Target doctor's username."
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "description": "ISO datetime for the consultation."
+                  }
+                },
+                "required": [
+                  "patientId",
+                  "doctorId",
+                  "scheduledAt"
+                ]
+              },
+              "example": {
+                "patientId": "p-123",
+                "doctorId": "dr.siti",
+                "scheduledAt": "2023-11-05T09:00:00Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/appointments/{id}/diagnosis": {
+      "patch": {
+        "summary": "PATCH /telemedicine/appointments/{id}/diagnosis",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/appointments/{id}/prescription": {
+      "post": {
+        "summary": "POST /telemedicine/appointments/{id}/prescription",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/appointments/{id}": {
+      "get": {
+        "summary": "GET /telemedicine/appointments/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "PATCH /telemedicine/appointments/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/doctor-status": {
+      "get": {
+        "summary": "GET /telemedicine/doctor-status",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /telemedicine/doctor-status",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/join/{token}": {
+      "get": {
+        "summary": "GET /telemedicine/join/{token}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /telemedicine/join/{token}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/request": {
+      "get": {
+        "summary": "GET /telemedicine/request",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "POST /telemedicine/request",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/request/{id}/handled": {
+      "post": {
+        "summary": "POST /telemedicine/request/{id}/handled",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/request/{id}": {
+      "delete": {
+        "summary": "DELETE /telemedicine/request/{id}",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/slots": {
+      "get": {
+        "summary": "GET /telemedicine/slots",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/telemedicine/token": {
+      "post": {
+        "summary": "POST /telemedicine/token",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/track-usage": {
+      "post": {
+        "summary": "POST /track-usage",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/vitals/history": {
+      "get": {
+        "summary": "Retrieve patient vital signs history.",
+        "description": "* Returns a time-series trajectory of clinical vitals (BP, HR, RR, Temp, SpO2)",
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "description": "SHA-256 hashed patient identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/voice/chat": {
+      "post": {
+        "summary": "POST /voice/chat",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/voice/token": {
+      "post": {
+        "summary": "POST /voice/token",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/voice/tts": {
+      "post": {
+        "summary": "POST /voice/tts",
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session"
+      },
+      "crewAccessToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Crew-Access-Token"
+      }
+    }
+  }
+}

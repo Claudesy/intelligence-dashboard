@@ -15,83 +15,83 @@
 /**
  * Glucose measurement types
  */
-export type GlucoseMeasurementType = "GDS" | "GDP" | "2JTTGO" | "HbA1c";
+export type GlucoseMeasurementType = 'GDS' | 'GDP' | '2JTTGO' | 'HbA1c'
 
 /**
  * Glucose data
  */
 export interface GlucoseData {
-  gds?: number; // Random plasma glucose (mg/dL)
-  gdp?: number; // Fasting plasma glucose (mg/dL)
-  ttgo_2h?: number; // 2h post-OGTT (mg/dL)
-  hba1c?: number; // HbA1c (%)
-  sample_type: "capillary" | "plasma_venous";
-  has_classic_symptoms: boolean;
+  gds?: number // Random plasma glucose (mg/dL)
+  gdp?: number // Fasting plasma glucose (mg/dL)
+  ttgo_2h?: number // 2h post-OGTT (mg/dL)
+  hba1c?: number // HbA1c (%)
+  sample_type: 'capillary' | 'plasma_venous'
+  has_classic_symptoms: boolean
 }
 
 /**
  * Classic hyperglycemia symptoms
  */
 export interface ClassicSymptoms {
-  polyuria: boolean; // Frequent urination
-  polydipsia: boolean; // Excessive thirst
-  polyphagia: boolean; // Excessive hunger
-  weight_loss: boolean; // Unexplained weight loss
-  blurred_vision: boolean;
+  polyuria: boolean // Frequent urination
+  polydipsia: boolean // Excessive thirst
+  polyphagia: boolean // Excessive hunger
+  weight_loss: boolean // Unexplained weight loss
+  blurred_vision: boolean
 }
 
 /**
  * Glucose categories
  */
 export type GlucoseCategory =
-  | "HYPOGLYCEMIA_CRISIS" // <70 mg/dL
-  | "NORMAL" // Normal ranges
-  | "PREDIABETES" // GDPT/TGT
-  | "DIABETES_CONFIRMED" // Meets criteria
-  | "HYPERGLYCEMIA_CRISIS"; // ≥200 + crisis signs
+  | 'HYPOGLYCEMIA_CRISIS' // <70 mg/dL
+  | 'NORMAL' // Normal ranges
+  | 'PREDIABETES' // GDPT/TGT
+  | 'DIABETES_CONFIRMED' // Meets criteria
+  | 'HYPERGLYCEMIA_CRISIS' // ≥200 + crisis signs
 
 /**
  * Crisis type for hyperglycemia
  */
 export type HyperglycemiaCrisisType =
-  | "NOT_HYPERGLYCEMIA"
-  | "HYPERGLYCEMIA_NO_CRISIS"
-  | "HYPERGLYCEMIC_CRISIS"; // DKA/HHS suspected
+  | 'NOT_HYPERGLYCEMIA'
+  | 'HYPERGLYCEMIA_NO_CRISIS'
+  | 'HYPERGLYCEMIC_CRISIS' // DKA/HHS suspected
 
 /**
  * DKA/HHS red flags
  */
 export interface DKAHHSRedFlags {
-  kussmaul_breathing: boolean; // Deep, rapid breathing
-  acetone_breath: boolean; // Fruity breath odor
-  nausea_vomiting: boolean;
-  abdominal_pain: boolean;
-  altered_mental_status: boolean;
-  severe_dehydration: boolean;
-  extreme_hyperglycemia: boolean; // >600 mg/dL
-  seizures: boolean;
+  kussmaul_breathing: boolean // Deep, rapid breathing
+  acetone_breath: boolean // Fruity breath odor
+  nausea_vomiting: boolean
+  abdominal_pain: boolean
+  altered_mental_status: boolean
+  severe_dehydration: boolean
+  extreme_hyperglycemia: boolean // >600 mg/dL
+  seizures: boolean
 }
 
 /**
  * Hypoglycemia treatment step (15-15 rule)
  */
 export interface HypoglycemiaTreatmentStep {
-  step: number;
-  timing: string;
-  action: string;
-  condition?: string;
+  step: number
+  timing: string
+  action: string
+  condition?: string
 }
 
 /**
  * Glucose classification result
  */
 export interface GlucoseClassification {
-  category: GlucoseCategory;
-  severity: "critical" | "high" | "moderate" | "normal";
-  value: number;
-  measurement_type: GlucoseMeasurementType;
-  recommendations: string[];
-  reasoning: string;
+  category: GlucoseCategory
+  severity: 'critical' | 'high' | 'moderate' | 'normal'
+  value: number
+  measurement_type: GlucoseMeasurementType
+  recommendations: string[]
+  reasoning: string
 }
 
 // ============================================================================
@@ -124,7 +124,7 @@ export const GLUCOSE_THRESHOLDS = {
   },
 
   EXTREME_HYPERGLYCEMIA: 600, // HHS threshold
-} as const;
+} as const
 
 /**
  * 15-15 Rule for hypoglycemia treatment
@@ -132,36 +132,36 @@ export const GLUCOSE_THRESHOLDS = {
 export const HYPOGLYCEMIA_15_15_RULE: HypoglycemiaTreatmentStep[] = [
   {
     step: 1,
-    timing: "Immediately",
-    action: "Give 15g fast-acting carbohydrate",
-    condition: "Glucose <70 AND patient conscious AND can swallow",
+    timing: 'Immediately',
+    action: 'Give 15g fast-acting carbohydrate',
+    condition: 'Glucose <70 AND patient conscious AND can swallow',
   },
   {
     step: 2,
-    timing: "15 minutes after step 1",
-    action: "Recheck glucose",
+    timing: '15 minutes after step 1',
+    action: 'Recheck glucose',
   },
   {
     step: 3,
-    timing: "If still <70 mg/dL",
-    action: "Repeat 15g carbohydrate (max 3 cycles)",
+    timing: 'If still <70 mg/dL',
+    action: 'Repeat 15g carbohydrate (max 3 cycles)',
   },
   {
     step: 4,
-    timing: "Once >70 mg/dL",
-    action: "Give meal/snack to prevent recurrence",
+    timing: 'Once >70 mg/dL',
+    action: 'Give meal/snack to prevent recurrence',
   },
-];
+]
 
 /**
  * Fast-acting carbohydrate examples (15g)
  */
 export const FAST_CARBS_15G = [
-  "3-4 glucose tablets",
-  "120 mL fruit juice",
-  "1 tablespoon honey or sugar",
-  "150 mL regular soda (not diet)",
-];
+  '3-4 glucose tablets',
+  '120 mL fruit juice',
+  '1 tablespoon honey or sugar',
+  '150 mL regular soda (not diet)',
+]
 
 // ============================================================================
 // GLUCOSE CLASSIFICATION
@@ -176,29 +176,25 @@ export const FAST_CARBS_15G = [
 export function classifyGlucose(data: GlucoseData): GlucoseCategory {
   // Step 1: Crisis detection (highest priority)
   if (data.gds && data.gds < GLUCOSE_THRESHOLDS.HYPOGLYCEMIA) {
-    return "HYPOGLYCEMIA_CRISIS";
+    return 'HYPOGLYCEMIA_CRISIS'
   }
 
-  if (
-    data.gds &&
-    data.gds >= GLUCOSE_THRESHOLDS.DIABETES.GDS &&
-    data.has_classic_symptoms
-  ) {
-    return "DIABETES_CONFIRMED";
+  if (data.gds && data.gds >= GLUCOSE_THRESHOLDS.DIABETES.GDS && data.has_classic_symptoms) {
+    return 'DIABETES_CONFIRMED'
   }
 
   // Step 2: Diabetes diagnosis
   if (data.gdp && data.gdp >= GLUCOSE_THRESHOLDS.DIABETES.GDP) {
-    return "DIABETES_CONFIRMED";
+    return 'DIABETES_CONFIRMED'
   }
 
   if (data.ttgo_2h && data.ttgo_2h >= GLUCOSE_THRESHOLDS.DIABETES.TTGO_2H) {
-    return "DIABETES_CONFIRMED";
+    return 'DIABETES_CONFIRMED'
   }
 
   if (data.hba1c && data.hba1c >= GLUCOSE_THRESHOLDS.DIABETES.HbA1c) {
     // Note: HbA1c alone needs confirmation
-    return "DIABETES_CONFIRMED";
+    return 'DIABETES_CONFIRMED'
   }
 
   // Step 3: Prediabetes
@@ -207,7 +203,7 @@ export function classifyGlucose(data: GlucoseData): GlucoseCategory {
     data.gdp >= GLUCOSE_THRESHOLDS.PREDIABETES.GDP.min &&
     data.gdp <= GLUCOSE_THRESHOLDS.PREDIABETES.GDP.max
   ) {
-    return "PREDIABETES";
+    return 'PREDIABETES'
   }
 
   if (
@@ -215,7 +211,7 @@ export function classifyGlucose(data: GlucoseData): GlucoseCategory {
     data.ttgo_2h >= GLUCOSE_THRESHOLDS.PREDIABETES.TTGO_2H.min &&
     data.ttgo_2h <= GLUCOSE_THRESHOLDS.PREDIABETES.TTGO_2H.max
   ) {
-    return "PREDIABETES";
+    return 'PREDIABETES'
   }
 
   if (
@@ -223,11 +219,11 @@ export function classifyGlucose(data: GlucoseData): GlucoseCategory {
     data.hba1c >= GLUCOSE_THRESHOLDS.PREDIABETES.HbA1c.min &&
     data.hba1c <= GLUCOSE_THRESHOLDS.PREDIABETES.HbA1c.max
   ) {
-    return "PREDIABETES";
+    return 'PREDIABETES'
   }
 
   // Step 4: Normal
-  return "NORMAL";
+  return 'NORMAL'
 }
 
 // ============================================================================
@@ -243,33 +239,33 @@ export function classifyGlucose(data: GlucoseData): GlucoseCategory {
  */
 export function treatHypoglycemia(
   glucose: number,
-  canSwallow: boolean,
+  canSwallow: boolean
 ): {
-  action: "MONITOR" | "TREAT" | "EMERGENCY";
-  treatment?: string;
-  steps?: HypoglycemiaTreatmentStep[];
-  alert?: string;
+  action: 'MONITOR' | 'TREAT' | 'EMERGENCY'
+  treatment?: string
+  steps?: HypoglycemiaTreatmentStep[]
+  alert?: string
 } {
   if (glucose >= GLUCOSE_THRESHOLDS.HYPOGLYCEMIA) {
     return {
-      action: "MONITOR",
-      treatment: "No immediate treatment needed",
-    };
+      action: 'MONITOR',
+      treatment: 'No immediate treatment needed',
+    }
   }
 
   if (!canSwallow) {
     return {
-      action: "EMERGENCY",
-      treatment: "IV Dextrose 10-25g OR Glucagon 1mg IM/SC",
-      alert: "Severe hypoglycemia - activate emergency protocol",
-    };
+      action: 'EMERGENCY',
+      treatment: 'IV Dextrose 10-25g OR Glucagon 1mg IM/SC',
+      alert: 'Severe hypoglycemia - activate emergency protocol',
+    }
   }
 
   // 15-15 Rule
   return {
-    action: "TREAT",
+    action: 'TREAT',
     steps: HYPOGLYCEMIA_15_15_RULE,
-  };
+  }
 }
 
 /**
@@ -281,11 +277,11 @@ export function treatHypoglycemia(
  */
 export function triageHyperglycemia(
   glucose: number,
-  symptoms: Partial<DKAHHSRedFlags>,
+  symptoms: Partial<DKAHHSRedFlags>
 ): HyperglycemiaCrisisType {
   // Not hyperglycemia
   if (glucose < GLUCOSE_THRESHOLDS.DIABETES.GDS) {
-    return "NOT_HYPERGLYCEMIA";
+    return 'NOT_HYPERGLYCEMIA'
   }
 
   // Check for crisis signs
@@ -296,14 +292,14 @@ export function triageHyperglycemia(
     symptoms.acetone_breath ||
     symptoms.altered_mental_status ||
     symptoms.abdominal_pain ||
-    symptoms.seizures;
+    symptoms.seizures
 
   if (hasCrisisSigns) {
-    return "HYPERGLYCEMIC_CRISIS"; // Suspect DKA/HHS
+    return 'HYPERGLYCEMIC_CRISIS' // Suspect DKA/HHS
   }
 
   // Hyperglycemia without crisis
-  return "HYPERGLYCEMIA_NO_CRISIS";
+  return 'HYPERGLYCEMIA_NO_CRISIS'
 }
 
 /**
@@ -318,7 +314,7 @@ export function checkDKARedFlags(redFlags: DKAHHSRedFlags): boolean {
     redFlags.acetone_breath ||
     redFlags.nausea_vomiting ||
     redFlags.abdominal_pain
-  );
+  )
 }
 
 /**
@@ -333,7 +329,7 @@ export function checkHHSRedFlags(redFlags: DKAHHSRedFlags): boolean {
     redFlags.altered_mental_status ||
     redFlags.seizures ||
     redFlags.severe_dehydration
-  );
+  )
 }
 
 // ============================================================================
@@ -348,23 +344,23 @@ export function checkHHSRedFlags(redFlags: DKAHHSRedFlags): boolean {
  * @returns True if screening recommended
  */
 export function shouldScreenForDM(patient: {
-  age: number;
-  weight_kg: number;
-  height_m: number;
-  family_history_dm_first_degree?: boolean;
-  history_cvd?: boolean;
-  hypertension?: boolean;
-  hdl_low?: boolean;
-  triglycerides_high?: boolean;
-  pcos?: boolean;
-  physical_inactivity?: boolean;
-  history_gestational_dm?: boolean;
+  age: number
+  weight_kg: number
+  height_m: number
+  family_history_dm_first_degree?: boolean
+  history_cvd?: boolean
+  hypertension?: boolean
+  hdl_low?: boolean
+  triglycerides_high?: boolean
+  pcos?: boolean
+  physical_inactivity?: boolean
+  history_gestational_dm?: boolean
 }): boolean {
-  const bmi = patient.weight_kg / patient.height_m ** 2;
+  const bmi = patient.weight_kg / patient.height_m ** 2
 
   // Asian BMI threshold
   if (bmi < 23) {
-    return false; // Screen only if BMI ≥23
+    return false // Screen only if BMI ≥23
   }
 
   // Check risk factors (need at least 1)
@@ -377,9 +373,9 @@ export function shouldScreenForDM(patient: {
     patient.physical_inactivity,
     patient.age > 35,
     patient.history_gestational_dm,
-  ];
+  ]
 
-  return riskFactors.some((factor) => factor === true);
+  return riskFactors.some(factor => factor === true)
 }
 
 // ============================================================================
@@ -393,63 +389,56 @@ export function shouldScreenForDM(patient: {
  * @param value - Glucose value
  * @returns Array of recommendations
  */
-export function getGlucoseRecommendations(
-  category: GlucoseCategory,
-  _value: number,
-): string[] {
+export function getGlucoseRecommendations(category: GlucoseCategory, _value: number): string[] {
   switch (category) {
-    case "HYPOGLYCEMIA_CRISIS":
+    case 'HYPOGLYCEMIA_CRISIS':
       return [
-        "⚡ TREAT IMMEDIATELY (15-15 rule)",
-        "15g fast-acting carbohydrate NOW",
-        "Recheck glucose in 15 min",
-        "Repeat if still <70 mg/dL",
-        "Give meal/snack after recovery",
-        "Evaluate cause (insulin/OAD dose, missed meal, exercise)",
-      ];
+        '⚡ TREAT IMMEDIATELY (15-15 rule)',
+        '15g fast-acting carbohydrate NOW',
+        'Recheck glucose in 15 min',
+        'Repeat if still <70 mg/dL',
+        'Give meal/snack after recovery',
+        'Evaluate cause (insulin/OAD dose, missed meal, exercise)',
+      ]
 
-    case "NORMAL":
-      return [
-        "Gula darah normal",
-        "Maintain healthy lifestyle",
-        "Rescreen per risk factors",
-      ];
+    case 'NORMAL':
+      return ['Gula darah normal', 'Maintain healthy lifestyle', 'Rescreen per risk factors']
 
-    case "PREDIABETES":
+    case 'PREDIABETES':
       return [
-        "⚡ Intensive Lifestyle Intervention:",
-        "Target: ↓7% body weight in 6 months",
-        "Exercise 150 min/week (moderate intensity)",
-        "Nutrition counseling (high fiber, low GI)",
-        "Recheck glucose 3-6 months",
-        "Consider metformin if high risk (BMI ≥35, age <60, gestational DM history)",
-      ];
+        '⚡ Intensive Lifestyle Intervention:',
+        'Target: ↓7% body weight in 6 months',
+        'Exercise 150 min/week (moderate intensity)',
+        'Nutrition counseling (high fiber, low GI)',
+        'Recheck glucose 3-6 months',
+        'Consider metformin if high risk (BMI ≥35, age <60, gestational DM history)',
+      ]
 
-    case "DIABETES_CONFIRMED":
+    case 'DIABETES_CONFIRMED':
       return [
-        "📋 Start DM Management:",
-        "Comprehensive DM education",
-        "Lifestyle counseling (diet, exercise)",
-        "Pharmacotherapy per PERKENI 2024 algorithm",
-        "Screen for complications (retinopathy, nephropathy, neuropathy)",
-        "HbA1c target: <7% (individualize)",
-        "Follow-up 2-4 weeks",
-      ];
+        '📋 Start DM Management:',
+        'Comprehensive DM education',
+        'Lifestyle counseling (diet, exercise)',
+        'Pharmacotherapy per PERKENI 2024 algorithm',
+        'Screen for complications (retinopathy, nephropathy, neuropathy)',
+        'HbA1c target: <7% (individualize)',
+        'Follow-up 2-4 weeks',
+      ]
 
-    case "HYPERGLYCEMIA_CRISIS":
+    case 'HYPERGLYCEMIA_CRISIS':
       return [
-        "🚑 IMMEDIATE ICU REFERRAL",
-        "Suspect DKA/HHS - EMERGENCY",
-        "IV access (2 large-bore lines)",
-        "Fluid resuscitation (NS 1L/hr initial)",
-        "Labs: VBG/ABG, ketones, electrolytes, osmolality",
-        "Continuous monitoring",
-        "Call ambulance",
-        "Do NOT give oral antidiabetics",
-      ];
+        '🚑 IMMEDIATE ICU REFERRAL',
+        'Suspect DKA/HHS - EMERGENCY',
+        'IV access (2 large-bore lines)',
+        'Fluid resuscitation (NS 1L/hr initial)',
+        'Labs: VBG/ABG, ketones, electrolytes, osmolality',
+        'Continuous monitoring',
+        'Call ambulance',
+        'Do NOT give oral antidiabetics',
+      ]
 
     default:
-      return ["Evaluate per PERKENI 2024 guidelines"];
+      return ['Evaluate per PERKENI 2024 guidelines']
   }
 }
 
@@ -464,29 +453,29 @@ export function getGlucoseRecommendations(
 export function getGlucoseReasoning(
   category: GlucoseCategory,
   value: number,
-  measurementType: GlucoseMeasurementType,
+  measurementType: GlucoseMeasurementType
 ): string {
   switch (category) {
-    case "HYPOGLYCEMIA_CRISIS":
-      return `Gula darah ${value} mg/dL <${GLUCOSE_THRESHOLDS.HYPOGLYCEMIA} (threshold hipoglikemia). TANGANI SEGERA dengan 15-15 rule.`;
+    case 'HYPOGLYCEMIA_CRISIS':
+      return `Gula darah ${value} mg/dL <${GLUCOSE_THRESHOLDS.HYPOGLYCEMIA} (threshold hipoglikemia). TANGANI SEGERA dengan 15-15 rule.`
 
-    case "NORMAL":
-      return `${measurementType} ${value} dalam batas normal. Tidak ada tanda diabetes atau prediabetes.`;
+    case 'NORMAL':
+      return `${measurementType} ${value} dalam batas normal. Tidak ada tanda diabetes atau prediabetes.`
 
-    case "PREDIABETES":
-      return `${measurementType} ${value} memenuhi kriteria prediabetes (GDPT/TGT). Intervensi gaya hidup intensif dapat mencegah progresi ke DM (5-10% per tahun tanpa intervensi).`;
+    case 'PREDIABETES':
+      return `${measurementType} ${value} memenuhi kriteria prediabetes (GDPT/TGT). Intervensi gaya hidup intensif dapat mencegah progresi ke DM (5-10% per tahun tanpa intervensi).`
 
-    case "DIABETES_CONFIRMED":
-      if (measurementType === "GDS") {
-        return `GDS ${value} ≥${GLUCOSE_THRESHOLDS.DIABETES.GDS} + gejala klasik = Diabetes Melitus TEGAK (tidak perlu tes ulang).`;
+    case 'DIABETES_CONFIRMED':
+      if (measurementType === 'GDS') {
+        return `GDS ${value} ≥${GLUCOSE_THRESHOLDS.DIABETES.GDS} + gejala klasik = Diabetes Melitus TEGAK (tidak perlu tes ulang).`
       }
-      return `${measurementType} ${value} memenuhi kriteria Diabetes Melitus per PERKENI 2024. Mulai management komprehensif.`;
+      return `${measurementType} ${value} memenuhi kriteria Diabetes Melitus per PERKENI 2024. Mulai management komprehensif.`
 
-    case "HYPERGLYCEMIA_CRISIS":
-      return `Gula darah ${value} + tanda krisis (DKA/HHS) = EMERGENSI. Rujuk ICU SEGERA untuk fluid resuscitation + insulin therapy.`;
+    case 'HYPERGLYCEMIA_CRISIS':
+      return `Gula darah ${value} + tanda krisis (DKA/HHS) = EMERGENSI. Rujuk ICU SEGERA untuk fluid resuscitation + insulin therapy.`
 
     default:
-      return `${measurementType} ${value} mg/dL`;
+      return `${measurementType} ${value} mg/dL`
   }
 }
 
@@ -501,45 +490,42 @@ export function getGlucoseReasoning(
  * @returns Complete glucose classification
  */
 export function classifyBloodGlucose(data: GlucoseData): GlucoseClassification {
-  const category = classifyGlucose(data);
+  const category = classifyGlucose(data)
 
   // Determine measurement type and value
-  let measurementType: GlucoseMeasurementType;
-  let value: number;
+  let measurementType: GlucoseMeasurementType
+  let value: number
 
   if (data.gds !== undefined) {
-    measurementType = "GDS";
-    value = data.gds;
+    measurementType = 'GDS'
+    value = data.gds
   } else if (data.gdp !== undefined) {
-    measurementType = "GDP";
-    value = data.gdp;
+    measurementType = 'GDP'
+    value = data.gdp
   } else if (data.ttgo_2h !== undefined) {
-    measurementType = "2JTTGO";
-    value = data.ttgo_2h;
+    measurementType = '2JTTGO'
+    value = data.ttgo_2h
   } else if (data.hba1c !== undefined) {
-    measurementType = "HbA1c";
-    value = data.hba1c;
+    measurementType = 'HbA1c'
+    value = data.hba1c
   } else {
-    throw new Error("No glucose measurement provided");
+    throw new Error('No glucose measurement provided')
   }
 
   // Determine severity
-  let severity: "critical" | "high" | "moderate" | "normal";
-  if (
-    category === "HYPOGLYCEMIA_CRISIS" ||
-    category === "HYPERGLYCEMIA_CRISIS"
-  ) {
-    severity = "critical";
-  } else if (category === "DIABETES_CONFIRMED") {
-    severity = "high";
-  } else if (category === "PREDIABETES") {
-    severity = "moderate";
+  let severity: 'critical' | 'high' | 'moderate' | 'normal'
+  if (category === 'HYPOGLYCEMIA_CRISIS' || category === 'HYPERGLYCEMIA_CRISIS') {
+    severity = 'critical'
+  } else if (category === 'DIABETES_CONFIRMED') {
+    severity = 'high'
+  } else if (category === 'PREDIABETES') {
+    severity = 'moderate'
   } else {
-    severity = "normal";
+    severity = 'normal'
   }
 
-  const recommendations = getGlucoseRecommendations(category, value);
-  const reasoning = getGlucoseReasoning(category, value, measurementType);
+  const recommendations = getGlucoseRecommendations(category, value)
+  const reasoning = getGlucoseReasoning(category, value, measurementType)
 
   return {
     category,
@@ -548,7 +534,7 @@ export function classifyBloodGlucose(data: GlucoseData): GlucoseClassification {
     measurement_type: measurementType,
     recommendations,
     reasoning,
-  };
+  }
 }
 
 // ============================================================================
@@ -568,4 +554,4 @@ export default {
   getGlucoseRecommendations,
   getGlucoseReasoning,
   classifyBloodGlucose,
-};
+}

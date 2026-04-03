@@ -1,42 +1,40 @@
 // Designed and constructed by Claudesy.
-"use client";
+'use client'
 
-import React from "react";
+import type React from 'react'
 
 // ============================================================
 // PKM Dashboard — ConsultationControls Component
 // ============================================================
 
-import { useState, useCallback } from "react";
 import {
+  FileText,
   Mic,
   MicOff,
-  Video,
-  VideoOff,
   Monitor,
   MonitorOff,
   PhoneOff,
-  FileText,
   Pill,
-} from "lucide-react";
-
-import { DiagnosisModal } from "./DiagnosisModal";
-import { EPrescriptionModal } from "./EPrescriptionModal";
-
+  Video,
+  VideoOff,
+} from 'lucide-react'
+import { useCallback, useState } from 'react'
 import type {
-  SessionState,
   AppointmentWithDetails,
   SessionParticipantRole,
-} from "@/types/telemedicine.types";
+  SessionState,
+} from '@/types/telemedicine.types'
+import { DiagnosisModal } from './DiagnosisModal'
+import { EPrescriptionModal } from './EPrescriptionModal'
 
 interface ConsultationControlsProps {
-  sessionState: SessionState;
-  participantRole: SessionParticipantRole;
-  appointment: AppointmentWithDetails;
-  onToggleMic: () => Promise<void>;
-  onToggleCamera: () => Promise<void>;
-  onToggleScreenShare: () => Promise<void>;
-  onEndCall: () => Promise<void>;
+  sessionState: SessionState
+  participantRole: SessionParticipantRole
+  appointment: AppointmentWithDetails
+  onToggleMic: () => Promise<void>
+  onToggleCamera: () => Promise<void>
+  onToggleScreenShare: () => Promise<void>
+  onEndCall: () => Promise<void>
 }
 
 export function ConsultationControls({
@@ -48,37 +46,37 @@ export function ConsultationControls({
   onToggleScreenShare,
   onEndCall,
 }: ConsultationControlsProps): React.JSX.Element {
-  const [showDiagnosis, setShowDiagnosis] = useState(false);
-  const [showPrescription, setShowPrescription] = useState(false);
-  const [isEndingCall, setIsEndingCall] = useState(false);
+  const [showDiagnosis, setShowDiagnosis] = useState(false)
+  const [showPrescription, setShowPrescription] = useState(false)
+  const [isEndingCall, setIsEndingCall] = useState(false)
 
-  const isDoctor = participantRole === "DOCTOR";
-  const isPatient = participantRole === "PATIENT";
+  const isDoctor = participantRole === 'DOCTOR'
+  const isPatient = participantRole === 'PATIENT'
 
   const handleEndCall = useCallback(async () => {
-    if (isEndingCall) return;
-    setIsEndingCall(true);
+    if (isEndingCall) return
+    setIsEndingCall(true)
     try {
-      await onEndCall();
+      await onEndCall()
     } finally {
-      setIsEndingCall(false);
+      setIsEndingCall(false)
     }
-  }, [onEndCall, isEndingCall]);
+  }, [onEndCall, isEndingCall])
 
   return (
     <>
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 24px",
-          background: "rgba(0,0,0,0.7)",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 24px',
+          background: 'rgba(0,0,0,0.7)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         {/* Left: Media controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <ControlButton
             onClick={onToggleMic}
             active={sessionState.isMicEnabled}
@@ -115,7 +113,7 @@ export function ConsultationControls({
 
         {/* Center: Clinical actions (dokter only) */}
         {isDoctor && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ClinicalButton
               icon={<FileText size={15} />}
               label="Diagnosis"
@@ -138,23 +136,23 @@ export function ConsultationControls({
           onClick={() => void handleEndCall()}
           disabled={isEndingCall}
           style={{
-            display: "flex",
-            alignItems: "center",
+            display: 'flex',
+            alignItems: 'center',
             gap: 8,
-            padding: "8px 20px",
-            background: "rgba(239,68,68,0.85)",
-            color: "#fff",
-            border: "none",
+            padding: '8px 20px',
+            background: 'rgba(239,68,68,0.85)',
+            color: '#fff',
+            border: 'none',
             borderRadius: 10,
             fontSize: 14,
             fontWeight: 600,
-            cursor: isEndingCall ? "not-allowed" : "pointer",
+            cursor: isEndingCall ? 'not-allowed' : 'pointer',
             opacity: isEndingCall ? 0.6 : 1,
-            transition: "background 0.2s",
+            transition: 'background 0.2s',
           }}
         >
           <PhoneOff size={16} />
-          {isEndingCall ? "Mengakhiri..." : "Akhiri Konsultasi"}
+          {isEndingCall ? 'Mengakhiri...' : 'Akhiri Konsultasi'}
         </button>
       </div>
 
@@ -174,20 +172,20 @@ export function ConsultationControls({
         </>
       )}
     </>
-  );
+  )
 }
 
 // ─── SUB-COMPONENTS ───────────────────────────────────────────
 
 interface ControlButtonProps {
-  onClick: () => Promise<void>;
-  active: boolean;
-  activeIcon: React.ReactNode;
-  inactiveIcon: React.ReactNode;
-  activeLabel: string;
-  inactiveLabel: string;
-  activeBg: string;
-  inactiveBg: string;
+  onClick: () => Promise<void>
+  active: boolean
+  activeIcon: React.ReactNode
+  inactiveIcon: React.ReactNode
+  activeLabel: string
+  inactiveLabel: string
+  activeBg: string
+  inactiveBg: string
 }
 
 function ControlButton({
@@ -205,30 +203,30 @@ function ControlButton({
       onClick={() => void onClick()}
       title={active ? activeLabel : inactiveLabel}
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         width: 44,
         height: 44,
         borderRadius: 10,
         background: active ? activeBg : inactiveBg,
-        color: "#fff",
-        border: "1px solid rgba(255,255,255,0.1)",
-        cursor: "pointer",
-        transition: "background 0.2s",
+        color: '#fff',
+        border: '1px solid rgba(255,255,255,0.1)',
+        cursor: 'pointer',
+        transition: 'background 0.2s',
       }}
     >
       {active ? activeIcon : inactiveIcon}
     </button>
-  );
+  )
 }
 
 interface ClinicalButtonProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  bg: string;
-  border: string;
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  bg: string
+  border: string
 }
 
 function ClinicalButton({
@@ -242,22 +240,22 @@ function ClinicalButton({
     <button
       onClick={onClick}
       style={{
-        display: "flex",
-        alignItems: "center",
+        display: 'flex',
+        alignItems: 'center',
         gap: 6,
-        padding: "7px 14px",
+        padding: '7px 14px',
         background: bg,
-        color: "#E67E22",
+        color: '#E67E22',
         border: `1px solid ${border}`,
         borderRadius: 8,
         fontSize: 14,
         fontWeight: 600,
-        cursor: "pointer",
-        transition: "background 0.2s",
+        cursor: 'pointer',
+        transition: 'background 0.2s',
       }}
     >
       {icon}
       {label}
     </button>
-  );
+  )
 }

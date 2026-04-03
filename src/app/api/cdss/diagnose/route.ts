@@ -1,64 +1,96 @@
-// The vision and craft of Claudesy.
-/**
- * CDSS Diagnose API — Iskandar Diagnosis Engine V2 (LLM-First)
- * POST /api/cdss/diagnose
- */
-
-import { NextResponse } from "next/server";
-import { runDiagnosisEngine } from "@/lib/cdss/engine";
-import { parseDiagnoseRequestBody } from "@/lib/cdss/diagnose-parser";
-import { writeCDSSAuditEntry } from "@/lib/cdss/workflow";
+import { NextResponse } from 'next/server'
+import { parseDiagnoseRequestBody } from '@/lib/cdss/diagnose-parser'
+import { runDiagnosisEngine } from '@/lib/cdss/engine'
+import { writeCDSSAuditEntry } from '@/lib/cdss/workflow'
 import {
+  getCrewAuthorizationMode,
   getCrewSessionFromRequest,
-  isCrewAuthorizedRequest
-} from "@/lib/server/crew-access-auth";
-import {
-  getRequestIp,
-  writeSecurityAuditLog,
-} from "@/lib/server/security-audit";
+  isClinicalCrewRole,
+} from '@/lib/server/crew-access-auth'
+import { getRequestIp, writeSecurityAuditLog } from '@/lib/server/security-audit'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
+/**
+ * Engine Diagnosis AADI V2 (Penalaran Klinis)
+ * @summary Diagnosis keluhan pasien dengan penalaran klinis
+ * @description Kirim data pasien lengkap (keluhan subjektif, tanda vital objektif) untuk menerima diagnosis diferensial berbantuan Artificial Intelligence.
+ * 
+ * @bodyParam {string} name - Nama lengkap pasien (untuk identifikasi rekam medis)
+ * @bodyParam {string} age - String usia pasien (misalnya: '25 tahun')
+ * @bodyParam {string} complaints - Keluhan subjektif utama yang dijelaskan oleh pasien.
+ * @bodyParam {string} history - Riwayat klinis pasien dan kondisi masa lalu yang relevan.
+ * @bodyParam {string} vitals - Tanda vital objektif (misalnya: 'TD 120/80, HR 80, Temp 36.5').
+ * @bodyParam {string} physicalExam - Temuan dari pemeriksaan fisik.
+ * @bodyParam {string} additionalInfo - Konteks klinis tambahan apa pun (opsional).
+ * 
+ * @example {
+ *   "name": "Budi Santoso",
+ *   "age": "45 tahun",
+ *   "complaints": "Nyeri dada kiri seperti tertekan, menjalar ke lengan kiri sejak 1 jam lalu.",
+ *   "history": "Riwayat hipertensi 5 tahun, tidak rutin minum obat.",
+ *   "vitals": "TD 150/90, HR 110, RR 24, SpO2 96%",
+ *   "physicalExam": "Akral dingin, ronchi halus basal paru (-).",
+ *   "additionalInfo": "Pasien merokok 1 pack per hari."
+ * }
+ * 
+ * @responseBody {object} - JSON berisi 'analysis' (penalaran) dan 'diagnosis' (rekomendasi).
+ */
 export async function POST(request: Request) {
-  const ip = getRequestIp(request);
-  const session = getCrewSessionFromRequest(request);
+  const ip = getRequestIp(request)
+  const session = getCrewSessionFromRequest(request)
+  const authorizationMode = getCrewAuthorizationMode(request)
 
-  if (!isCrewAuthorizedRequest(request)) {
+  if (!session) {
     await writeSecurityAuditLog({
-      endpoint: "/api/cdss/diagnose",
-      action: "CDSS_DIAGNOSE",
-      result: "unauthenticated",
-      userId: session?.username ?? null,
-      role: session?.role ?? null,
+      endpoint: '/api/cdss/diagnose',
+      action: 'CDSS_DIAGNOSE',
+      result: 'unauthenticated',
+      userId: null,
+      role: null,
       ip,
-    });
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      metadata: {
+        authorizationMode,
+      },
+    })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  // RBAC: semua authenticated clinical staff boleh akses CDSS diagnose
 
-  let body: unknown;
+  if (!isClinicalCrewRole(session.role) && !isClinicalCrewRole(session.profession)) {
+    await writeSecurityAuditLog({
+      endpoint: '/api/cdss/diagnose',
+      action: 'CDSS_DIAGNOSE',
+      result: 'forbidden',
+      userId: session.username,
+      role: session.role,
+      ip,
+      metadata: {
+        authorizationMode,
+      },
+    })
+    return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 })
+  }
+
+  let body: unknown
   try {
-    body = await request.json();
+    body = await request.json()
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const parsed = parseDiagnoseRequestBody(body);
+  const parsed = parseDiagnoseRequestBody(body)
   if (!parsed.ok) {
-    return NextResponse.json(
-      { error: parsed.error },
-      { status: parsed.status },
-    );
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status })
   }
 
   try {
-    const result = await runDiagnosisEngine(parsed.input);
+    const result = await runDiagnosisEngine(parsed.input)
     await writeCDSSAuditEntry({
       sessionId: parsed.input.session_id,
-      action: "DIAGNOSE_RESULT",
+      action: 'DIAGNOSE_RESULT',
       validationStatus: result.validation_summary.requires_more_data
-        ? "needs_more_data"
-        : "completed",
+        ? 'needs_more_data'
+        : 'completed',
       modelVersion: result.model_version,
       latencyMs: result.processing_time_ms,
       outputSummary: {
@@ -76,11 +108,11 @@ export async function POST(request: Request) {
         hasReasoningContent: !!result._reasoning_content,
         reasoningContentLength: result._reasoning_content?.length ?? 0,
       },
-    });
+    })
     await writeSecurityAuditLog({
-      endpoint: "/api/cdss/diagnose",
-      action: "CDSS_DIAGNOSE",
-      result: "success",
+      endpoint: '/api/cdss/diagnose',
+      action: 'CDSS_DIAGNOSE',
+      result: 'success',
       userId: session?.username ?? null,
       role: session?.role ?? null,
       ip,
@@ -91,22 +123,19 @@ export async function POST(request: Request) {
         totalValidatedSuggestions: result.validation_summary.total_validated,
         unverifiedCodes: result.validation_summary.unverified_codes,
       },
-    });
-    return NextResponse.json(result);
+    })
+    return NextResponse.json(result)
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Internal error";
+    const msg = e instanceof Error ? e.message : 'Internal error'
     await writeSecurityAuditLog({
-      endpoint: "/api/cdss/diagnose",
-      action: "CDSS_DIAGNOSE",
-      result: "failure",
+      endpoint: '/api/cdss/diagnose',
+      action: 'CDSS_DIAGNOSE',
+      result: 'failure',
       userId: session?.username ?? null,
       role: session?.role ?? null,
       ip,
       metadata: { error: msg },
-    });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

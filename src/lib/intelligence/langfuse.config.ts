@@ -5,5 +5,5 @@
 
 export async function initializeAbysLangfuseTracing(): Promise<boolean> {
   // No-op in standalone mode — tracing handled at monorepo level
-  return false;
+  return false
 }

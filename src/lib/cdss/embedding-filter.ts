@@ -7,39 +7,39 @@
  * Fallback ke keyword pre-filter jika embedding gagal.
  */
 
-import "server-only";
+import 'server-only'
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { FilteredDisease } from "./pre-filter";
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import type { FilteredDisease } from './pre-filter'
 
 interface DiseaseVector {
-  icd10: string;
-  nama: string;
-  vector: number[] | null;
+  icd10: string
+  nama: string
+  vector: number[] | null
 }
 
 interface VectorsFile {
-  _metadata: { dimensions: number; total: number };
-  vectors: DiseaseVector[];
+  _metadata: { dimensions: number; total: number }
+  vectors: DiseaseVector[]
 }
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
 
-let _vectors: DiseaseVector[] | null = null;
+let _vectors: DiseaseVector[] | null = null
 
 function loadVectors(): DiseaseVector[] {
-  if (_vectors) return _vectors;
+  if (_vectors) return _vectors
   try {
     const raw = readFileSync(
-      join(process.cwd(), "public", "data", "penyakit-vectors.json"),
-      "utf-8",
-    );
-    const file = JSON.parse(raw) as VectorsFile;
-    _vectors = (file.vectors ?? []).filter((v) => v.vector !== null);
-    return _vectors;
+      join(process.cwd(), 'public', 'data', 'penyakit-vectors.json'),
+      'utf-8'
+    )
+    const file = JSON.parse(raw) as VectorsFile
+    _vectors = (file.vectors ?? []).filter(v => v.vector !== null)
+    return _vectors
   } catch {
-    return [];
+    return []
   }
 }
 
@@ -48,14 +48,14 @@ function loadVectors(): DiseaseVector[] {
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0,
     normA = 0,
-    normB = 0;
+    normB = 0
   for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+    dot += a[i] * b[i]
+    normA += a[i] * a[i]
+    normB += b[i] * b[i]
   }
-  const denom = Math.sqrt(normA) * Math.sqrt(normB);
-  return denom === 0 ? 0 : dot / denom;
+  const denom = Math.sqrt(normA) * Math.sqrt(normB)
+  return denom === 0 ? 0 : dot / denom
 }
 
 // ── Embed via Gemini API ──────────────────────────────────────────────────────
@@ -64,92 +64,84 @@ async function embedQuery(text: string, apiKey: string): Promise<number[]> {
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: "models/gemini-embedding-001",
+        model: 'models/gemini-embedding-001',
         content: { parts: [{ text }] },
-        taskType: "SEMANTIC_SIMILARITY",
+        taskType: 'SEMANTIC_SIMILARITY',
         outputDimensionality: 768,
       }),
-    },
-  );
+    }
+  )
   const data = (await r.json()) as {
-    embedding?: { values: number[] };
-    error?: unknown;
-  };
-  if (!r.ok || !data.embedding) {
-    throw new Error(
-      `Embedding API error: ${JSON.stringify(data.error ?? "unknown")}`,
-    );
+    embedding?: { values: number[] }
+    error?: unknown
   }
-  return data.embedding.values;
+  if (!r.ok || !data.embedding) {
+    throw new Error(`Embedding API error: ${JSON.stringify(data.error ?? 'unknown')}`)
+  }
+  return data.embedding.values
 }
 
 // ── penyakit.json lookup untuk build FilteredDisease ─────────────────────────
 
 interface PenyakitEntry {
-  id?: string;
-  icd10: string;
-  nama: string;
-  definisi?: string;
-  gejala?: string[];
-  gejala_klinis?: string[];
-  pemeriksaan_fisik?: string[];
-  red_flags?: string[];
-  terapi?: Array<{ obat: string; dosis: string; frek: string }>;
-  kriteria_rujukan?: string;
-  diagnosis_banding?: string[];
+  id?: string
+  icd10: string
+  nama: string
+  definisi?: string
+  gejala?: string[]
+  gejala_klinis?: string[]
+  pemeriksaan_fisik?: string[]
+  red_flags?: string[]
+  terapi?: Array<{ obat: string; dosis: string; frek: string }>
+  kriteria_rujukan?: string
+  diagnosis_banding?: string[]
 }
 
-let _penyakitMap: Map<string, PenyakitEntry[]> | null = null;
+let _penyakitMap: Map<string, PenyakitEntry[]> | null = null
 
 function getPenyakitMap(): Map<string, PenyakitEntry[]> {
-  if (_penyakitMap) return _penyakitMap;
+  if (_penyakitMap) return _penyakitMap
   try {
-    const raw = readFileSync(
-      join(process.cwd(), "public", "data", "penyakit.json"),
-      "utf-8",
-    );
-    const db = JSON.parse(raw) as { penyakit: PenyakitEntry[] };
-    _penyakitMap = new Map();
+    const raw = readFileSync(join(process.cwd(), 'public', 'data', 'penyakit.json'), 'utf-8')
+    const db = JSON.parse(raw) as { penyakit: PenyakitEntry[] }
+    _penyakitMap = new Map()
     for (const disease of db.penyakit ?? []) {
-      const key = buildEntryKey(disease.icd10, disease.nama);
-      const current = _penyakitMap.get(key) ?? [];
-      current.push(disease);
-      _penyakitMap.set(key, current);
+      const key = buildEntryKey(disease.icd10, disease.nama)
+      const current = _penyakitMap.get(key) ?? []
+      current.push(disease)
+      _penyakitMap.set(key, current)
     }
-    return _penyakitMap;
+    return _penyakitMap
   } catch {
-    return new Map();
+    return new Map()
   }
 }
 
-function toFilteredDisease(
-  entry: PenyakitEntry,
-  score: number,
-): FilteredDisease {
+function toFilteredDisease(entry: PenyakitEntry, score: number): FilteredDisease {
   return {
     id: entry.id ?? `${entry.icd10}:${entry.nama}`,
     icd10: entry.icd10,
     nama: entry.nama,
-    definisi: entry.definisi ?? "",
+    definisi: entry.definisi ?? '',
     gejala: [...(entry.gejala ?? []), ...(entry.gejala_klinis ?? [])],
     pemeriksaan_fisik: entry.pemeriksaan_fisik ?? [],
     red_flags: entry.red_flags ?? [],
     terapi: entry.terapi ?? [],
-    kriteria_rujukan: entry.kriteria_rujukan ?? "",
+    kriteria_rujukan: entry.kriteria_rujukan ?? '',
     diagnosis_banding: entry.diagnosis_banding ?? [],
     score,
-  };
+  }
 }
 
 function normalizeText(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 function buildEntryKey(icd10: string, nama: string): string {
-  return `${icd10.trim().toUpperCase()}::${normalizeText(nama)}`;
+  return `${icd10.trim().toUpperCase()}::${normalizeText(nama)}`
 }
 
 // ── Main Export ───────────────────────────────────────────────────────────────
@@ -157,38 +149,36 @@ function buildEntryKey(icd10: string, nama: string): string {
 export async function embeddingFilterDiseases(
   keluhanUtama: string,
   keluhanTambahan: string | undefined,
-  topN = 15,
+  topN = 15
 ): Promise<FilteredDisease[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY tidak dikonfigurasi");
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY tidak dikonfigurasi')
 
-  const vectors = loadVectors();
-  if (vectors.length === 0) throw new Error("Vectors belum di-generate");
+  const vectors = loadVectors()
+  if (vectors.length === 0) throw new Error('Vectors belum di-generate')
 
-  const query = [keluhanUtama, keluhanTambahan ?? ""].join(" ").trim();
-  const queryVector = await embedQuery(query, apiKey);
+  const query = [keluhanUtama, keluhanTambahan ?? ''].join(' ').trim()
+  const queryVector = await embedQuery(query, apiKey)
 
-  const penyakitMap = getPenyakitMap();
+  const penyakitMap = getPenyakitMap()
 
   const scored = vectors
-    .map((v) => ({
+    .map(v => ({
       key: buildEntryKey(v.icd10, v.nama),
       score: cosineSimilarity(queryVector, v.vector as number[]),
     }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, topN);
+    .slice(0, topN)
 
   return scored
     .flatMap(({ key, score }) => {
-      const entries = penyakitMap.get(key) ?? [];
-      return entries.map((entry) =>
-        toFilteredDisease(entry, Math.round(score * 1000)),
-      );
+      const entries = penyakitMap.get(key) ?? []
+      return entries.map(entry => toFilteredDisease(entry, Math.round(score * 1000)))
     })
-    .slice(0, topN);
+    .slice(0, topN)
 }
 
 export function isEmbeddingReady(): boolean {
-  const vectors = loadVectors();
-  return vectors.length > 0;
+  const vectors = loadVectors()
+  return vectors.length > 0
 }

@@ -5,18 +5,18 @@
  * DOM selectors for ePuskesmas Resep form (29 fields)
  */
 
-import type { PageFieldMap, AturanPakai } from "./types";
+import type { AturanPakai, PageFieldMap } from './types'
 
 // ============================================================================
 // ATURAN PAKAI OPTIONS
 // ============================================================================
 export const ATURAN_PAKAI_OPTIONS: Record<AturanPakai, string> = {
-  "1": "Sebelum Makan",
-  "2": "Sesudah Makan",
-  "3": "Pemakaian Luar",
-  "4": "Jika Diperlukan",
-  "5": "Saat Makan",
-};
+  '1': 'Sebelum Makan',
+  '2': 'Sesudah Makan',
+  '3': 'Pemakaian Luar',
+  '4': 'Jika Diperlukan',
+  '5': 'Saat Makan',
+}
 
 // ============================================================================
 // RESEP PAGE STATIC FIELDS (6 readonly + 3 AJAX + 3 fillable)
@@ -25,86 +25,81 @@ export const RESEP_FIELDS: PageFieldMap = {
   // 6 READONLY (never fill)
   pelayanan_id: {
     selector: 'input[name="pelayanan_id"], input[name="Resep[pelayanan_id]"]',
-    type: "text",
+    type: 'text',
     readonly: true,
   },
   pasien_id: {
     selector: 'input[name="pasien_id"]',
-    type: "text",
+    type: 'text',
     readonly: true,
   },
   ruangan_asal_id: {
     selector: 'input[name="ruangan_asal_id"], select[name="ruangan_asal_id"]',
-    type: "select",
+    type: 'select',
     readonly: true,
   },
   ruangantujuan_id: {
-    selector:
-      'input[name="ruangantujuan_id"], select[name="Resep[ruangantujuan_id]"]',
-    type: "select",
+    selector: 'input[name="ruangantujuan_id"], select[name="Resep[ruangantujuan_id]"]',
+    type: 'select',
     readonly: true,
   },
   dokter_id: {
     selector: 'input[name="dokter_id"], input[name="Resep[dokter_id]"]',
-    type: "text",
+    type: 'text',
     readonly: true,
   },
   perawat_id: {
     selector: 'input[name="perawat_id"], input[name="Resep[perawat_id]"]',
-    type: "text",
+    type: 'text',
     readonly: true,
   },
 
   // 3 AJAX autocomplete display fields
   ruangan: {
-    selector:
-      'input[name="ruangan"], input#ruangan, input[data-field="ruangan"]',
-    type: "autocomplete",
+    selector: 'input[name="ruangan"], input#ruangan, input[data-field="ruangan"]',
+    type: 'autocomplete',
     required: false,
   },
   dokter_nama_bpjs: {
-    selector:
-      'input[name="dokter_nama_bpjs"], input[name="dokter"], input#dokter_nama',
-    type: "autocomplete",
+    selector: 'input[name="dokter_nama_bpjs"], input[name="dokter"], input#dokter_nama',
+    type: 'autocomplete',
     required: true,
   },
   perawat_nama: {
-    selector:
-      'input[name="perawat_nama"], input[name="perawat"], input#perawat_nama',
-    type: "autocomplete",
+    selector: 'input[name="perawat_nama"], input[name="perawat"], input#perawat_nama',
+    type: 'autocomplete',
     required: false,
   },
 
   // 3 static fillable fields
   no_resep: {
-    selector:
-      'input[name="no_resep"], input[name="Resep[no_resep]"], input#no_resep',
-    type: "text",
+    selector: 'input[name="no_resep"], input[name="Resep[no_resep]"], input#no_resep',
+    type: 'text',
     required: false,
   },
   alergi: {
     selector: 'textarea[name="alergi"], input[name="alergi"], textarea#alergi',
-    type: "textarea",
+    type: 'textarea',
     required: false,
   },
   prioritas: {
     selector: 'select[name="prioritas"], select[name="Resep[prioritas]"]',
-    type: "select",
+    type: 'select',
     required: false,
   },
-};
+}
 
 // ============================================================================
 // PER-ROW MEDICATION FIELD GENERATORS (7 fields x N rows)
 // ============================================================================
 export interface ResepRowSelectors {
-  obat_racikan: string;
-  obat_jumlah_permintaan: string;
-  obat_nama: string;
-  obat_jumlah: string;
-  obat_signa: string;
-  aturan_pakai: string;
-  obat_keterangan: string;
+  obat_racikan: string
+  obat_jumlah_permintaan: string
+  obat_nama: string
+  obat_jumlah: string
+  obat_signa: string
+  aturan_pakai: string
+  obat_keterangan: string
 }
 
 /**
@@ -113,9 +108,8 @@ export interface ResepRowSelectors {
  * @param n Zero-based row index
  */
 export function getResepRowSelectors(n: number): ResepRowSelectors {
-  const n1 = n + 1;
-  const firstRowOnly = (selectors: string[]): string[] =>
-    n === 0 ? selectors : [];
+  const n1 = n + 1
+  const firstRowOnly = (selectors: string[]): string[] => (n === 0 ? selectors : [])
   return {
     obat_racikan: [
       `select[name="obat_racikan[${n}]"]`,
@@ -124,12 +118,9 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
       `select[name="ResepDetail[${n1}][obat_racikan]"]`,
       `select[name="resepdetail[${n}][obat_racikan]"]`,
       `select[name="resepdetail[${n1}][obat_racikan]"]`,
-      ...firstRowOnly([
-        'select[name="obat_racikan"]',
-        'select[name*="[obat_racikan]"]',
-      ]),
+      ...firstRowOnly(['select[name="obat_racikan"]', 'select[name*="[obat_racikan]"]']),
       `.medication-row:nth-child(${n + 1}) select[name*="racikan"]`,
-    ].join(", "),
+    ].join(', '),
 
     obat_jumlah_permintaan: [
       `input[name="obat_jumlah_permintaan[${n}]"]`,
@@ -143,7 +134,7 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
         'input[name*="[obat_jumlah_permintaan]"]',
       ]),
       `.medication-row:nth-child(${n + 1}) input[name*="jumlah_permintaan"]`,
-    ].join(", "),
+    ].join(', '),
 
     obat_nama: [
       `input[name="obat_nama[${n}]"]`,
@@ -163,7 +154,7 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
         'input[placeholder*="Nama Obat"]',
       ]),
       `.medication-row:nth-child(${n + 1}) input[name*="obat_nama"]`,
-    ].join(", "),
+    ].join(', '),
 
     obat_jumlah: [
       `input[name="obat_jumlah[${n}]"]`,
@@ -174,12 +165,9 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
       `input[name="resepdetail[${n1}][obat_jumlah]"]`,
       `input[name="obat[${n}][jumlah]"]`,
       `input[name="obat[${n1}][jumlah]"]`,
-      ...firstRowOnly([
-        'input[name="obat_jumlah"]',
-        'input[name*="[obat_jumlah]"]',
-      ]),
+      ...firstRowOnly(['input[name="obat_jumlah"]', 'input[name*="[obat_jumlah]"]']),
       `.medication-row:nth-child(${n + 1}) input[name*="obat_jumlah"]:not([name*="permintaan"])`,
-    ].join(", "),
+    ].join(', '),
 
     obat_signa: [
       `input[name="obat_signa[${n}]"]`,
@@ -197,7 +185,7 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
         'input[placeholder*="Cari Resep"]',
       ]),
       `.medication-row:nth-child(${n + 1}) input[name*="signa"]`,
-    ].join(", "),
+    ].join(', '),
 
     aturan_pakai: [
       `select[name="aturan_pakai[${n}]"]`,
@@ -208,12 +196,9 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
       `select[name="resepdetail[${n1}][aturan_pakai]"]`,
       `select[name="obat[${n}][aturan]"]`,
       `select[name="obat[${n1}][aturan]"]`,
-      ...firstRowOnly([
-        'select[name="aturan_pakai"]',
-        'select[name*="[aturan_pakai]"]',
-      ]),
+      ...firstRowOnly(['select[name="aturan_pakai"]', 'select[name*="[aturan_pakai]"]']),
       `.medication-row:nth-child(${n + 1}) select[name*="aturan"]`,
-    ].join(", "),
+    ].join(', '),
 
     obat_keterangan: [
       `input[name="obat_keterangan[${n}]"]`,
@@ -232,65 +217,65 @@ export function getResepRowSelectors(n: number): ResepRowSelectors {
       ]),
       `.medication-row:nth-child(${n + 1}) input[name*="keterangan"]`,
       `.medication-row:nth-child(${n + 1}) textarea[name*="keterangan"]`,
-    ].join(", "),
-  };
+    ].join(', '),
+  }
 }
 
 // ============================================================================
 // AUTOCOMPLETE OPTIONS PER FIELD TYPE
 // ============================================================================
 export interface AutocompleteOptions {
-  timeout?: number;
-  dropdownSelector?: string;
-  retries?: number;
-  typeDelay?: number;
-  allowFirstItemFallback?: boolean;
-  requireDropdownSelection?: boolean;
+  timeout?: number
+  dropdownSelector?: string
+  retries?: number
+  typeDelay?: number
+  allowFirstItemFallback?: boolean
+  requireDropdownSelection?: boolean
 }
 
 export const AUTOCOMPLETE_OPTIONS: Record<string, AutocompleteOptions> = {
   ruangan: {
     timeout: 1000,
-    dropdownSelector: ".ui-autocomplete .ui-menu-item, .autocomplete-result",
+    dropdownSelector: '.ui-autocomplete .ui-menu-item, .autocomplete-result',
     retries: 2,
     typeDelay: 50,
   },
   dokter: {
     timeout: 1500,
-    dropdownSelector: ".ui-autocomplete .ui-menu-item, .autocomplete-result",
+    dropdownSelector: '.ui-autocomplete .ui-menu-item, .autocomplete-result',
     retries: 2,
     typeDelay: 50,
   },
   perawat: {
     timeout: 1000,
-    dropdownSelector: ".ui-autocomplete .ui-menu-item, .autocomplete-result",
+    dropdownSelector: '.ui-autocomplete .ui-menu-item, .autocomplete-result',
     retries: 2,
     typeDelay: 50,
   },
   obat: {
     timeout: 1500,
-    dropdownSelector: ".ui-autocomplete .ui-menu-item, .autocomplete-result",
+    dropdownSelector: '.ui-autocomplete .ui-menu-item, .autocomplete-result',
     retries: 3,
     typeDelay: 60,
   },
   signa: {
     timeout: 800,
-    dropdownSelector: ".ui-autocomplete .ui-menu-item, .autocomplete-result",
+    dropdownSelector: '.ui-autocomplete .ui-menu-item, .autocomplete-result',
     retries: 2,
     typeDelay: 40,
   },
-};
+}
 
 // ============================================================================
 // ADD ROW BUTTON SELECTORS
 // ============================================================================
 export const ADD_ROW_BUTTON_SELECTORS = [
-  "button#add-obat",
-  "button.tambah-obat",
+  'button#add-obat',
+  'button.tambah-obat',
   'button[data-action="add-row"]',
-  "a.add-medication",
-  ".btn-tambah-obat",
+  'a.add-medication',
+  '.btn-tambah-obat',
   '[onclick*="tambahObat"]',
   '[onclick*="addRow"]',
   '[onclick*="addObat"]',
-];
+]

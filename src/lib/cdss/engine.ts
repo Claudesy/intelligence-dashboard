@@ -410,6 +410,14 @@ ${input.structured_signs_text}
 INSTRUKSI TAMBAHAN: Pertimbangkan tanda klinis terstruktur di atas saat mengidentifikasi red flags dan menentukan urgency. Jika ada tanda syok, distress pernapasan, HMOD, atau DKA/HHS, prioritaskan kondisi tersebut dalam asesmen.`
     : ''
 
+  const deteriorationBlock = input.deterioration_summary_text
+    ? `
+## Ringkasan Deteriorasi Komposit
+${input.deterioration_summary_text}
+
+INSTRUKSI TAMBAHAN: Gunakan ringkasan deteriorasi komposit ini sebagai sinyal eskalasi bedside/trend. Jika ada composite alert dengan severity tinggi/kritis, naikkan urgency differential dan action plan sesuai bukti klinisnya. Watcher menunjukkan pola yang perlu dimonitor, bukan diagnosis pasti.`
+    : ''
+
   // Phase 3: Trajectory context block (appended if available)
   const trajectoryBlock = input.trajectory_context
     ? `
@@ -439,7 +447,7 @@ INSTRUKSI TAMBAHAN: Pertimbangkan trajectory klinis di atas dalam asesmen urgenc
 - Alergi: ${allergies}
 - Hamil: ${pregnant}
 - Obat saat ini: ${drugs}
-${structuredSignsBlock}${trajectoryBlock}
+${structuredSignsBlock}${deteriorationBlock}${trajectoryBlock}
 ## Database Penyakit KKI — Pre-filtered berdasarkan keluhan (Format: ICD10 | Nama | Definisi singkat | Gejala | Red flags | Banding)
 ${kbContext}
 

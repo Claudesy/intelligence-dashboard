@@ -1,187 +1,186 @@
 // Architected and built by Claudesy.
-"use client";
+'use client'
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { io, Socket } from "socket.io-client";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { io, type Socket } from 'socket.io-client'
 
-const ACARS_PAGE_WIDTH = 1200;
+const ACARS_PAGE_WIDTH = 1200
 const ACARS_PANEL_STYLE = {
-  background: "transparent",
-  border: "1px solid var(--line-base)",
+  background: 'transparent',
+  border: '1px solid var(--line-base)',
   borderRadius: 12,
-  boxShadow: "none",
-} as const;
+  boxShadow: 'none',
+} as const
 
 type CrewInfo = {
-  username: string;
-  displayName: string;
-  fullName: string;
-  profession: string;
-  role: string;
-  institution: string;
-};
+  username: string
+  displayName: string
+  fullName: string
+  profession: string
+  role: string
+  institution: string
+}
 
 type SessionUser = {
-  username: string;
-  displayName: string;
-  fullName: string;
-  role: string;
-  profession: string;
-};
+  username: string
+  displayName: string
+  fullName: string
+  role: string
+  profession: string
+}
 
 type ChatMessage = {
-  id: string;
-  roomId: string;
-  senderId: string;
-  senderName: string;
-  text: string;
-  time: string;
-};
+  id: string
+  roomId: string
+  senderId: string
+  senderName: string
+  text: string
+  time: string
+}
 
 function getAvatarUrl(profession: string, role: string): string {
-  const p = profession.toLowerCase();
-  if (p.includes("dokter") || role === "DOKTER") return "/avatar/doctor-m.png";
-  if (p.includes("perawat") || role === "PERAWAT") return "/avatar/nurse-m.png";
-  if (p.includes("bidan") || role === "BIDAN") return "/avatar/nurse-w.png";
-  if (p.includes("apoteker") || role === "APOTEKER")
-    return "/avatar/pharmacy-m.png";
-  return "/avatar/adm-m.png";
+  const p = profession.toLowerCase()
+  if (p.includes('dokter') || role === 'DOKTER') return '/avatar/doctor-m.png'
+  if (p.includes('perawat') || role === 'PERAWAT') return '/avatar/nurse-m.png'
+  if (p.includes('bidan') || role === 'BIDAN') return '/avatar/nurse-w.png'
+  if (p.includes('apoteker') || role === 'APOTEKER') return '/avatar/pharmacy-m.png'
+  return '/avatar/adm-m.png'
 }
 
 function getUserColor(role: string): string {
   switch (role) {
-    case "DOKTER":
-      return "#D47A57";
-    case "PERAWAT":
-      return "#5B8DB8";
-    case "BIDAN":
-      return "#A87BBE";
-    case "APOTEKER":
-      return "#5B9E8F";
-    case "ADMINISTRATOR":
-      return "#E67E22";
+    case 'DOKTER':
+      return '#D47A57'
+    case 'PERAWAT':
+      return '#5B8DB8'
+    case 'BIDAN':
+      return '#A87BBE'
+    case 'APOTEKER':
+      return '#5B9E8F'
+    case 'ADMINISTRATOR':
+      return '#E67E22'
     default:
-      return "#888";
+      return '#888'
   }
 }
 
 function dmRoomId(me: string, other: string): string {
-  const [a, b] = [me, other].sort();
-  return `dm:${a}:${b}`;
+  const [a, b] = [me, other].sort()
+  return `dm:${a}:${b}`
 }
 
 export default function AcarsRosterPage() {
-  const params = useParams();
-  const router = useRouter();
-  const username = typeof params.username === "string" ? params.username : "";
+  const params = useParams()
+  const router = useRouter()
+  const username = typeof params.username === 'string' ? params.username : ''
 
-  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
-  const [targetCrew, setTargetCrew] = useState<CrewInfo | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null)
+  const [targetCrew, setTargetCrew] = useState<CrewInfo | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [connected, setConnected] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const socketRef = useRef<Socket | null>(null);
-  const messagesListRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null)
+  const messagesListRef = useRef<HTMLDivElement>(null)
 
   // Fetch session + target crew
   useEffect(() => {
-    if (!username) return;
+    if (!username) return
 
     async function init() {
       try {
         const [profileRes, crewRes] = await Promise.all([
-          fetch("/api/auth/profile", { cache: "no-store" }),
+          fetch('/api/auth/profile', { cache: 'no-store' }),
           fetch(`/api/crew/${encodeURIComponent(username)}`, {
-            cache: "no-store",
+            cache: 'no-store',
           }),
-        ]);
+        ])
 
-        const profileData = await profileRes.json();
-        const crewData = await crewRes.json();
+        const profileData = await profileRes.json()
+        const crewData = await crewRes.json()
 
         if (!profileData.ok || !profileData.user) {
-          setError("Sesi tidak valid. Silakan login kembali.");
-          setLoading(false);
-          return;
+          setError('Sesi tidak valid. Silakan login kembali.')
+          setLoading(false)
+          return
         }
 
-        const src = profileData.user;
+        const src = profileData.user
         setCurrentUser({
           username: src.username,
           displayName: src.displayName,
           fullName: profileData.profile?.fullName || src.displayName,
           role: src.role,
-          profession: src.profession || "",
-        });
+          profession: src.profession || '',
+        })
 
         if (!crewData.ok || !crewData.crew) {
-          setError(crewData.error || "Crew tidak ditemukan.");
-          setLoading(false);
-          return;
+          setError(crewData.error || 'Crew tidak ditemukan.')
+          setLoading(false)
+          return
         }
 
-        setTargetCrew(crewData.crew);
+        setTargetCrew(crewData.crew)
 
         // Redirect if viewing self
         if (src.username.toLowerCase() === username.toLowerCase()) {
-          router.replace("/acars");
-          return;
+          router.replace('/acars')
+          return
         }
       } catch {
-        setError("Gagal memuat data.");
+        setError('Gagal memuat data.')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
 
-    init();
-  }, [username, router]);
+    init()
+  }, [username, router])
 
   // Connect socket + join DM room
   useEffect(() => {
-    if (!currentUser || !targetCrew || currentUser.username === targetCrew.username) return;
+    if (!currentUser || !targetCrew || currentUser.username === targetCrew.username) return
 
-    const roomId = dmRoomId(currentUser.username, targetCrew.username);
-    const socket = io();
-    socketRef.current = socket;
+    const roomId = dmRoomId(currentUser.username, targetCrew.username)
+    const socket = io()
+    socketRef.current = socket
 
-    socket.on("connect", () => {
-      setConnected(true);
-      socket.emit("room:join", roomId);
-    });
+    socket.on('connect', () => {
+      setConnected(true)
+      socket.emit('room:join', roomId)
+    })
 
-    socket.on("disconnect", () => setConnected(false));
+    socket.on('disconnect', () => setConnected(false))
 
-    socket.on("message:receive", (msg: ChatMessage) => {
-      if (msg.roomId !== roomId) return;
-      if (msg.senderId === currentUser.username) return;
-      setMessages((prev) => [...prev, msg]);
-    });
+    socket.on('message:receive', (msg: ChatMessage) => {
+      if (msg.roomId !== roomId) return
+      if (msg.senderId === currentUser.username) return
+      setMessages(prev => [...prev, msg])
+    })
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [currentUser, targetCrew]);
+      socket.disconnect()
+      socketRef.current = null
+    }
+  }, [currentUser, targetCrew])
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    const container = messagesListRef.current;
-    if (!container) return;
-    container.scrollTop = container.scrollHeight;
-  }, [messages]);
+    const container = messagesListRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+  }, [messages])
 
   const sendMessage = useCallback(() => {
-    const text = input.trim();
-    if (!text || !socketRef.current || !currentUser || !targetCrew) return;
+    const text = input.trim()
+    if (!text || !socketRef.current || !currentUser || !targetCrew) return
 
-    const roomId = dmRoomId(currentUser.username, targetCrew.username);
+    const roomId = dmRoomId(currentUser.username, targetCrew.username)
     const msg: ChatMessage = {
       id: `${Date.now()}-${Math.random()}`,
       roomId,
@@ -189,20 +188,20 @@ export default function AcarsRosterPage() {
       senderName: currentUser.fullName,
       text,
       time: new Date().toISOString(),
-    };
+    }
 
-    socketRef.current.emit("message:send", {
+    socketRef.current.emit('message:send', {
       roomId,
       text,
-    });
-    setMessages((prev) => [...prev, msg]);
-    setInput("");
-  }, [input, currentUser, targetCrew]);
+    })
+    setMessages(prev => [...prev, msg])
+    setInput('')
+  }, [input, currentUser, targetCrew])
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
     }
   }
 
@@ -210,18 +209,18 @@ export default function AcarsRosterPage() {
     return (
       <div
         style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           minHeight: 300,
-          color: "var(--text-muted)",
+          color: 'var(--text-muted)',
           fontSize: 14,
         }}
       >
         Memuat roster...
       </div>
-    );
+    )
   }
 
   if (error || !targetCrew) {
@@ -229,20 +228,20 @@ export default function AcarsRosterPage() {
       <div
         style={{
           maxWidth: ACARS_PAGE_WIDTH,
-          width: "100%",
-          margin: "0 auto",
+          width: '100%',
+          margin: '0 auto',
           padding: 24,
         }}
       >
         <Link
           href="/acars"
           style={{
-            display: "inline-flex",
-            alignItems: "center",
+            display: 'inline-flex',
+            alignItems: 'center',
             gap: 8,
-            color: "var(--c-asesmen)",
+            color: 'var(--c-asesmen)',
             fontSize: 14,
-            textDecoration: "none",
+            textDecoration: 'none',
             marginBottom: 16,
           }}
         >
@@ -252,29 +251,29 @@ export default function AcarsRosterPage() {
         <div
           style={{
             padding: 24,
-            background: "var(--bg-card)",
-            border: "1px solid var(--line-base)",
+            background: 'var(--bg-card)',
+            border: '1px solid var(--line-base)',
             borderRadius: 12,
-            color: "var(--text-muted)",
+            color: 'var(--text-muted)',
           }}
         >
-          {error || "Crew tidak ditemukan."}
+          {error || 'Crew tidak ditemukan.'}
         </div>
       </div>
-    );
+    )
   }
 
-  const myColor = currentUser ? getUserColor(currentUser.role) : "#E67E22";
-  const targetColor = getUserColor(targetCrew.role);
-  const targetAvatar = getAvatarUrl(targetCrew.profession, targetCrew.role);
+  const myColor = currentUser ? getUserColor(currentUser.role) : '#E67E22'
+  const targetColor = getUserColor(targetCrew.role)
+  const targetAvatar = getAvatarUrl(targetCrew.profession, targetCrew.role)
 
   return (
     <div
       style={{
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
         gap: 20,
       }}
     >
@@ -282,21 +281,21 @@ export default function AcarsRosterPage() {
       <div
         style={{
           maxWidth: ACARS_PAGE_WIDTH,
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
         <Link
           href="/acars"
           style={{
-            display: "inline-flex",
-            alignItems: "center",
+            display: 'inline-flex',
+            alignItems: 'center',
             gap: 8,
-            color: "var(--c-asesmen)",
+            color: 'var(--c-asesmen)',
             fontSize: 13,
-            textDecoration: "none",
+            textDecoration: 'none',
           }}
         >
           <ArrowLeft size={18} />
@@ -304,31 +303,31 @@ export default function AcarsRosterPage() {
         </Link>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
+            display: 'flex',
+            alignItems: 'center',
             gap: 8,
-            padding: "6px 12px",
-            background: "rgba(255,255,255,0.02)",
+            padding: '6px 12px',
+            background: 'rgba(255,255,255,0.02)',
             borderRadius: 6,
-            border: "1px solid var(--line-base)",
+            border: '1px solid var(--line-base)',
           }}
         >
           <div
             style={{
               width: 8,
               height: 8,
-              borderRadius: "50%",
-              background: connected ? "var(--c-ok)" : "var(--text-muted)",
+              borderRadius: '50%',
+              background: connected ? 'var(--c-ok)' : 'var(--text-muted)',
             }}
           />
           <span
             style={{
               fontSize: 11,
-              letterSpacing: "0.1em",
-              color: connected ? "var(--c-ok)" : "var(--text-muted)",
+              letterSpacing: '0.1em',
+              color: connected ? 'var(--c-ok)' : 'var(--text-muted)',
             }}
           >
-            {connected ? "LIVE" : "OFFLINE"}
+            {connected ? 'LIVE' : 'OFFLINE'}
           </span>
         </div>
       </div>
@@ -337,26 +336,26 @@ export default function AcarsRosterPage() {
       <div
         style={{
           maxWidth: ACARS_PAGE_WIDTH,
-          width: "100%",
+          width: '100%',
           ...ACARS_PANEL_STYLE,
           padding: 24,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
+            display: 'flex',
+            alignItems: 'center',
             gap: 20,
             paddingBottom: 20,
-            borderBottom: "1px solid var(--line-base)",
+            borderBottom: '1px solid var(--line-base)',
           }}
         >
           <div
             style={{
               width: 80,
               height: 80,
-              borderRadius: "50%",
-              overflow: "hidden",
+              borderRadius: '50%',
+              overflow: 'hidden',
               border: `3px solid ${targetColor}`,
               flexShrink: 0,
             }}
@@ -366,7 +365,7 @@ export default function AcarsRosterPage() {
               alt=""
               width={80}
               height={80}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           </div>
           <div>
@@ -374,8 +373,8 @@ export default function AcarsRosterPage() {
               style={{
                 fontSize: 22,
                 fontWeight: 600,
-                color: "var(--text-main)",
-                letterSpacing: "0.02em",
+                color: 'var(--text-main)',
+                letterSpacing: '0.02em',
               }}
             >
               {targetCrew.fullName}
@@ -383,7 +382,7 @@ export default function AcarsRosterPage() {
             <div
               style={{
                 fontSize: 13,
-                color: "var(--text-muted)",
+                color: 'var(--text-muted)',
                 marginTop: 4,
               }}
             >
@@ -394,7 +393,7 @@ export default function AcarsRosterPage() {
                 fontSize: 13,
                 color: targetColor,
                 marginTop: 4,
-                letterSpacing: "0.05em",
+                letterSpacing: '0.05em',
               }}
             >
               {targetCrew.profession || targetCrew.role}
@@ -403,7 +402,7 @@ export default function AcarsRosterPage() {
               <div
                 style={{
                   fontSize: 12,
-                  color: "var(--text-muted)",
+                  color: 'var(--text-muted)',
                   marginTop: 2,
                 }}
               >
@@ -417,8 +416,8 @@ export default function AcarsRosterPage() {
         <div
           style={{
             marginTop: 20,
-            display: "flex",
-            flexDirection: "column",
+            display: 'flex',
+            flexDirection: 'column',
             minHeight: 320,
           }}
         >
@@ -426,8 +425,8 @@ export default function AcarsRosterPage() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              letterSpacing: "0.1em",
-              color: "var(--text-muted)",
+              letterSpacing: '0.1em',
+              color: 'var(--text-muted)',
               marginBottom: 12,
             }}
           >
@@ -437,9 +436,9 @@ export default function AcarsRosterPage() {
             ref={messagesListRef}
             style={{
               flex: 1,
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
               gap: 8,
               marginBottom: 12,
               paddingRight: 4,
@@ -449,86 +448,78 @@ export default function AcarsRosterPage() {
             {messages.length === 0 && (
               <div
                 style={{
-                  textAlign: "center",
-                  color: "var(--text-muted)",
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
                   fontSize: 14,
-                  padding: "40px 0",
+                  padding: '40px 0',
                 }}
               >
                 Belum ada pesan. Mulai percakapan dengan {targetCrew.fullName}.
               </div>
             )}
-            {messages.map((msg) => {
-              const isMe = currentUser && msg.senderId === currentUser.username;
+            {messages.map(msg => {
+              const isMe = currentUser && msg.senderId === currentUser.username
               return (
                 <div
                   key={msg.id}
                   style={{
-                    padding: "10px 14px",
-                    background: isMe
-                      ? "rgba(255,255,255,0.02)"
-                      : "rgba(255,255,255,0.01)",
+                    padding: '10px 14px',
+                    background: isMe ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)',
                     borderRadius: 8,
-                    borderLeft: isMe
-                      ? `2px solid ${myColor}`
-                      : "2px solid transparent",
-                    border: "1px solid var(--line-base)",
+                    borderLeft: isMe ? `2px solid ${myColor}` : '2px solid transparent',
+                    border: '1px solid var(--line-base)',
                   }}
                 >
                   <div
                     style={{
                       fontSize: 11,
-                      color: isMe ? myColor : "var(--text-muted)",
+                      color: isMe ? myColor : 'var(--text-muted)',
                       marginBottom: 4,
                     }}
                   >
-                    {isMe ? "Anda" : msg.senderName} ·{" "}
-                    {new Date(msg.time).toLocaleTimeString("id-ID", {
-                      hour: "2-digit",
-                      minute: "2-digit",
+                    {isMe ? 'Anda' : msg.senderName} ·{' '}
+                    {new Date(msg.time).toLocaleTimeString('id-ID', {
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </div>
-                  <div style={{ fontSize: 13, color: "var(--text-main)" }}>
-                    {msg.text}
-                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-main)' }}>{msg.text}</div>
                 </div>
-              );
+              )
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <input
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={`Kirim pesan ke ${targetCrew.fullName}...`}
               disabled={!connected}
               style={{
                 flex: 1,
-                padding: "12px 16px",
-                background: "rgba(255,255,255,0.02)",
-                border: "1px solid var(--line-base)",
+                padding: '12px 16px',
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid var(--line-base)',
                 borderRadius: 8,
-                color: "var(--text-main)",
+                color: 'var(--text-main)',
                 fontSize: 15,
-                outline: "none",
+                outline: 'none',
               }}
             />
             <button
               onClick={sendMessage}
               disabled={!input.trim() || !connected}
               style={{
-                padding: "12px 24px",
-                background: input.trim()
-                  ? "rgba(255,255,255,0.02)"
-                  : "rgba(255,255,255,0.01)",
-                border: `1px solid ${input.trim() ? myColor : "var(--line-base)"}`,
+                padding: '12px 24px',
+                background: input.trim() ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)',
+                border: `1px solid ${input.trim() ? myColor : 'var(--line-base)'}`,
                 borderRadius: 8,
-                color: input.trim() ? myColor : "var(--text-muted)",
+                color: input.trim() ? myColor : 'var(--text-muted)',
                 fontSize: 12,
-                letterSpacing: "0.08em",
-                cursor: input.trim() ? "pointer" : "not-allowed",
+                letterSpacing: '0.08em',
+                cursor: input.trim() ? 'pointer' : 'not-allowed',
                 opacity: input.trim() ? 1 : 0.5,
               }}
             >
@@ -538,5 +529,5 @@ export default function AcarsRosterPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

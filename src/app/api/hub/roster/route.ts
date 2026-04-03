@@ -1,27 +1,21 @@
 // Claudesy's vision, brought to life.
-import { NextResponse } from "next/server";
-import {
-  isCrewAuthorizedRequest,
-  listCrewAccessUsers,
-} from "@/lib/server/crew-access-auth";
-import { listAllCrewProfiles } from "@/lib/server/crew-access-profile";
+import { NextResponse } from 'next/server'
+import { isCrewAuthorizedRequest, listCrewAccessUsers } from '@/lib/server/crew-access-auth'
+import { listAllCrewProfiles } from '@/lib/server/crew-access-profile'
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
   if (!isCrewAuthorizedRequest(request)) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 },
-    );
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const users = listCrewAccessUsers();
-    const profiles = listAllCrewProfiles();
+    const users = listCrewAccessUsers()
+    const profiles = listAllCrewProfiles()
 
-    const roster = users.map((user) => {
-      const profile = profiles.get(user.username);
+    const roster = users.map(user => {
+      const profile = profiles.get(user.username)
       return {
         username: user.username,
         displayName: user.displayName,
@@ -37,24 +31,21 @@ export async function GET(request: Request) {
               jobTitles: profile.jobTitles,
               avatarUrl: profile.avatarUrl,
               serviceAreas: profile.serviceAreas,
-              strNumber: profile.strNumber ? "***" : "",
-              sipNumber: profile.sipNumber ? "***" : "",
-              employeeId: profile.employeeId ? "***" : "",
+              strNumber: profile.strNumber ? '***' : '',
+              sipNumber: profile.sipNumber ? '***' : '',
+              employeeId: profile.employeeId ? '***' : '',
               hasGithubUrl: !!profile.githubUrl,
               hasLinkedinUrl: !!profile.linkedinUrl,
               hasGravatarUrl: !!profile.gravatarUrl,
               hasBlogUrl: !!profile.blogUrl,
             }
           : null,
-      };
-    });
+      }
+    })
 
-    return NextResponse.json({ ok: true, roster });
+    return NextResponse.json({ ok: true, roster })
   } catch (error) {
-    console.error("[Hub] Roster error:", error);
-    return NextResponse.json(
-      { ok: false, error: "Gagal memuat roster." },
-      { status: 500 },
-    );
+    console.error('[Hub] Roster error:', error)
+    return NextResponse.json({ ok: false, error: 'Gagal memuat roster.' }, { status: 500 })
   }
 }

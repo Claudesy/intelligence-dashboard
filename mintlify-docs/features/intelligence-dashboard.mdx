@@ -1,0 +1,31 @@
+---
+title: "Intelligence Dashboard"
+description: "Real-time clinical observability and analytics"
+---
+
+# Intelligence Dashboard
+
+Real-time monitoring and analytics for clinical operations.
+
+## Features
+
+- **Real-time events** via Socket.IO `/intelligence` namespace
+- **Observability** — Langfuse (LLM tracing) + Sentry (error monitoring)
+- **Auth-gated** — Only crew with valid sessions can connect
+
+## Event Types
+
+| Event | Description |
+|-------|------------|
+| `encounter:updated` | Patient encounter changes |
+| `alert:critical` | Critical clinical alerts |
+| `eklaim:status-changed` | E-Klaim status updates |
+| `cdss:suggestion-ready` | CDSS diagnosis results available |
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/app/dashboard/intelligence/` | Dashboard UI |
+| `src/lib/intelligence/` | Langfuse, Sentry, observability logic |
+| `src/app/api/dashboard/intelligence/` | Dashboard API |

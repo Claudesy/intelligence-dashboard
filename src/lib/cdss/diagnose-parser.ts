@@ -51,6 +51,64 @@ function parseStructuredSignsText(value: unknown): string | undefined {
   return parts.length > 0 ? parts.join('\n') : undefined
 }
 
+function parseCompositeDeteriorationText(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (!value || typeof value !== 'object') return undefined
+
+  const root = value as Record<string, unknown>
+  const parts: string[] = []
+
+  const derived = root.derived && typeof root.derived === 'object' ? (root.derived as Record<string, unknown>) : null
+  if (derived) {
+    const metrics = [
+      typeof derived.map === 'number' ? `MAP=${derived.map}` : '',
+      typeof derived.pulsePressure === 'number' ? `PP=${derived.pulsePressure}` : '',
+      typeof derived.shockIndex === 'number' ? `SI=${derived.shockIndex}` : '',
+      typeof derived.modifiedShockIndex === 'number' ? `MSI=${derived.modifiedShockIndex}` : '',
+    ].filter(Boolean)
+    if (metrics.length > 0) {
+      parts.push(`Derived metrics: ${metrics.join(', ')}`)
+    }
+  }
+
+  const summariseAlerts = (label: string, rawAlerts: unknown) => {
+    if (!Array.isArray(rawAlerts) || rawAlerts.length === 0) return
+    const lines = rawAlerts
+      .flatMap(item => {
+        if (!item || typeof item !== 'object') return []
+        const alert = item as Record<string, unknown>
+        const title =
+          typeof alert.title === 'string' && alert.title.trim()
+            ? alert.title.trim()
+            : typeof alert.syndrome === 'string'
+              ? alert.syndrome
+              : null
+        if (!title) return []
+        const fragments = [
+          `severity=${alert.severity}`,
+          `confidence=${alert.confidence}`,
+          typeof alert.summary === 'string' && alert.summary.trim()
+            ? `summary=${alert.summary.trim()}`
+            : '',
+          Array.isArray(alert.evidence) && alert.evidence.length > 0
+            ? `evidence=${alert.evidence
+                .filter(entry => typeof entry === 'string' && entry.trim())
+                .slice(0, 3)
+                .join(' | ')}`
+            : '',
+        ].filter(Boolean)
+        return [`- ${title}${fragments.length > 0 ? ` (${fragments.join('; ')})` : ''}`]
+      })
+    if (lines.length > 0) {
+      parts.push(`${label}:\n${lines.join('\n')}`)
+    }
+  }
+
+  summariseAlerts('Composite alerts', root.compositeAlerts)
+  summariseAlerts('Composite watchers', root.watchers)
+  return parts.length > 0 ? parts.join('\n') : undefined
+}
+
 export type DiagnoseRequestParseResult =
   | { ok: true; input: CDSSEngineInput }
   | { ok: false; error: string; status: number }
@@ -114,6 +172,9 @@ export function parseDiagnoseRequestBody(body: unknown): DiagnoseRequestParseRes
       session_id: typeof b.session_id === 'string' ? b.session_id : undefined,
       trajectory_context: parseTrajectoryContext(b.trajectory_context),
       structured_signs_text: parseStructuredSignsText(b.structured_signs ?? b.structured_signs_text),
+      deterioration_summary_text: parseCompositeDeteriorationText(
+        b.composite_deterioration ?? b.deterioration_summary_text
+      ),
     },
   }
 }

@@ -57,3 +57,4 @@ yarn.lock
 docs/document-extraction-engine.md
 docs/extraction-quality-scoring-system.md
 TECHNICAL.md
+.vercel

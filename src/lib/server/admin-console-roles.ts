@@ -1,8 +1,4 @@
 // Claudesy's vision, brought to life.
-import "server-only";
+import 'server-only'
 
-export const ADMIN_CONSOLE_ROLES = new Set([
-  "CEO",
-  "ADMINISTRATOR",
-  "CHIEF_EXECUTIVE_OFFICER",
-]);
+export const ADMIN_CONSOLE_ROLES = new Set(['CEO', 'ADMINISTRATOR', 'CHIEF_EXECUTIVE_OFFICER'])

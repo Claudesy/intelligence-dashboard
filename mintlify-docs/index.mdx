@@ -1,0 +1,190 @@
+---
+title: "Laporan Teknis V2.0"
+description: "Progress Dan Implementasi: Sentra Intelligence Dashboard"
+---
+
+# SENTRA INTELLIGENCE DASHBOARD
+## Clinical Information System untuk Primary Healthcare Indonesia
+
+**Dibangun oleh: dr. Ferdi Iskandar**  
+*Founder & CEO, Sentra Healthcare Solutions*  
+*Clinical Steward & Solo Architect*
+
+**Tanggal:** 10 Maret 2026  
+**Versi Dokumen:** 2.0  
+**Status:** Production-Deployed at Puskesmas PONED Balowerti, Kota Kediri
+
+---
+
+## EXECUTIVE SUMMARY
+
+Sentra Intelligence Dashboard adalah sistem informasi klinis *full-stack* yang dirancang khusus untuk fasilitas kesehatan tingkat primer (FKTP) di Indonesia. Sistem ini mengkonsolidasikan seluruh workflow klinis — dari anamnesis hingga pelaporan regulasi — dalam satu antarmuka terpadu yang beroperasi secara real-time.
+
+**Capaian Utama:**
+
+- 45.030 rekam medis elektronik terdigitalisasi dari Puskesmas PONED Balowerti
+- 159 penyakit dalam knowledge base dengan validasi klinis berlapis
+- 1.930 kode ICD-10 multi-versi (2010, 2016, 2019) terintegrasi
+- Response time \<2 detik untuk Clinical Decision Support System (CDSS)
+- 98,7% akurasi auto-fill EMR dengan Playwright RPA engine
+- Zero-downtime deployment di Railway dengan Nixpacks
+- HMAC-signed session cookies dengan 12-hour TTL — stateless, tamper-proof
+
+**Filosofi Inti:**
+
+> "Technology enables, but humans decide."  
+> — dr. Ferdi Iskandar
+
+Sistem ini dibangun dengan prinsip bahwa AI adalah *augmentative*, bukan *replacement*. Setiap rekomendasi klinis melewati 6 safety gates sebelum mencapai dokter. Keputusan akhir selalu berada di tangan manusia.
+
+---
+
+## 1. LATAR BELAKANG & MOTIVASI
+
+### Profil Penulis
+
+**dr. Ferdi Iskandar** adalah seorang dokter berlisensi dengan:
+
+- **12+ tahun** pengalaman klinis (IGD, Puskesmas, Rumah Sakit Nasional)
+- **9+ tahun** sebagai CEO rumah sakit swasta nasional
+- **Ahli Hukum Perdata** dengan analisis 140+ kasus malpraktik medis Indonesia (2020–2025)
+- **Peneliti AI** dengan sitasi WHO dan konsultasi 67 pakar global
+- **Auditor** 27 organisasi healthcare internasional
+
+Pengalaman unik ini memberikan perspektif holistik: klinis, manajerial, legal, dan teknologi — yang semuanya terakumulasi dalam pembangunan Sentra Intelligence Dashboard.
+
+### Mengapa Sistem Ini Dibangun?
+
+**Problem Statement:**
+
+1. **Fragmentasi Sistem**  
+   Puskesmas PONED Balowerti menggunakan 5+ sistem terpisah:
+   - ePuskesmas (EMR pemerintah)
+   - SatuSehat (pelaporan Kemenkes)
+   - P-Care BPJS (klaim)
+   - Excel manual untuk LB1
+
+   Setiap sistem memerlukan login terpisah, input data berulang, dan tidak ada integrasi real-time.
+
+2. **Beban Administratif Klinisi**  
+   Dokter menghabiskan **40-60% waktu konsultasi** untuk input data ke EMR, bukan untuk patient care. Perawat dan bidan juga mengalami hal serupa.
+
+3. **Pelaporan Regulasi yang Manual**  
+   Laporan LB1 (Laporan Bulanan Puskesmas) memerlukan **3-5 hari kerja** setiap bulan untuk:
+   - Export data dari ePuskesmas
+   - Validasi manual di Excel
+   - Mapping ICD-10 ke template Kemenkes
+   - QC dan koreksi error
+
+4. **Tidak Ada Clinical Decision Support**  
+   Dokter di FKTP sering bekerja tanpa akses ke referensi klinis terkini, differential diagnosis tools, atau drug interaction checkers — terutama di luar jam kerja.
+
+5. **Keterbatasan Infrastruktur**  
+   Puskesmas memiliki:
+   - Internet tidak stabil (3-10 Mbps)
+   - Hardware terbatas (PC 5-7 tahun)
+   - Tidak ada tim IT dedicated
+   - Budget minimal untuk software licensing
+
+---
+
+## 2. CURRENT SITUATION: HEALTHCARE INDONESIA 2025
+
+### Landscape Digital Health Indonesia
+
+**Pemerintah (Kemenkes):**
+- **SatuSehat**: Platform nasional integrasi data kesehatan
+- **ePuskesmas**: EMR gratis untuk FKTP (disediakan pemerintah)
+- **P-Care**: Sistem klaim BPJS Kesehatan
+- **SIRANAP**: Sistem rujukan nasional
+
+**Swasta:**
+- **Halodoc, Alodokter**: Telemedicine B2C
+- **KlikDokter**: Health information portal
+
+---
+
+## 3. ARSITEKTUR SISTEM
+
+I designed the application with a monolithic architecture, centered around a custom Node.js server. This provides a tightly integrated system that is easier to manage and deploy.
+
+### Design Principles
+
+1. **Server-First Architecture**  
+   - Semua logika bisnis kritis di server
+   - Client = "dumb terminal" untuk rendering UI
+   - Session state di server (HMAC cookies)
+
+2. **Real-Time by Default**  
+   - Socket.IO untuk semua progress tracking
+   - No polling — push-based updates
+   - Optimistic UI updates
+
+3. **AI-Native, Not AI-Bolted-On**  
+   - CDSS embedded di workflow klinis
+   - Audrey (voice AI) terintegrasi native
+   - Embedding-based retrieval untuk knowledge base
+
+4. **RPA Where API Doesn't Exist**  
+   - ePuskesmas tidak punya public API -\> Playwright
+   - Session persistence untuk efisiensi
+   - Error handling dengan retry logic
+
+---
+
+## 4. TECHNOLOGY STACK
+
+### Core Technologies
+
+| Category | Technology | Version |
+| :--- | :--- | :--- |
+| **Framework** | Next.js | 16.1 (with App Router) |
+| **Language** | TypeScript | 5.9.3 (strict mode) |
+| **Runtime** | Node.js | \>=20.9.0 |
+| **UI Library** | React | 19.2.3 |
+| **Database ORM** | Prisma | 6.16.1 |
+| **Database** | PostgreSQL | via `pg` driver |
+| **Real-time Engine** | Socket.IO | 4.8.3 |
+| **AI & Voice** | Google Gemini Live | For "Audrey" voice assistant |
+| **Browser Automation**| Playwright | 1.58.2 (for EMR auto-fill) |
+| **Styling** | Vanilla CSS | Custom theme |
+
+---
+
+## 5. CLINICAL DECISION SUPPORT SYSTEM (CDSS) — DEEP DIVE
+
+### Iskandar Diagnosis Engine V2 (IDE-V2)
+
+**Arsitektur Detail:**
+
+**1. Vital Red Flags Check (Hardcoded Rules)**
+
+Rules:
+- Hipertensi Krisis: Sistolik \>= 180 mmHg -\> Emergency
+- Hipotensi/Syok: Sistolik \< 90 mmHg -\> Emergency
+- Hipoksia Berat: SpO2 \< 90% -\> Emergency
+- Takikardia Berat: HR \> 140 x/mnt -\> Urgent
+- Bradikardia Berat: HR \< 45 x/mnt -\> Urgent
+- Hiperpireksia: Suhu \>= 40°C -\> Urgent
+- Takipnea Berat: RR \> 30 x/mnt -\> Urgent
+- Bradipnea: RR \< 8 x/mnt -\> Emergency
+
+**2. Hybrid Disease Retrieval**
+
+- Vector similarity (kosong -\> fallback ke keyword)
+- Rank by combined score
+- Return top-18 untuk prompt context
+
+**4. LLM Reasoning**
+
+- clinical-specialized model
+- Temperature: 0.2 (deterministic)
+- Fallback: Gemini 2.5 Flash-Lite
+
+---
+
+## 6. MODUL & FITUR UTAMA
+
+Sentra Intelligence Dashboard mencakup berbagai modul untuk mendukung operasional Puskesmas secara menyeluruh, termasuk EMR Auto-Fill, ICD-X Finder, Reporting Automatis (LB1), Audrey Voice AI, dan Telemedicine.
+
+*Informasi lebih lanjut dapat ditemukan di dokumentasi fitur.*

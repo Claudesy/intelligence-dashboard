@@ -1,196 +1,186 @@
 // Masterplan and masterpiece by Claudesy.
-"use client";
+'use client'
 
-import { useCallback, useEffect, useState } from "react";
-import styles from "./AdminNotam.module.css";
+import { useCallback, useEffect, useState } from 'react'
+import styles from './AdminNotam.module.css'
 
 /* ── Types ── */
 
 interface NOTAMRecord {
-  id: string;
-  title: string;
-  body: string;
-  priority: "info" | "warning" | "urgent";
-  createdBy: string;
-  createdByName: string;
-  createdAt: string;
-  expiresAt: string | null;
-  active: boolean;
+  id: string
+  title: string
+  body: string
+  priority: 'info' | 'warning' | 'urgent'
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  expiresAt: string | null
+  active: boolean
 }
 
 /* ── Priority helpers ── */
 
 function priorityLabel(p: string): string {
   switch (p) {
-    case "urgent":
-      return "URGENT";
-    case "warning":
-      return "WARNING";
+    case 'urgent':
+      return 'URGENT'
+    case 'warning':
+      return 'WARNING'
     default:
-      return "INFO";
+      return 'INFO'
   }
 }
 
 function priorityBadgeClassName(p: string): string {
   switch (p) {
-    case "urgent":
-      return `${styles.badge} ${styles.badgeUrgent}`;
-    case "warning":
-      return `${styles.badge} ${styles.badgeWarning}`;
+    case 'urgent':
+      return `${styles.badge} ${styles.badgeUrgent}`
+    case 'warning':
+      return `${styles.badge} ${styles.badgeWarning}`
     default:
-      return `${styles.badge} ${styles.badgeInfo}`;
+      return `${styles.badge} ${styles.badgeInfo}`
   }
 }
 
 function formatDateTime(iso: string): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleString("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const d = new Date(iso)
+    return d.toLocaleString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   } catch {
-    return iso;
+    return iso
   }
 }
 
 function isExpired(expiresAt: string | null): boolean {
-  if (!expiresAt) return false;
-  return new Date(expiresAt) <= new Date();
+  if (!expiresAt) return false
+  return new Date(expiresAt) <= new Date()
 }
 
 /* ── Component ── */
 
 export default function AdminNotam() {
-  const [notams, setNotams] = useState<NOTAMRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [notams, setNotams] = useState<NOTAMRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   /* Create form state */
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [priority, setPriority] = useState<"info" | "warning" | "urgent">(
-    "info",
-  );
-  const [expiresAt, setExpiresAt] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [priority, setPriority] = useState<'info' | 'warning' | 'urgent'>('info')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   /* ── Fetch ── */
 
   const fetchNotams = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/notam", { cache: "no-store" });
+      const res = await fetch('/api/admin/notam', { cache: 'no-store' })
       if (!res.ok) {
-        setError("Gagal memuat data NOTAM.");
-        return;
+        setError('Gagal memuat data NOTAM.')
+        return
       }
-      const data = (await res.json()) as { ok: boolean; notams: NOTAMRecord[] };
+      const data = (await res.json()) as { ok: boolean; notams: NOTAMRecord[] }
       if (data.ok) {
-        setNotams(data.notams);
+        setNotams(data.notams)
       }
     } catch {
-      setError("Gagal memuat data NOTAM.");
+      setError('Gagal memuat data NOTAM.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    void fetchNotams();
-  }, [fetchNotams]);
+    void fetchNotams()
+  }, [fetchNotams])
 
   /* ── Create ── */
 
   async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-    setSubmitting(true);
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setSubmitting(true)
 
     try {
-      const res = await fetch("/api/admin/notam", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/admin/notam', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
           body: body.trim(),
           priority,
           expiresAt: expiresAt || null,
         }),
-      });
+      })
       const data = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        message?: string;
-      };
+        ok: boolean
+        error?: string
+        message?: string
+      }
       if (!data.ok) {
-        setError(data.error || "Gagal membuat NOTAM.");
-        return;
+        setError(data.error || 'Gagal membuat NOTAM.')
+        return
       }
 
-      setSuccess(data.message || "NOTAM berhasil dibuat.");
-      setTitle("");
-      setBody("");
-      setPriority("info");
-      setExpiresAt("");
-      void fetchNotams();
+      setSuccess(data.message || 'NOTAM berhasil dibuat.')
+      setTitle('')
+      setBody('')
+      setPriority('info')
+      setExpiresAt('')
+      void fetchNotams()
     } catch {
-      setError("Gagal membuat NOTAM.");
+      setError('Gagal membuat NOTAM.')
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
   }
 
   /* ── Deactivate ── */
 
   async function handleDeactivate(id: string) {
-    setError("");
-    setSuccess("");
+    setError('')
+    setSuccess('')
 
     try {
-      const res = await fetch(`/api/admin/notam/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/notam/${id}`, { method: 'DELETE' })
       const data = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        message?: string;
-      };
+        ok: boolean
+        error?: string
+        message?: string
+      }
       if (!data.ok) {
-        setError(data.error || "Gagal menonaktifkan NOTAM.");
-        return;
+        setError(data.error || 'Gagal menonaktifkan NOTAM.')
+        return
       }
 
-      setSuccess(data.message || "NOTAM dinonaktifkan.");
-      void fetchNotams();
+      setSuccess(data.message || 'NOTAM dinonaktifkan.')
+      void fetchNotams()
     } catch {
-      setError("Gagal menonaktifkan NOTAM.");
+      setError('Gagal menonaktifkan NOTAM.')
     }
   }
 
   /* ── Derived lists ── */
 
-  const activeNotams = notams.filter(
-    (n) => n.active && !isExpired(n.expiresAt),
-  );
-  const inactiveNotams = notams.filter(
-    (n) => !n.active || isExpired(n.expiresAt),
-  );
+  const activeNotams = notams.filter(n => n.active && !isExpired(n.expiresAt))
+  const inactiveNotams = notams.filter(n => !n.active || isExpired(n.expiresAt))
 
   /* ── Render ── */
 
   if (loading) {
-    return (
-      <div className={`${styles.statusMessage} ${styles.loadingMessage}`}>
-        Memuat NOTAM...
-      </div>
-    );
+    return <div className={`${styles.statusMessage} ${styles.loadingMessage}`}>Memuat NOTAM...</div>
   }
 
-  const errorClassName = `${styles.feedback} ${styles.feedbackError}`;
-  const successClassName = `${styles.feedback} ${styles.feedbackSuccess}`;
+  const errorClassName = `${styles.feedback} ${styles.feedbackError}`
+  const successClassName = `${styles.feedback} ${styles.feedbackSuccess}`
 
   return (
     <div className={styles.root}>
@@ -209,7 +199,7 @@ export default function AdminNotam() {
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               placeholder="Judul pengumuman..."
               required
               maxLength={200}
@@ -222,7 +212,7 @@ export default function AdminNotam() {
             <label className={styles.label}>Isi</label>
             <textarea
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={e => setBody(e.target.value)}
               placeholder="Isi pengumuman untuk seluruh crew..."
               required
               maxLength={2000}
@@ -237,9 +227,7 @@ export default function AdminNotam() {
               <label className={styles.label}>Prioritas</label>
               <select
                 value={priority}
-                onChange={(e) =>
-                  setPriority(e.target.value as "info" | "warning" | "urgent")
-                }
+                onChange={e => setPriority(e.target.value as 'info' | 'warning' | 'urgent')}
                 title="Prioritas notam"
                 aria-label="Prioritas notam"
                 className={styles.input}
@@ -254,7 +242,7 @@ export default function AdminNotam() {
               <input
                 type="datetime-local"
                 value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
+                onChange={e => setExpiresAt(e.target.value)}
                 title="Kedaluwarsa notam"
                 aria-label="Kedaluwarsa notam"
                 className={styles.input}
@@ -267,24 +255,20 @@ export default function AdminNotam() {
             disabled={submitting || !title.trim() || !body.trim()}
             className={styles.primaryButton}
           >
-            {submitting ? "Mengirim..." : "Terbitkan NOTAM"}
+            {submitting ? 'Mengirim...' : 'Terbitkan NOTAM'}
           </button>
         </form>
       </div>
 
       {/* ── Active NOTAMs ── */}
       <div>
-        <p className={styles.sectionKick}>
-          NOTAM AKTIF ({activeNotams.length})
-        </p>
+        <p className={styles.sectionKick}>NOTAM AKTIF ({activeNotams.length})</p>
 
         {activeNotams.length === 0 ? (
-          <div className={styles.emptyState}>
-            Tidak ada NOTAM aktif saat ini.
-          </div>
+          <div className={styles.emptyState}>Tidak ada NOTAM aktif saat ini.</div>
         ) : (
           <div className={styles.cardList}>
-            {activeNotams.map((n) => (
+            {activeNotams.map(n => (
               <div key={n.id} className={styles.activeCard}>
                 <div className={styles.cardHeader}>
                   <div className={styles.cardBody}>
@@ -298,15 +282,10 @@ export default function AdminNotam() {
                     <div className={styles.metaRow}>
                       <span>Oleh: {n.createdByName}</span>
                       <span>{formatDateTime(n.createdAt)}</span>
-                      {n.expiresAt && (
-                        <span>Kedaluwarsa: {formatDateTime(n.expiresAt)}</span>
-                      )}
+                      {n.expiresAt && <span>Kedaluwarsa: {formatDateTime(n.expiresAt)}</span>}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDeactivate(n.id)}
-                    className={styles.dangerButton}
-                  >
+                  <button onClick={() => handleDeactivate(n.id)} className={styles.dangerButton}>
                     NONAKTIFKAN
                   </button>
                 </div>
@@ -323,27 +302,22 @@ export default function AdminNotam() {
             RIWAYAT ({inactiveNotams.length})
           </p>
           <div className={styles.historyList}>
-            {inactiveNotams.map((n) => (
-              <div
-                key={n.id}
-                className={`${styles.historyCard} ${styles.historyCardMuted}`}
-              >
+            {inactiveNotams.map(n => (
+              <div key={n.id} className={`${styles.historyCard} ${styles.historyCardMuted}`}>
                 <div className={styles.historyTitleRow}>
                   <span className={priorityBadgeClassName(n.priority)}>
                     {priorityLabel(n.priority)}
                   </span>
                   <span className={styles.historyTitle}>{n.title}</span>
                   <span className={styles.historyBadge}>
-                    {!n.active ? "NONAKTIF" : "KEDALUWARSA"}
+                    {!n.active ? 'NONAKTIF' : 'KEDALUWARSA'}
                   </span>
                 </div>
                 <p className={styles.historyText}>{n.body}</p>
                 <div className={styles.historyMetaRow}>
                   <span>Oleh: {n.createdByName}</span>
                   <span>{formatDateTime(n.createdAt)}</span>
-                  {n.expiresAt && (
-                    <span>Kedaluwarsa: {formatDateTime(n.expiresAt)}</span>
-                  )}
+                  {n.expiresAt && <span>Kedaluwarsa: {formatDateTime(n.expiresAt)}</span>}
                 </div>
               </div>
             ))}
@@ -351,5 +325,5 @@ export default function AdminNotam() {
         </div>
       )}
     </div>
-  );
+  )
 }

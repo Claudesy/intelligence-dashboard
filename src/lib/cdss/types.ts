@@ -59,6 +59,8 @@ export interface CDSSEngineInput {
   trajectory_context?: CDSSTrajectoryContext
   // Phase 3: Structured bedside triage signs from Assist/bedside (text summary — avoids cross-module coupling)
   structured_signs_text?: string
+  // Phase 4: Composite deterioration summary from multi-syndrome bedside/trend orchestrator
+  deterioration_summary_text?: string
 }
 
 export interface ValidatedSuggestion {

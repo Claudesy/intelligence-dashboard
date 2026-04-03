@@ -3,35 +3,35 @@
 // PKM Dashboard — LiveKit Token Generation Helper
 // ============================================================
 
-import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
-import type { SessionParticipantRole } from "@/types/telemedicine.types";
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk'
+import type { SessionParticipantRole } from '@/types/telemedicine.types'
 
-const LIVEKIT_URL = process.env.LIVEKIT_URL ?? "";
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY ?? "";
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET ?? "";
+const LIVEKIT_URL = process.env.LIVEKIT_URL ?? ''
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY ?? ''
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET ?? ''
 
 export function getLiveKitConfig(): {
-  url: string;
-  apiKey: string;
-  apiSecret: string;
+  url: string
+  apiKey: string
+  apiSecret: string
 } {
   return {
     url: LIVEKIT_URL,
     apiKey: LIVEKIT_API_KEY,
     apiSecret: LIVEKIT_API_SECRET,
-  };
+  }
 }
 
 export function isLiveKitConfigured(): boolean {
-  return !!(LIVEKIT_URL && LIVEKIT_API_KEY && LIVEKIT_API_SECRET);
+  return !!(LIVEKIT_URL && LIVEKIT_API_KEY && LIVEKIT_API_SECRET)
 }
 
 interface GenerateTokenParams {
-  roomName: string;
-  participantIdentity: string;
-  participantName: string;
-  participantRole: SessionParticipantRole;
-  metadata?: string;
+  roomName: string
+  participantIdentity: string
+  participantName: string
+  participantRole: SessionParticipantRole
+  metadata?: string
 }
 
 /**
@@ -39,20 +39,20 @@ interface GenerateTokenParams {
  * DOCTOR/NURSE bisa publish (mic+camera), PATIENT bisa publish, OBSERVER hanya subscribe.
  */
 function getGrantsForRole(role: SessionParticipantRole): {
-  canPublish: boolean;
-  canSubscribe: boolean;
-  canPublishData: boolean;
+  canPublish: boolean
+  canSubscribe: boolean
+  canPublishData: boolean
 } {
   switch (role) {
-    case "DOCTOR":
-    case "NURSE":
-      return { canPublish: true, canSubscribe: true, canPublishData: true };
-    case "PATIENT":
-      return { canPublish: true, canSubscribe: true, canPublishData: true };
-    case "OBSERVER":
-      return { canPublish: false, canSubscribe: true, canPublishData: false };
+    case 'DOCTOR':
+    case 'NURSE':
+      return { canPublish: true, canSubscribe: true, canPublishData: true }
+    case 'PATIENT':
+      return { canPublish: true, canSubscribe: true, canPublishData: true }
+    case 'OBSERVER':
+      return { canPublish: false, canSubscribe: true, canPublishData: false }
     default:
-      return { canPublish: false, canSubscribe: true, canPublishData: false };
+      return { canPublish: false, canSubscribe: true, canPublishData: false }
   }
 }
 
@@ -63,14 +63,14 @@ export async function generateLiveKitToken({
   participantRole,
   metadata,
 }: GenerateTokenParams): Promise<string> {
-  const grants = getGrantsForRole(participantRole);
+  const grants = getGrantsForRole(participantRole)
 
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity: participantIdentity,
     name: participantName,
     metadata: metadata ?? JSON.stringify({ role: participantRole }),
-    ttl: "4h",
-  });
+    ttl: '4h',
+  })
 
   at.addGrant({
     roomJoin: true,
@@ -78,9 +78,9 @@ export async function generateLiveKitToken({
     canPublish: grants.canPublish,
     canSubscribe: grants.canSubscribe,
     canPublishData: grants.canPublishData,
-  });
+  })
 
-  return await at.toJwt();
+  return await at.toJwt()
 }
 
 /**
@@ -88,17 +88,13 @@ export async function generateLiveKitToken({
  * RoomServiceClient digunakan untuk provisi room di server LiveKit.
  */
 export async function ensureLiveKitRoom(roomName: string): Promise<void> {
-  const svc = new RoomServiceClient(
-    LIVEKIT_URL,
-    LIVEKIT_API_KEY,
-    LIVEKIT_API_SECRET,
-  );
+  const svc = new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
   try {
     await svc.createRoom({
       name: roomName,
       emptyTimeout: 300,
       maxParticipants: 10,
-    });
+    })
   } catch {
     // Room mungkin sudah ada — tidak masalah
   }

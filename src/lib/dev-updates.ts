@@ -1,14 +1,14 @@
 // Masterplan and masterpiece by Claudesy.
-export type DevUpdateCategory = "release" | "improvement" | "maintenance";
+export type DevUpdateCategory = 'release' | 'improvement' | 'maintenance'
 
 export interface DevUpdateRecord {
-  id: string;
-  title: string;
-  body: string;
-  category: DevUpdateCategory;
-  createdBy: string;
-  createdByName: string;
-  createdAt: string;
-  expiresAt: string | null;
-  active: boolean;
+  id: string
+  title: string
+  body: string
+  category: DevUpdateCategory
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  expiresAt: string | null
+  active: boolean
 }

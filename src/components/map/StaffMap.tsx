@@ -1,41 +1,41 @@
 // The vision and craft of Claudesy.
-"use client";
+'use client'
 
-import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import L from 'leaflet'
+import React, { useEffect, useState } from 'react'
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type StaffLocation = {
-  id: string;
-  name: string;
-  role: string;
-  institution?: string;
-  isOnline: boolean;
-  gender: "male" | "female";
-  avatarUrl?: string;
+  id: string
+  name: string
+  role: string
+  institution?: string
+  isOnline: boolean
+  gender: 'male' | 'female'
+  avatarUrl?: string
   location: {
-    lat: number;
-    lng: number;
-    label: string;
-  };
-  lastSeen?: string;
-  color: string;
-};
+    lat: number
+    lng: number
+    label: string
+  }
+  lastSeen?: string
+  color: string
+}
 
 // ─── Avatar Marker with Name Label ────────────────────────────────────────────
 function createAvatarIcon(isOnline: boolean, avatarUrl: string, name: string) {
-  const size = 64;
+  const size = 64
   const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
+    .split(' ')
+    .map(n => n[0])
+    .join('')
     .substring(0, 2)
-    .toUpperCase();
+    .toUpperCase()
 
   return L.divIcon({
-    className: "scars-avatar-marker",
+    className: 'scars-avatar-marker',
     html: `
       <div style="
         display: flex;
@@ -55,7 +55,7 @@ function createAvatarIcon(isOnline: boolean, avatarUrl: string, name: string) {
           box-shadow:
             4px 4px 10px rgba(0,0,0,0.5),
             -2px -2px 6px rgba(255,255,255,0.08);
-          border: 2px solid ${isOnline ? "#3B82F6" : "#555"};
+          border: 2px solid ${isOnline ? '#3B82F6' : '#555'};
         ">
           <!-- Avatar Image -->
           <img
@@ -92,7 +92,7 @@ function createAvatarIcon(isOnline: boolean, avatarUrl: string, name: string) {
               z-index: 10;
             "></div>
           `
-              : ""
+              : ''
           }
         </div>
         
@@ -101,7 +101,7 @@ function createAvatarIcon(isOnline: boolean, avatarUrl: string, name: string) {
           background: rgba(26,26,26,0.95);
           padding: 4px 10px;
           border-radius: 12px;
-          border: 1px solid ${isOnline ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"};
+          border: 1px solid ${isOnline ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.1)'};
           box-shadow: 0 2px 8px rgba(0,0,0,0.4);
           white-space: nowrap;
         ">
@@ -110,7 +110,7 @@ function createAvatarIcon(isOnline: boolean, avatarUrl: string, name: string) {
             font-size: 11px;
             font-weight: 600;
             letter-spacing: 0.05em;
-            color: ${isOnline ? "#4ADE80" : "#888"};
+            color: ${isOnline ? '#4ADE80' : '#888'};
             text-transform: uppercase;
           ">${initials}</span>
         </div>
@@ -119,26 +119,26 @@ function createAvatarIcon(isOnline: boolean, avatarUrl: string, name: string) {
     iconSize: [size + 8, size + 40],
     iconAnchor: [(size + 8) / 2, (size + 40) / 2],
     popupAnchor: [0, -(size / 2)],
-  });
+  })
 }
 
 // ─── Map Controller (for centering) ───────────────────────────────────────────
 function MapController({ center }: { center: [number, number] }) {
-  const map = useMap();
+  const map = useMap()
   useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
-  return null;
+    map.setView(center, map.getZoom())
+  }, [center, map])
+  return null
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 type StaffMapProps = {
-  staff: StaffLocation[];
-  center?: [number, number];
-  zoom?: number;
-  onStaffClick?: (staff: StaffLocation) => void;
-  selectedStaffId?: string | null;
-};
+  staff: StaffLocation[]
+  center?: [number, number]
+  zoom?: number
+  onStaffClick?: (staff: StaffLocation) => void
+  selectedStaffId?: string | null
+}
 
 export default function StaffMap({
   staff,
@@ -146,36 +146,36 @@ export default function StaffMap({
   zoom = 19,
   onStaffClick,
 }: StaffMapProps) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    setMounted(true)
+  }, [])
 
   if (!mounted) {
     return (
       <div
         style={{
-          width: "100%",
-          height: "100%",
-          background: "#1a1a1a",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#666",
-          fontFamily: "var(--font-mono)",
+          width: '100%',
+          height: '100%',
+          background: '#1a1a1a',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontFamily: 'var(--font-mono)',
           fontSize: 13,
         }}
       >
         LOADING MAP...
       </div>
-    );
+    )
   }
 
-  const onlineCount = staff.filter((s) => s.isOnline).length;
+  const onlineCount = staff.filter(s => s.isOnline).length
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       {/* Custom CSS */}
       <style>{`
         @keyframes pulse-dot {
@@ -215,42 +215,42 @@ export default function StaffMap({
       {/* Status Overlay */}
       <div
         style={{
-          position: "absolute",
+          position: 'absolute',
           top: 16,
           left: 16,
           zIndex: 1000,
-          display: "flex",
+          display: 'flex',
           gap: 10,
         }}
       >
         <div
           style={{
-            background: "rgba(26,26,26,0.95)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: 'rgba(26,26,26,0.95)',
+            border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 8,
-            padding: "8px 14px",
-            display: "flex",
-            alignItems: "center",
+            padding: '8px 14px',
+            display: 'flex',
+            alignItems: 'center',
             gap: 8,
-            boxShadow: "4px 4px 12px rgba(0,0,0,0.4)",
+            boxShadow: '4px 4px 12px rgba(0,0,0,0.4)',
           }}
         >
           <div
             style={{
               width: 10,
               height: 10,
-              borderRadius: "50%",
-              background: "#3B82F6",
-              boxShadow: "0 0 8px #3B82F6",
+              borderRadius: '50%',
+              background: '#3B82F6',
+              boxShadow: '0 0 8px #3B82F6',
             }}
           />
           <span
             style={{
-              fontFamily: "var(--font-mono)",
+              fontFamily: 'var(--font-mono)',
               fontSize: 12,
               fontWeight: 600,
-              letterSpacing: "0.1em",
-              color: "#3B82F6",
+              letterSpacing: '0.1em',
+              color: '#3B82F6',
             }}
           >
             {onlineCount} ONLINE
@@ -262,7 +262,7 @@ export default function StaffMap({
       <MapContainer
         center={center}
         zoom={zoom}
-        style={{ width: "100%", height: "100%", background: "#1a1a1a" }}
+        style={{ width: '100%', height: '100%', background: '#1a1a1a' }}
         zoomControl={false}
       >
         {/* Dark Theme Tiles - CartoDB Dark Matter */}
@@ -276,14 +276,14 @@ export default function StaffMap({
         <MapController center={center} />
 
         {/* Staff Markers with Avatar + Name */}
-        {staff.map((person) => (
+        {staff.map(person => (
           <Marker
             key={person.id}
             position={[person.location.lat, person.location.lng]}
             icon={createAvatarIcon(
               person.isOnline,
-              person.avatarUrl || "/avatar/doctor-m.png",
-              person.name,
+              person.avatarUrl || '/avatar/doctor-m.png',
+              person.name
             )}
             eventHandlers={{
               click: () => onStaffClick?.(person),
@@ -292,115 +292,113 @@ export default function StaffMap({
             <Popup closeButton={false}>
               <div
                 style={{
-                  overflow: "hidden",
+                  overflow: 'hidden',
                   padding: 20,
-                  position: "relative",
+                  position: 'relative',
                   width: 240,
-                  background: "#262626",
+                  background: '#262626',
                   borderRadius: 16,
                 }}
               >
                 {/* Animated orbs */}
                 <div
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     top: -12,
                     left: -12,
                     width: 96,
                     height: 96,
-                    borderRadius: "50%",
-                    background: "transparent",
+                    borderRadius: '50%',
+                    background: 'transparent',
                     boxShadow: `inset 0 0 30px ${person.color}60`,
-                    animation: "orb-drift-1 6s ease-in-out infinite",
+                    animation: 'orb-drift-1 6s ease-in-out infinite',
                   }}
                 />
                 <div
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     top: 140,
                     left: 56,
                     width: 96,
                     height: 96,
-                    borderRadius: "50%",
-                    background: "transparent",
-                    boxShadow: "inset 0 0 30px rgba(59,130,246,0.35)",
-                    animation: "orb-drift-2 7s ease-in-out infinite",
+                    borderRadius: '50%',
+                    background: 'transparent',
+                    boxShadow: 'inset 0 0 30px rgba(59,130,246,0.35)',
+                    animation: 'orb-drift-2 7s ease-in-out infinite',
                   }}
                 />
                 <div
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     top: 60,
                     left: 180,
                     width: 96,
                     height: 96,
-                    borderRadius: "50%",
-                    background: "transparent",
+                    borderRadius: '50%',
+                    background: 'transparent',
                     boxShadow: `inset 0 0 30px ${person.color}40`,
-                    animation: "orb-drift-3 8s ease-in-out infinite",
+                    animation: 'orb-drift-3 8s ease-in-out infinite',
                   }}
                 />
                 <div
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     top: 20,
                     left: 20,
                     width: 48,
                     height: 48,
-                    borderRadius: "50%",
-                    background: "transparent",
-                    boxShadow: "inset 0 0 20px rgba(74,222,128,0.3)",
-                    animation: "orb-drift-2 5s ease-in-out infinite",
+                    borderRadius: '50%',
+                    background: 'transparent',
+                    boxShadow: 'inset 0 0 20px rgba(74,222,128,0.3)',
+                    animation: 'orb-drift-2 5s ease-in-out infinite',
                   }}
                 />
                 <div
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     top: -24,
                     left: -12,
                     width: 200,
                     height: 200,
-                    borderRadius: "50%",
-                    background: "transparent",
-                    boxShadow: "inset 0 0 40px rgba(59,130,246,0.15)",
-                    animation: "orb-drift-3 10s ease-in-out infinite",
+                    borderRadius: '50%',
+                    background: 'transparent',
+                    boxShadow: 'inset 0 0 40px rgba(59,130,246,0.15)',
+                    animation: 'orb-drift-3 10s ease-in-out infinite',
                   }}
                 />
 
                 {/* Content overlay */}
                 <div
                   style={{
-                    position: "relative",
+                    position: 'relative',
                     zIndex: 1,
-                    background: "rgba(64,64,64,0.45)",
+                    background: 'rgba(64,64,64,0.45)',
                     borderRadius: 12,
                     padding: 16,
-                    display: "flex",
-                    flexDirection: "column",
+                    display: 'flex',
+                    flexDirection: 'column',
                     gap: 10,
-                    backdropFilter: "blur(4px)",
+                    backdropFilter: 'blur(4px)',
                   }}
                 >
                   {/* Avatar + status */}
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 12 }}
-                  >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div
                       style={{
                         width: 48,
                         height: 48,
-                        borderRadius: "50%",
-                        overflow: "hidden",
+                        borderRadius: '50%',
+                        overflow: 'hidden',
                         flexShrink: 0,
                         border: `2px solid ${person.color}`,
                         boxShadow: `0 0 10px ${person.color}40`,
                       }}
                     >
                       <img
-                        src={person.avatarUrl || "/avatar/doctor-m.png"}
+                        src={person.avatarUrl || '/avatar/doctor-m.png'}
                         width={48}
                         height={48}
-                        style={{ objectFit: "cover", display: "block" }}
+                        style={{ objectFit: 'cover', display: 'block' }}
                         alt=""
                       />
                     </div>
@@ -409,8 +407,8 @@ export default function StaffMap({
                         style={{
                           fontSize: 15,
                           fontWeight: 700,
-                          color: "#fafafa",
-                          fontStyle: "italic",
+                          color: '#fafafa',
+                          fontStyle: 'italic',
                           lineHeight: 1.2,
                         }}
                       >
@@ -419,10 +417,10 @@ export default function StaffMap({
                       <div
                         style={{
                           fontSize: 11,
-                          color: "#d4d4d4",
-                          letterSpacing: "0.08em",
+                          color: '#d4d4d4',
+                          letterSpacing: '0.08em',
                           marginTop: 2,
-                          textTransform: "uppercase",
+                          textTransform: 'uppercase',
                         }}
                       >
                         {person.role}
@@ -431,31 +429,27 @@ export default function StaffMap({
                   </div>
 
                   {/* Info */}
-                  <div
-                    style={{ fontSize: 12, color: "#d4d4d4", lineHeight: 1.5 }}
-                  >
-                    {person.institution || "Puskesmas Balowerti"}
+                  <div style={{ fontSize: 12, color: '#d4d4d4', lineHeight: 1.5 }}>
+                    {person.institution || 'Puskesmas Balowerti'}
                   </div>
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                     }}
                   >
-                    <span style={{ fontSize: 11, color: "#a3a3a3" }}>
-                      {person.location.label}
-                    </span>
+                    <span style={{ fontSize: 11, color: '#a3a3a3' }}>{person.location.label}</span>
                     {person.isOnline && (
                       <span
                         style={{
                           fontSize: 10,
                           fontWeight: 600,
-                          letterSpacing: "0.1em",
-                          color: "#4ADE80",
-                          padding: "2px 8px",
+                          letterSpacing: '0.1em',
+                          color: '#4ADE80',
+                          padding: '2px 8px',
                           borderRadius: 4,
-                          border: "1px solid rgba(74,222,128,0.3)",
+                          border: '1px solid rgba(74,222,128,0.3)',
                         }}
                       >
                         LIVE
@@ -469,5 +463,5 @@ export default function StaffMap({
         ))}
       </MapContainer>
     </div>
-  );
+  )
 }
